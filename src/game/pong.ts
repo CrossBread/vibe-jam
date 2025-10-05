@@ -1,3 +1,5 @@
+import defaultDevConfig from './devConfig.json'
+
 export interface PongState {
   leftScore: number
   rightScore: number
@@ -45,8 +47,9 @@ export function createPong(
   const BALL_R = 8
   const WIN_SCORE = 11
 
-  const config = createDevConfig()
-  const overlay = createDevOverlay(config)
+  const defaults = createDevConfig()
+  const config = deepClone(defaults)
+  const overlay = createDevOverlay(config, defaults)
   canvas.parentElement?.appendChild(overlay)
 
   const keys: KeySet = {}
@@ -153,8 +156,10 @@ export function createPong(
     const dy = sinkY - state.ballY
     const dist = Math.hypot(dx, dy) || 1
     const prevVx = state.vx
-    if (config.gravityEnabled) {
-      const force = config.gravityStrength / (dist * dist + config.gravityFalloff)
+    const blackHole = config.modifiers.arena.blackHole
+    if (blackHole.enabled) {
+      const force =
+        blackHole.gravityStrength / (dist * dist + blackHole.gravityFalloff)
       const ax = (dx / dist) * force
       const ay = (dy / dist) * force
       state.vx += ax * dt
@@ -239,21 +244,23 @@ export function createPong(
     ctx.stroke()
     ctx.setLineDash([])
 
-    const sinkGradient = ctx.createRadialGradient(
-      W / 2,
-      H / 2,
-      0,
-      W / 2,
-      H / 2,
-      40,
-    )
-    sinkGradient.addColorStop(0, 'rgba(148, 163, 184, 0.75)')
-    sinkGradient.addColorStop(0.45, 'rgba(148, 163, 184, 0.35)')
-    sinkGradient.addColorStop(1, 'rgba(15, 23, 42, 0)')
-    ctx.fillStyle = sinkGradient
-    ctx.beginPath()
-    ctx.arc(W / 2, H / 2, 40, 0, Math.PI * 2)
-    ctx.fill()
+    if (config.modifiers.arena.blackHole.enabled) {
+      const sinkGradient = ctx.createRadialGradient(
+        W / 2,
+        H / 2,
+        0,
+        W / 2,
+        H / 2,
+        40,
+      )
+      sinkGradient.addColorStop(0, 'rgba(148, 163, 184, 0.75)')
+      sinkGradient.addColorStop(0.45, 'rgba(148, 163, 184, 0.35)')
+      sinkGradient.addColorStop(1, 'rgba(15, 23, 42, 0)')
+      ctx.fillStyle = sinkGradient
+      ctx.beginPath()
+      ctx.arc(W / 2, H / 2, 40, 0, Math.PI * 2)
+      ctx.fill()
+    }
 
     ctx.fillStyle = '#e7ecf3'
     ctx.fillRect(40, state.leftY, PADDLE_W, PADDLE_H)
@@ -282,26 +289,43 @@ export function createPong(
   return { state, reset, tick }
 }
 
+interface ModifierBase {
+  name: string
+  description: string
+  enabled: boolean
+}
+
+interface BlackHoleModifier extends ModifierBase {
+  gravityStrength: number
+  gravityFalloff: number
+}
+
+interface ArenaModifiers {
+  blackHole: BlackHoleModifier
+}
+
+interface ModifiersConfig {
+  arena: ArenaModifiers
+  ball: Record<string, unknown>
+  paddle: Record<string, unknown>
+}
+
 interface DevConfig {
   paddleSpeed: number
   baseBallSpeed: number
   minHorizontalRatio: number
-  gravityStrength: number
-  gravityFalloff: number
-  gravityEnabled: boolean
   speedIncreaseOnHit: number
+  modifiers: ModifiersConfig
 }
 
+const DEFAULT_DEV_CONFIG: DevConfig = defaultDevConfig as DevConfig
+
 function createDevConfig(): DevConfig {
-  return {
-    paddleSpeed: 310,
-    baseBallSpeed: 320,
-    minHorizontalRatio: 0.35,
-    gravityStrength: 4_800_000,
-    gravityFalloff: 12_000,
-    gravityEnabled: true,
-    speedIncreaseOnHit: 1.03
-  }
+  return deepClone(DEFAULT_DEV_CONFIG)
+}
+
+function deepClone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value))
 }
 
 let devOverlayStylesInjected = false
@@ -314,7 +338,7 @@ function ensureDevOverlayStyles() {
       position: fixed;
       top: 16px;
       right: 16px;
-      width: 260px;
+      width: 280px;
       padding: 16px;
       border-radius: 12px;
       background: rgba(15, 23, 42, 0.95);
@@ -338,12 +362,14 @@ function ensureDevOverlayStyles() {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 12px;
     }
     .dev-overlay__hint {
       color: rgba(226, 232, 240, 0.65);
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.08em;
+      white-space: nowrap;
     }
     .dev-overlay__controls {
       display: flex;
@@ -360,10 +386,70 @@ function ensureDevOverlayStyles() {
       align-items: center;
       justify-content: space-between;
       font-weight: 500;
+      gap: 8px;
     }
     .dev-overlay__value {
       font-variant-numeric: tabular-nums;
       color: rgba(226, 232, 240, 0.85);
+    }
+    .dev-overlay__section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-top: 12px;
+      margin-top: 12px;
+      border-top: 1px solid rgba(148, 163, 184, 0.35);
+    }
+    .dev-overlay__section-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(226, 232, 240, 0.7);
+    }
+    .dev-overlay__modifier {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px;
+      border-radius: 10px;
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+    }
+    .dev-overlay__description {
+      margin: 0;
+      color: rgba(226, 232, 240, 0.65);
+      font-size: 12px;
+    }
+    .dev-overlay__buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .dev-overlay__button {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      background: rgba(56, 189, 248, 0.12);
+      color: #e0f2fe;
+      font-weight: 500;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+    .dev-overlay__button:hover {
+      background: rgba(56, 189, 248, 0.22);
+      border-color: rgba(56, 189, 248, 0.65);
+    }
+    .dev-overlay__status {
+      margin-top: 8px;
+      min-height: 16px;
+      font-size: 11px;
+      color: rgba(226, 232, 240, 0.65);
+    }
+    .dev-overlay__status--error {
+      color: #fca5a5;
     }
     .dev-overlay input[type="range"] {
       width: 100%;
@@ -377,7 +463,7 @@ function ensureDevOverlayStyles() {
   devOverlayStylesInjected = true
 }
 
-function createDevOverlay(config: DevConfig): HTMLDivElement {
+function createDevOverlay(config: DevConfig, defaults: DevConfig): HTMLDivElement {
   ensureDevOverlayStyles()
 
   const overlay = document.createElement('div')
@@ -396,76 +482,202 @@ function createDevOverlay(config: DevConfig): HTMLDivElement {
   const controls = document.createElement('div')
   controls.className = 'dev-overlay__controls'
 
-  controls.appendChild(
-    createSliderControl('Paddle Speed', config.paddleSpeed, {
-      min: 100,
-      max: 600,
-      step: 10,
-      format: v => `${Math.round(v)} px/s`,
-      onInput: v => (config.paddleSpeed = v)
-    })
-  )
+  const buttons = document.createElement('div')
+  buttons.className = 'dev-overlay__buttons'
 
-  controls.appendChild(
-    createSliderControl('Ball Base Speed', config.baseBallSpeed, {
-      min: 120,
-      max: 600,
-      step: 10,
-      format: v => `${Math.round(v)} px/s`,
-      onInput: v => (config.baseBallSpeed = v)
-    })
-  )
+  const status = document.createElement('div')
+  status.className = 'dev-overlay__status'
 
-  controls.appendChild(
-    createSliderControl('Min Horizontal Ratio', config.minHorizontalRatio, {
-      min: 0.1,
-      max: 1,
-      step: 0.01,
-      format: v => v.toFixed(2),
-      onInput: v => (config.minHorizontalRatio = v)
-    })
-  )
+  function setStatus(message: string, variant: 'default' | 'error' = 'default') {
+    status.textContent = message
+    status.classList.toggle('dev-overlay__status--error', variant === 'error')
+  }
 
-  controls.appendChild(
-    createSliderControl('Gravity Strength', config.gravityStrength, {
-      min: 0,
-      max: 8_000_000,
-      step: 100_000,
-      format: v => `${Math.round(v).toLocaleString()} ƒ`,
-      onInput: v => (config.gravityStrength = v)
-    })
-  )
+  function renderControls() {
+    controls.innerHTML = ''
 
-  controls.appendChild(
-    createSliderControl('Gravity Falloff', config.gravityFalloff, {
-      min: 0,
-      max: 30_000,
-      step: 500,
-      format: v => `${Math.round(v).toLocaleString()}`,
-      onInput: v => (config.gravityFalloff = v)
-    })
-  )
+    controls.appendChild(
+      createSliderControl('Paddle Speed', config.paddleSpeed, {
+        min: 100,
+        max: 600,
+        step: 10,
+        format: v => `${Math.round(v)} px/s`,
+        onInput: v => (config.paddleSpeed = v)
+      })
+    )
 
-  controls.appendChild(
-    createSliderControl('Hit Speed Multiplier', config.speedIncreaseOnHit, {
-      min: 1,
-      max: 1.3,
-      step: 0.01,
-      format: v => v.toFixed(2) + '×',
-      onInput: v => (config.speedIncreaseOnHit = v)
-    })
-  )
+    controls.appendChild(
+      createSliderControl('Ball Base Speed', config.baseBallSpeed, {
+        min: 120,
+        max: 600,
+        step: 10,
+        format: v => `${Math.round(v)} px/s`,
+        onInput: v => (config.baseBallSpeed = v)
+      })
+    )
 
-  controls.appendChild(
-    createToggleControl('Enable Gravity Well', config.gravityEnabled, enabled => {
-      config.gravityEnabled = enabled
+    controls.appendChild(
+      createSliderControl('Min Horizontal Ratio', config.minHorizontalRatio, {
+        min: 0.1,
+        max: 1,
+        step: 0.01,
+        format: v => v.toFixed(2),
+        onInput: v => (config.minHorizontalRatio = v)
+      })
+    )
+
+    controls.appendChild(
+      createSliderControl('Hit Speed Multiplier', config.speedIncreaseOnHit, {
+        min: 1,
+        max: 1.3,
+        step: 0.01,
+        format: v => v.toFixed(2) + '×',
+        onInput: v => (config.speedIncreaseOnHit = v)
+      })
+    )
+
+    const arenaSection = document.createElement('div')
+    arenaSection.className = 'dev-overlay__section'
+
+    const arenaTitle = document.createElement('div')
+    arenaTitle.className = 'dev-overlay__section-title'
+    arenaTitle.textContent = 'Arena Modifiers'
+    arenaSection.appendChild(arenaTitle)
+
+    const blackHole = config.modifiers.arena.blackHole
+    const blackHoleWrapper = document.createElement('div')
+    blackHoleWrapper.className = 'dev-overlay__modifier'
+
+    const blackHoleHeader = document.createElement('div')
+    blackHoleHeader.className = 'dev-overlay__label'
+
+    const blackHoleTitle = document.createElement('span')
+    blackHoleTitle.textContent = blackHole.name
+
+    const blackHoleToggle = document.createElement('input')
+    blackHoleToggle.type = 'checkbox'
+    blackHoleToggle.checked = blackHole.enabled
+    blackHoleToggle.addEventListener('change', () => {
+      blackHole.enabled = blackHoleToggle.checked
     })
-  )
+
+    blackHoleHeader.appendChild(blackHoleTitle)
+    blackHoleHeader.appendChild(blackHoleToggle)
+    blackHoleWrapper.appendChild(blackHoleHeader)
+
+    const blackHoleDescription = document.createElement('p')
+    blackHoleDescription.className = 'dev-overlay__description'
+    blackHoleDescription.textContent = blackHole.description
+    blackHoleWrapper.appendChild(blackHoleDescription)
+
+    blackHoleWrapper.appendChild(
+      createSliderControl('Gravity Strength', blackHole.gravityStrength, {
+        min: 0,
+        max: 8_000_000,
+        step: 100_000,
+        format: v => `${Math.round(v).toLocaleString()} ƒ`,
+        onInput: v => (blackHole.gravityStrength = v)
+      })
+    )
+
+    blackHoleWrapper.appendChild(
+      createSliderControl('Gravity Falloff', blackHole.gravityFalloff, {
+        min: 0,
+        max: 30_000,
+        step: 500,
+        format: v => `${Math.round(v).toLocaleString()}`,
+        onInput: v => (blackHole.gravityFalloff = v)
+      })
+    )
+
+    arenaSection.appendChild(blackHoleWrapper)
+    controls.appendChild(arenaSection)
+  }
+
+  renderControls()
+
+  const copyButton = createOverlayButton('Copy Config JSON')
+  copyButton.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(config, null, 2))
+      setStatus('Config copied to clipboard.')
+    } catch (error) {
+      console.error(error)
+      setStatus('Unable to copy config to clipboard.', 'error')
+    }
+  })
+
+  const loadButton = createOverlayButton('Load from Clipboard')
+  loadButton.addEventListener('click', async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      const parsed = JSON.parse(text) as unknown
+      if (!isDevConfig(parsed)) {
+        setStatus('Clipboard contents are not a valid config.', 'error')
+        return
+      }
+      applyConfig(config, parsed)
+      renderControls()
+      setStatus('Configuration loaded from clipboard.')
+    } catch (error) {
+      console.error(error)
+      setStatus('Failed to load config from clipboard.', 'error')
+    }
+  })
+
+  const resetButton = createOverlayButton('Reset to Defaults')
+  resetButton.addEventListener('click', () => {
+    applyConfig(config, defaults)
+    renderControls()
+    setStatus('Configuration reset to defaults.')
+  })
+
+  buttons.appendChild(copyButton)
+  buttons.appendChild(loadButton)
+  buttons.appendChild(resetButton)
 
   overlay.appendChild(title)
   overlay.appendChild(controls)
+  overlay.appendChild(buttons)
+  overlay.appendChild(status)
 
   return overlay
+}
+
+function applyConfig(target: DevConfig, source: DevConfig) {
+  target.paddleSpeed = source.paddleSpeed
+  target.baseBallSpeed = source.baseBallSpeed
+  target.minHorizontalRatio = source.minHorizontalRatio
+  target.speedIncreaseOnHit = source.speedIncreaseOnHit
+  target.modifiers = deepClone(source.modifiers)
+}
+
+function isDevConfig(value: unknown): value is DevConfig {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<DevConfig>
+  const arena = (candidate.modifiers as ModifiersConfig | undefined)?.arena
+  const blackHole = arena?.blackHole as Partial<BlackHoleModifier> | undefined
+  return (
+    typeof candidate.paddleSpeed === 'number' &&
+    typeof candidate.baseBallSpeed === 'number' &&
+    typeof candidate.minHorizontalRatio === 'number' &&
+    typeof candidate.speedIncreaseOnHit === 'number' &&
+    !!arena &&
+    !!blackHole &&
+    typeof blackHole.name === 'string' &&
+    typeof blackHole.description === 'string' &&
+    typeof blackHole.enabled === 'boolean' &&
+    typeof blackHole.gravityStrength === 'number' &&
+    typeof blackHole.gravityFalloff === 'number'
+  )
+}
+
+function createOverlayButton(label: string) {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = 'dev-overlay__button'
+  button.textContent = label
+  return button
 }
 
 function toggleOverlay(overlay: HTMLDivElement) {
