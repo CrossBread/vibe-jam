@@ -1,0 +1,84 @@
+name: Assistants in Action (Direct Commit to master)
+
+on:
+  workflow_dispatch:
+    inputs:
+      instructions:
+        description: "Natural-language change request (e.g., 'Add right-paddle AI, win score 15')"
+        required: true
+        type: string
+  issues:
+    types: [opened, edited, labeled]
+
+permissions:
+  contents: write
+  issues: write
+
+env:
+  GH_BRANCH: master
+
+jobs:
+  apply:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && (
+        contains(github.event.issue.title, '[agent]') ||
+        contains(join(github.event.issue.labels.*.name, ','), 'agent')
+      ))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.GH_BRANCH }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: |
+          npm ci || npm i
+
+      - name: Run Assistant Edit
+        id: assistant
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GH_BRANCH: ${{ env.GH_BRANCH }}
+          INSTRUCTIONS: ${{ inputs.instructions || github.event.issue.body }}
+        run: |
+          node assistant/run.mjs "$INSTRUCTIONS"
+
+      - name: Run tests/build (if present)
+        run: |
+          if [ -f package.json ]; then
+            npm run test --if-present
+            npm run build --if-present
+          fi
+
+      - name: Push changes (direct to master)
+        run: |
+          git config user.name "assistants-bot"
+          git config user.email "assistants-bot@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "assistant: ${{ inputs.instructions || github.event.issue.title || 'automated change' }}"
+            git push origin HEAD:${{ env.GH_BRANCH }}
+          fi
+
+      - name: Comment on issue (if applicable)
+        if: github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `✅ Assistant applied changes and pushed to **${process.env.GH_BRANCH}**.\n\n` +
+                         `**Instructions:**\n\n> ${context.payload.issue.body || '(none)'}\n`
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            })
