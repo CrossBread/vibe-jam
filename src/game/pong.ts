@@ -13,14 +13,31 @@ export interface PongState {
 
 export interface PongAPI {
   state: PongState
+
   reset(): void
+
   tick(dt: number): void
+}
+
+export interface PongOptions {
+  /**
+   * Automatically start the internal requestAnimationFrame loop.
+   * Disable for headless/unit testing environments.
+   */
+  autoStart?: boolean
 }
 
 type KeySet = Record<string, boolean>
 
-export function createPong(canvas: HTMLCanvasElement): PongAPI {
-  const ctx = canvas.getContext('2d')!
+export function createPong(
+  canvas: HTMLCanvasElement,
+  options: PongOptions = {},
+): PongAPI {
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('Canvas 2D context is required')
+  const ctx = context
+
+  const { autoStart = true } = options
   const W = canvas.width
   const H = canvas.height
   const PADDLE_H = 90
@@ -37,13 +54,15 @@ export function createPong(canvas: HTMLCanvasElement): PongAPI {
   let leftAIEnabled = true
   let rightAIEnabled = true
 
-  window.addEventListener('keydown', e => {
-    keys[e.key] = true
-    const key = e.key.toLowerCase()
-    if (key === 'w' || key === 's') leftAIEnabled = false
-    if (key === 'arrowup' || key === 'arrowdown') rightAIEnabled = false
-  })
-  window.addEventListener('keyup', e => (keys[e.key] = false))
+  if (typeof window !== 'undefined') {
+    window.addEventListener('keydown', (e) => {
+      keys[e.key] = true
+      const key = e.key.toLowerCase()
+      if (key === 'w' || key === 's') leftAIEnabled = false
+      if (key === 'arrowup' || key === 'arrowdown') rightAIEnabled = false
+    })
+    window.addEventListener('keyup', (e) => (keys[e.key] = false))
+  }
 
   const state: PongState = {
     leftScore: 0,
@@ -55,7 +74,7 @@ export function createPong(canvas: HTMLCanvasElement): PongAPI {
     leftY: H * 0.5 - PADDLE_H / 2,
     rightY: H * 0.5 - PADDLE_H / 2,
     paused: false,
-    winner: null
+    winner: null,
   }
 
   function resetBall(toLeft: boolean) {
@@ -76,19 +95,25 @@ export function createPong(canvas: HTMLCanvasElement): PongAPI {
     resetBall(Math.random() < 0.5)
   }
 
-  window.addEventListener('keypress', (e) => {
-    if (e.key.toLowerCase() === 'r') reset()
-  })
+  if (typeof window !== 'undefined') {
+    window.addEventListener('keypress', (e) => {
+      if (e.key.toLowerCase() === 'r') reset()
+    })
+  }
 
   let last = performance.now()
+
   function loop(now: number) {
-    const dt = Math.min(1/30, (now - last) / 1000)
+    const dt = Math.min(1 / 30, (now - last) / 1000)
     last = now
     tick(dt)
     draw()
     requestAnimationFrame(loop)
   }
-  requestAnimationFrame(loop)
+
+  if (autoStart && typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(loop)
+  }
 
   function tick(dt: number) {
     if (state.winner) return
@@ -153,12 +178,14 @@ export function createPong(canvas: HTMLCanvasElement): PongAPI {
     }
 
     // Left paddle collision
-    if (state.ballX - BALL_R < 40 + PADDLE_W &&
-        state.ballX - BALL_R > 40 &&
-        state.ballY > state.leftY &&
-        state.ballY < state.leftY + PADDLE_H) {
+    if (
+      state.ballX - BALL_R < 40 + PADDLE_W &&
+      state.ballX - BALL_R > 40 &&
+      state.ballY > state.leftY &&
+      state.ballY < state.leftY + PADDLE_H
+    ) {
       state.ballX = 40 + PADDLE_W + BALL_R
-      const rel = (state.ballY - (state.leftY + PADDLE_H/2)) / (PADDLE_H/2)
+      const rel = (state.ballY - (state.leftY + PADDLE_H / 2)) / (PADDLE_H / 2)
       const angle = rel * 0.8
       const speed = Math.hypot(state.vx, state.vy) * 1.03
       state.vx = Math.cos(angle) * speed
@@ -166,12 +193,14 @@ export function createPong(canvas: HTMLCanvasElement): PongAPI {
     }
 
     // Right paddle collision
-    if (state.ballX + BALL_R > W - 40 - PADDLE_W &&
-        state.ballX + BALL_R < W - 40 &&
-        state.ballY > state.rightY &&
-        state.ballY < state.rightY + PADDLE_H) {
+    if (
+      state.ballX + BALL_R > W - 40 - PADDLE_W &&
+      state.ballX + BALL_R < W - 40 &&
+      state.ballY > state.rightY &&
+      state.ballY < state.rightY + PADDLE_H
+    ) {
       state.ballX = W - 40 - PADDLE_W - BALL_R
-      const rel = (state.ballY - (state.rightY + PADDLE_H/2)) / (PADDLE_H/2)
+      const rel = (state.ballY - (state.rightY + PADDLE_H / 2)) / (PADDLE_H / 2)
       const angle = Math.PI - rel * 0.8
       const speed = Math.hypot(state.vx, state.vy) * 1.03
       state.vx = Math.cos(angle) * speed
@@ -198,18 +227,25 @@ export function createPong(canvas: HTMLCanvasElement): PongAPI {
     ctx.strokeStyle = 'rgba(255,255,255,0.15)'
     ctx.setLineDash([6, 10])
     ctx.beginPath()
-    ctx.moveTo(W/2, 0)
-    ctx.lineTo(W/2, H)
+    ctx.moveTo(W / 2, 0)
+    ctx.lineTo(W / 2, H)
     ctx.stroke()
     ctx.setLineDash([])
 
-    const sinkGradient = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, 40)
+    const sinkGradient = ctx.createRadialGradient(
+      W / 2,
+      H / 2,
+      0,
+      W / 2,
+      H / 2,
+      40,
+    )
     sinkGradient.addColorStop(0, 'rgba(148, 163, 184, 0.75)')
     sinkGradient.addColorStop(0.45, 'rgba(148, 163, 184, 0.35)')
     sinkGradient.addColorStop(1, 'rgba(15, 23, 42, 0)')
     ctx.fillStyle = sinkGradient
     ctx.beginPath()
-    ctx.arc(W/2, H/2, 40, 0, Math.PI * 2)
+    ctx.arc(W / 2, H / 2, 40, 0, Math.PI * 2)
     ctx.fill()
 
     ctx.fillStyle = '#e7ecf3'
@@ -220,14 +256,15 @@ export function createPong(canvas: HTMLCanvasElement): PongAPI {
     ctx.arc(state.ballX, state.ballY, BALL_R, 0, Math.PI * 2)
     ctx.fill()
 
-    ctx.font = 'bold 28px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto'
+    ctx.font =
+      'bold 28px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto'
     ctx.textAlign = 'center'
-    ctx.fillText(String(state.leftScore), W/2 - 60, 40)
-    ctx.fillText(String(state.rightScore), W/2 + 60, 40)
+    ctx.fillText(String(state.leftScore), W / 2 - 60, 40)
+    ctx.fillText(String(state.rightScore), W / 2 + 60, 40)
 
     if (state.winner) {
       ctx.font = 'bold 36px ui-sans-serif, system-ui'
-      ctx.fillText(`${state.winner.toUpperCase()} WINS!`, W/2, H/2)
+      ctx.fillText(`${state.winner.toUpperCase()} WINS!`, W / 2, H / 2)
     }
   }
 
