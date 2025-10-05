@@ -110,7 +110,7 @@ export function createPong(canvas: HTMLCanvasElement): PongAPI {
         state.ballY < state.leftY + PADDLE_H) {
       state.ballX = 40 + PADDLE_W + BALL_R
       const rel = (state.ballY - (state.leftY + PADDLE_H/2)) / (PADDLE_H/2)
-      const angle = rel * 0.8 // ~45deg
+      const angle = rel * 0.8
       const speed = Math.hypot(state.vx, state.vy) * 1.03
       state.vx = Math.cos(angle) * speed
       state.vy = Math.sin(angle) * speed
@@ -143,11 +143,9 @@ export function createPong(canvas: HTMLCanvasElement): PongAPI {
   }
 
   function draw() {
-    // bg
     ctx.fillStyle = '#10172a'
     ctx.fillRect(0, 0, W, H)
 
-    // center line
     ctx.strokeStyle = 'rgba(255,255,255,0.15)'
     ctx.setLineDash([6, 10])
     ctx.beginPath()
@@ -156,17 +154,14 @@ export function createPong(canvas: HTMLCanvasElement): PongAPI {
     ctx.stroke()
     ctx.setLineDash([])
 
-    // paddles
     ctx.fillStyle = '#e7ecf3'
     ctx.fillRect(40, state.leftY, PADDLE_W, PADDLE_H)
     ctx.fillRect(W - 40 - PADDLE_W, state.rightY, PADDLE_W, PADDLE_H)
 
-    // ball
     ctx.beginPath()
     ctx.arc(state.ballX, state.ballY, BALL_R, 0, Math.PI * 2)
     ctx.fill()
 
-    // score
     ctx.font = 'bold 28px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto'
     ctx.textAlign = 'center'
     ctx.fillText(String(state.leftScore), W/2 - 60, 40)
@@ -182,9 +177,5 @@ export function createPong(canvas: HTMLCanvasElement): PongAPI {
     return Math.max(a, Math.min(b, v))
   }
 
-  return {
-    state,
-    reset,
-    tick
-  }
+  return { state, reset, tick }
 }
