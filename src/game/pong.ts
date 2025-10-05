@@ -907,10 +907,6 @@ function toggleOverlay(overlay: HTMLDivElement) {
   overlay.setAttribute('aria-hidden', visible ? 'false' : 'true')
 }
 
-function getGravityWells(arena: ArenaModifiers): GravityWellModifier[] {
-  return GRAVITY_WELL_KEYS.map(key => arena[key])
-}
-
 function getGravityWellsEntries(
   arena: ArenaModifiers,
 ): [GravityWellKey, GravityWellModifier][] {
