@@ -34,7 +34,15 @@ export function createPong(canvas: HTMLCanvasElement): PongAPI {
   const WIN_SCORE = 11
 
   const keys: KeySet = {}
-  window.addEventListener('keydown', e => (keys[e.key] = true))
+  let leftAIEnabled = true
+  let rightAIEnabled = true
+
+  window.addEventListener('keydown', e => {
+    keys[e.key] = true
+    const key = e.key.toLowerCase()
+    if (key === 'w' || key === 's') leftAIEnabled = false
+    if (key === 'arrowup' || key === 'arrowdown') rightAIEnabled = false
+  })
   window.addEventListener('keyup', e => (keys[e.key] = false))
 
   const state: PongState = {
@@ -63,6 +71,8 @@ export function createPong(canvas: HTMLCanvasElement): PongAPI {
     state.leftY = H * 0.5 - PADDLE_H / 2
     state.rightY = H * 0.5 - PADDLE_H / 2
     state.winner = null
+    leftAIEnabled = true
+    rightAIEnabled = true
     resetBall(Math.random() < 0.5)
   }
 
@@ -84,10 +94,25 @@ export function createPong(canvas: HTMLCanvasElement): PongAPI {
     if (state.winner) return
 
     // Controls
-    if (keys['w']) state.leftY -= SPEED * dt
-    if (keys['s']) state.leftY += SPEED * dt
-    if (keys['ArrowUp']) state.rightY -= SPEED * dt
-    if (keys['ArrowDown']) state.rightY += SPEED * dt
+    if (leftAIEnabled) {
+      const target = state.ballY - PADDLE_H / 2
+      const diff = target - state.leftY
+      const maxStep = SPEED * dt
+      state.leftY += clamp(diff, -maxStep, maxStep)
+    } else {
+      if (keys['w']) state.leftY -= SPEED * dt
+      if (keys['s']) state.leftY += SPEED * dt
+    }
+
+    if (rightAIEnabled) {
+      const target = state.ballY - PADDLE_H / 2
+      const diff = target - state.rightY
+      const maxStep = SPEED * dt
+      state.rightY += clamp(diff, -maxStep, maxStep)
+    } else {
+      if (keys['ArrowUp']) state.rightY -= SPEED * dt
+      if (keys['ArrowDown']) state.rightY += SPEED * dt
+    }
 
     state.leftY = clamp(state.leftY, 0, H - PADDLE_H)
     state.rightY = clamp(state.rightY, 0, H - PADDLE_H)
