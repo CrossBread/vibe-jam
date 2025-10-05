@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vibe Games Starter — Pong</title>
+    <style>
+      html, body { height: 100%; margin: 0; background: #0e1220; color: #e7ecf3; }
+      #app { display:flex; align-items:center; justify-content:center; height:100%; }
+      .hud { position: fixed; top: 10px; left: 10px; background: rgba(255,255,255,0.06); padding: 8px 10px; border-radius: 8px; font-family: ui-sans-serif, system-ui; }
+      a { color: #8bd5ff; }
+      canvas { box-shadow: 0 10px 40px rgba(0,0,0,0.4); border-radius: 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="hud">
+      <div><strong>Pong</strong> — Arrow Up/Down vs W/S</div>
+      <div>Score 11 to win • Press R to reset</div>
+      <div><a href="https://github.com/" target="_blank" rel="noreferrer">Source</a></div>
+    </div>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
