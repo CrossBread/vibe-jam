@@ -154,12 +154,12 @@ export function createPong(
     const sinkY = H * 0.5
     const dx = sinkX - state.ballX
     const dy = sinkY - state.ballY
-    const dist = Math.hypot(dx, dy) || 1
+    const distSq = dx * dx + dy * dy
+    const dist = Math.sqrt(distSq) || 1
     const prevVx = state.vx
-    const blackHole = config.modifiers.arena.blackHole
-    if (blackHole.enabled) {
-      const force =
-        blackHole.gravityStrength / (dist * dist + blackHole.gravityFalloff)
+    for (const well of getGravityWells(config.modifiers.arena)) {
+      if (!well.enabled) continue
+      const force = well.gravityStrength / (distSq + well.gravityFalloff)
       const ax = (dx / dist) * force
       const ay = (dy / dist) * force
       state.vx += ax * dt
@@ -244,21 +244,23 @@ export function createPong(
     ctx.stroke()
     ctx.setLineDash([])
 
-    if (config.modifiers.arena.blackHole.enabled) {
+    for (const [key, well] of getGravityWellsEntries(config.modifiers.arena)) {
+      if (!well.enabled) continue
+      const visuals = GRAVITY_WELL_VISUALS[key]
       const sinkGradient = ctx.createRadialGradient(
         W / 2,
         H / 2,
         0,
         W / 2,
         H / 2,
-        40,
+        well.radius,
       )
-      sinkGradient.addColorStop(0, 'rgba(148, 163, 184, 0.75)')
-      sinkGradient.addColorStop(0.45, 'rgba(148, 163, 184, 0.35)')
-      sinkGradient.addColorStop(1, 'rgba(15, 23, 42, 0)')
+      sinkGradient.addColorStop(0, visuals.inner)
+      sinkGradient.addColorStop(0.45, visuals.mid)
+      sinkGradient.addColorStop(1, visuals.outer)
       ctx.fillStyle = sinkGradient
       ctx.beginPath()
-      ctx.arc(W / 2, H / 2, 40, 0, Math.PI * 2)
+      ctx.arc(W / 2, H / 2, well.radius, 0, Math.PI * 2)
       ctx.fill()
     }
 
@@ -289,20 +291,22 @@ export function createPong(
   return { state, reset, tick }
 }
 
+const GRAVITY_WELL_KEYS = ['blackHole', 'superMassive', 'whiteDwarf'] as const
+type GravityWellKey = (typeof GRAVITY_WELL_KEYS)[number]
+
 interface ModifierBase {
   name: string
   description: string
   enabled: boolean
 }
 
-interface BlackHoleModifier extends ModifierBase {
+interface GravityWellModifier extends ModifierBase {
   gravityStrength: number
   gravityFalloff: number
+  radius: number
 }
 
-interface ArenaModifiers {
-  blackHole: BlackHoleModifier
-}
+type ArenaModifiers = Record<GravityWellKey, GravityWellModifier>
 
 interface ModifiersConfig {
   arena: ArenaModifiers
@@ -316,6 +320,30 @@ interface DevConfig {
   minHorizontalRatio: number
   speedIncreaseOnHit: number
   modifiers: ModifiersConfig
+}
+
+interface GravityWellVisual {
+  inner: string
+  mid: string
+  outer: string
+}
+
+const GRAVITY_WELL_VISUALS: Record<GravityWellKey, GravityWellVisual> = {
+  blackHole: {
+    inner: 'rgba(148, 163, 184, 0.75)',
+    mid: 'rgba(148, 163, 184, 0.35)',
+    outer: 'rgba(15, 23, 42, 0)',
+  },
+  superMassive: {
+    inner: 'rgba(96, 165, 250, 0.45)',
+    mid: 'rgba(59, 130, 246, 0.25)',
+    outer: 'rgba(15, 23, 42, 0)',
+  },
+  whiteDwarf: {
+    inner: 'rgba(226, 232, 240, 0.8)',
+    mid: 'rgba(241, 245, 249, 0.45)',
+    outer: 'rgba(15, 23, 42, 0)',
+  },
 }
 
 const DEFAULT_DEV_CONFIG: DevConfig = defaultDevConfig as DevConfig
@@ -544,53 +572,65 @@ function createDevOverlay(config: DevConfig, defaults: DevConfig): HTMLDivElemen
     arenaTitle.textContent = 'Arena Modifiers'
     arenaSection.appendChild(arenaTitle)
 
-    const blackHole = config.modifiers.arena.blackHole
-    const blackHoleWrapper = document.createElement('div')
-    blackHoleWrapper.className = 'dev-overlay__modifier'
+    for (const [, modifier] of getGravityWellsEntries(config.modifiers.arena)) {
+      const wrapper = document.createElement('div')
+      wrapper.className = 'dev-overlay__modifier'
 
-    const blackHoleHeader = document.createElement('div')
-    blackHoleHeader.className = 'dev-overlay__label'
+      const header = document.createElement('div')
+      header.className = 'dev-overlay__label'
 
-    const blackHoleTitle = document.createElement('span')
-    blackHoleTitle.textContent = blackHole.name
+      const title = document.createElement('span')
+      title.textContent = modifier.name
 
-    const blackHoleToggle = document.createElement('input')
-    blackHoleToggle.type = 'checkbox'
-    blackHoleToggle.checked = blackHole.enabled
-    blackHoleToggle.addEventListener('change', () => {
-      blackHole.enabled = blackHoleToggle.checked
-    })
-
-    blackHoleHeader.appendChild(blackHoleTitle)
-    blackHoleHeader.appendChild(blackHoleToggle)
-    blackHoleWrapper.appendChild(blackHoleHeader)
-
-    const blackHoleDescription = document.createElement('p')
-    blackHoleDescription.className = 'dev-overlay__description'
-    blackHoleDescription.textContent = blackHole.description
-    blackHoleWrapper.appendChild(blackHoleDescription)
-
-    blackHoleWrapper.appendChild(
-      createSliderControl('Gravity Strength', blackHole.gravityStrength, {
-        min: 0,
-        max: 8_000_000,
-        step: 100_000,
-        format: v => `${Math.round(v).toLocaleString()} ƒ`,
-        onInput: v => (blackHole.gravityStrength = v)
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.checked = modifier.enabled
+      toggle.addEventListener('change', () => {
+        modifier.enabled = toggle.checked
       })
-    )
 
-    blackHoleWrapper.appendChild(
-      createSliderControl('Gravity Falloff', blackHole.gravityFalloff, {
-        min: 0,
-        max: 30_000,
-        step: 500,
-        format: v => `${Math.round(v).toLocaleString()}`,
-        onInput: v => (blackHole.gravityFalloff = v)
-      })
-    )
+      header.appendChild(title)
+      header.appendChild(toggle)
+      wrapper.appendChild(header)
 
-    arenaSection.appendChild(blackHoleWrapper)
+      const description = document.createElement('p')
+      description.className = 'dev-overlay__description'
+      description.textContent = modifier.description
+      wrapper.appendChild(description)
+
+      wrapper.appendChild(
+        createSliderControl('Gravity Strength', modifier.gravityStrength, {
+          min: 0,
+          max: 8_000_000,
+          step: 100_000,
+          format: v => `${Math.round(v).toLocaleString()} ƒ`,
+          onInput: v => (modifier.gravityStrength = v)
+        })
+      )
+
+      wrapper.appendChild(
+        createSliderControl('Gravity Falloff', modifier.gravityFalloff, {
+          min: 0,
+          max: 30_000,
+          step: 500,
+          format: v => `${Math.round(v).toLocaleString()}`,
+          onInput: v => (modifier.gravityFalloff = v)
+        })
+      )
+
+      wrapper.appendChild(
+        createSliderControl('Visual Radius', modifier.radius, {
+          min: 10,
+          max: 120,
+          step: 1,
+          format: v => `${Math.round(v)} px`,
+          onInput: v => (modifier.radius = v)
+        })
+      )
+
+      arenaSection.appendChild(wrapper)
+    }
+
     controls.appendChild(arenaSection)
   }
 
@@ -655,20 +695,38 @@ function applyConfig(target: DevConfig, source: DevConfig) {
 function isDevConfig(value: unknown): value is DevConfig {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<DevConfig>
-  const arena = (candidate.modifiers as ModifiersConfig | undefined)?.arena
-  const blackHole = arena?.blackHole as Partial<BlackHoleModifier> | undefined
+  if (
+    typeof candidate.paddleSpeed !== 'number' ||
+    typeof candidate.baseBallSpeed !== 'number' ||
+    typeof candidate.minHorizontalRatio !== 'number' ||
+    typeof candidate.speedIncreaseOnHit !== 'number'
+  ) {
+    return false
+  }
+
+  const modifiers = candidate.modifiers as Partial<ModifiersConfig> | undefined
+  if (!modifiers || typeof modifiers !== 'object') return false
+
+  const arena = modifiers.arena as Partial<Record<string, unknown>> | undefined
+  if (!arena || typeof arena !== 'object') return false
+
+  for (const key of GRAVITY_WELL_KEYS) {
+    if (!isGravityWellModifier(arena[key])) return false
+  }
+
+  return true
+}
+
+function isGravityWellModifier(value: unknown): value is GravityWellModifier {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<GravityWellModifier>
   return (
-    typeof candidate.paddleSpeed === 'number' &&
-    typeof candidate.baseBallSpeed === 'number' &&
-    typeof candidate.minHorizontalRatio === 'number' &&
-    typeof candidate.speedIncreaseOnHit === 'number' &&
-    !!arena &&
-    !!blackHole &&
-    typeof blackHole.name === 'string' &&
-    typeof blackHole.description === 'string' &&
-    typeof blackHole.enabled === 'boolean' &&
-    typeof blackHole.gravityStrength === 'number' &&
-    typeof blackHole.gravityFalloff === 'number'
+    typeof candidate.name === 'string' &&
+    typeof candidate.description === 'string' &&
+    typeof candidate.enabled === 'boolean' &&
+    typeof candidate.gravityStrength === 'number' &&
+    typeof candidate.gravityFalloff === 'number' &&
+    typeof candidate.radius === 'number'
   )
 }
 
@@ -683,6 +741,16 @@ function createOverlayButton(label: string) {
 function toggleOverlay(overlay: HTMLDivElement) {
   const visible = overlay.classList.toggle('dev-overlay--visible')
   overlay.setAttribute('aria-hidden', visible ? 'false' : 'true')
+}
+
+function getGravityWells(arena: ArenaModifiers): GravityWellModifier[] {
+  return GRAVITY_WELL_KEYS.map(key => arena[key])
+}
+
+function getGravityWellsEntries(
+  arena: ArenaModifiers,
+): [GravityWellKey, GravityWellModifier][] {
+  return GRAVITY_WELL_KEYS.map(key => [key, arena[key]])
 }
 
 interface SliderOptions {
@@ -721,28 +789,6 @@ function createSliderControl(label: string, value: number, options: SliderOption
 
   wrapper.appendChild(title)
   wrapper.appendChild(input)
-
-  return wrapper
-}
-
-function createToggleControl(label: string, value: boolean, onInput: (value: boolean) => void) {
-  const wrapper = document.createElement('label')
-  wrapper.className = 'dev-overlay__control'
-
-  const title = document.createElement('div')
-  title.className = 'dev-overlay__label'
-  title.textContent = label
-
-  const checkbox = document.createElement('input')
-  checkbox.type = 'checkbox'
-  checkbox.checked = value
-
-  checkbox.addEventListener('change', () => {
-    onInput(checkbox.checked)
-  })
-
-  title.appendChild(checkbox)
-  wrapper.appendChild(title)
 
   return wrapper
 }

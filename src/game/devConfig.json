@@ -10,7 +10,24 @@
         "description": "Gravity sink in the center of the playing field",
         "enabled": true,
         "gravityStrength": 4800000,
-        "gravityFalloff": 12000
+        "gravityFalloff": 12000,
+        "radius": 40
+      },
+      "superMassive": {
+        "name": "Super Massive",
+        "description": "Large low intensity gravity sink",
+        "enabled": false,
+        "gravityStrength": 3200000,
+        "gravityFalloff": 20000,
+        "radius": 72
+      },
+      "whiteDwarf": {
+        "name": "White Dwarf",
+        "description": "Small high intensity gravity sink",
+        "enabled": false,
+        "gravityStrength": 7200000,
+        "gravityFalloff": 6000,
+        "radius": 26
       }
     },
     "ball": {},
