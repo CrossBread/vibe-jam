@@ -889,11 +889,9 @@ function isGravityWellModifier(value: unknown): value is GravityWellModifier {
     return false
   }
 
-  if ('wanderSpeed' in candidate && typeof candidate.wanderSpeed !== 'number') {
-    return false
-  }
+  return !('wanderSpeed' in candidate && typeof candidate.wanderSpeed !== 'number');
 
-  return true
+
 }
 
 function createOverlayButton(label: string) {
