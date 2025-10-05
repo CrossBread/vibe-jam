@@ -43,12 +43,11 @@ export function createPong(
   const PADDLE_H = 90
   const PADDLE_W = 12
   const BALL_R = 8
-  const SPEED = 310
-  const BALL_SPEED = 320
-  const MIN_HORIZONTAL_SPEED = BALL_SPEED * 0.35
-  const GRAVITY_STRENGTH = 4800000
-  const GRAVITY_FALLOFF = 12000
   const WIN_SCORE = 11
+
+  const config = createDevConfig()
+  const overlay = createDevOverlay(config)
+  canvas.parentElement?.appendChild(overlay)
 
   const keys: KeySet = {}
   let leftAIEnabled = true
@@ -56,6 +55,11 @@ export function createPong(
 
   if (typeof window !== 'undefined') {
     window.addEventListener('keydown', (e) => {
+      if (e.key === '`' && !e.repeat) {
+        toggleOverlay(overlay)
+        e.preventDefault()
+        return
+      }
       keys[e.key] = true
       const key = e.key.toLowerCase()
       if (key === 'w' || key === 's') leftAIEnabled = false
@@ -69,8 +73,8 @@ export function createPong(
     rightScore: 0,
     ballX: W * 0.5,
     ballY: H * 0.5,
-    vx: BALL_SPEED * (Math.random() < 0.5 ? -1 : 1),
-    vy: (Math.random() * 2 - 1) * BALL_SPEED * 0.6,
+    vx: config.baseBallSpeed * (Math.random() < 0.5 ? -1 : 1),
+    vy: (Math.random() * 2 - 1) * config.baseBallSpeed * 0.6,
     leftY: H * 0.5 - PADDLE_H / 2,
     rightY: H * 0.5 - PADDLE_H / 2,
     paused: false,
@@ -80,8 +84,8 @@ export function createPong(
   function resetBall(toLeft: boolean) {
     state.ballX = W * 0.5
     state.ballY = H * 0.5
-    state.vx = BALL_SPEED * (toLeft ? -1 : 1)
-    state.vy = (Math.random() * 2 - 1) * BALL_SPEED * 0.6
+    state.vx = config.baseBallSpeed * (toLeft ? -1 : 1)
+    state.vy = (Math.random() * 2 - 1) * config.baseBallSpeed * 0.6
   }
 
   function reset() {
@@ -122,21 +126,21 @@ export function createPong(
     if (leftAIEnabled) {
       const target = state.ballY - PADDLE_H / 2
       const diff = target - state.leftY
-      const maxStep = SPEED * dt
+      const maxStep = config.paddleSpeed * dt
       state.leftY += clamp(diff, -maxStep, maxStep)
     } else {
-      if (keys['w']) state.leftY -= SPEED * dt
-      if (keys['s']) state.leftY += SPEED * dt
+      if (keys['w']) state.leftY -= config.paddleSpeed * dt
+      if (keys['s']) state.leftY += config.paddleSpeed * dt
     }
 
     if (rightAIEnabled) {
       const target = state.ballY - PADDLE_H / 2
       const diff = target - state.rightY
-      const maxStep = SPEED * dt
+      const maxStep = config.paddleSpeed * dt
       state.rightY += clamp(diff, -maxStep, maxStep)
     } else {
-      if (keys['ArrowUp']) state.rightY -= SPEED * dt
-      if (keys['ArrowDown']) state.rightY += SPEED * dt
+      if (keys['ArrowUp']) state.rightY -= config.paddleSpeed * dt
+      if (keys['ArrowDown']) state.rightY += config.paddleSpeed * dt
     }
 
     state.leftY = clamp(state.leftY, 0, H - PADDLE_H)
@@ -148,17 +152,20 @@ export function createPong(
     const dx = sinkX - state.ballX
     const dy = sinkY - state.ballY
     const dist = Math.hypot(dx, dy) || 1
-    const force = GRAVITY_STRENGTH / (dist * dist + GRAVITY_FALLOFF)
-    const ax = (dx / dist) * force
-    const ay = (dy / dist) * force
     const prevVx = state.vx
-    state.vx += ax * dt
-    state.vy += ay * dt
+    if (config.gravityEnabled) {
+      const force = config.gravityStrength / (dist * dist + config.gravityFalloff)
+      const ax = (dx / dist) * force
+      const ay = (dy / dist) * force
+      state.vx += ax * dt
+      state.vy += ay * dt
+    }
 
     if (prevVx !== 0) {
       const direction = Math.sign(prevVx)
-      const minSpeed = MIN_HORIZONTAL_SPEED * direction
-      if (state.vx * direction < MIN_HORIZONTAL_SPEED) {
+      const minHorizontalSpeed = config.baseBallSpeed * config.minHorizontalRatio
+      const minSpeed = minHorizontalSpeed * direction
+      if (state.vx * direction < minHorizontalSpeed) {
         state.vx = minSpeed
       }
     }
@@ -187,7 +194,7 @@ export function createPong(
       state.ballX = 40 + PADDLE_W + BALL_R
       const rel = (state.ballY - (state.leftY + PADDLE_H / 2)) / (PADDLE_H / 2)
       const angle = rel * 0.8
-      const speed = Math.hypot(state.vx, state.vy) * 1.03
+      const speed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
       state.vx = Math.cos(angle) * speed
       state.vy = Math.sin(angle) * speed
     }
@@ -202,7 +209,7 @@ export function createPong(
       state.ballX = W - 40 - PADDLE_W - BALL_R
       const rel = (state.ballY - (state.rightY + PADDLE_H / 2)) / (PADDLE_H / 2)
       const angle = Math.PI - rel * 0.8
-      const speed = Math.hypot(state.vx, state.vy) * 1.03
+      const speed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
       state.vx = Math.cos(angle) * speed
       state.vy = Math.sin(angle) * speed
     }
@@ -273,4 +280,257 @@ export function createPong(
   }
 
   return { state, reset, tick }
+}
+
+interface DevConfig {
+  paddleSpeed: number
+  baseBallSpeed: number
+  minHorizontalRatio: number
+  gravityStrength: number
+  gravityFalloff: number
+  gravityEnabled: boolean
+  speedIncreaseOnHit: number
+}
+
+function createDevConfig(): DevConfig {
+  return {
+    paddleSpeed: 310,
+    baseBallSpeed: 320,
+    minHorizontalRatio: 0.35,
+    gravityStrength: 4_800_000,
+    gravityFalloff: 12_000,
+    gravityEnabled: true,
+    speedIncreaseOnHit: 1.03
+  }
+}
+
+let devOverlayStylesInjected = false
+
+function ensureDevOverlayStyles() {
+  if (devOverlayStylesInjected) return
+  const style = document.createElement('style')
+  style.textContent = `
+    .dev-overlay {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      width: 260px;
+      padding: 16px;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.95);
+      color: #e2e8f0;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.45);
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      line-height: 1.4;
+      z-index: 9999;
+      display: none;
+      backdrop-filter: blur(10px);
+    }
+    .dev-overlay.dev-overlay--visible {
+      display: block;
+    }
+    .dev-overlay__title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .dev-overlay__hint {
+      color: rgba(226, 232, 240, 0.65);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .dev-overlay__controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .dev-overlay__control {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .dev-overlay__label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 500;
+    }
+    .dev-overlay__value {
+      font-variant-numeric: tabular-nums;
+      color: rgba(226, 232, 240, 0.85);
+    }
+    .dev-overlay input[type="range"] {
+      width: 100%;
+      accent-color: #38bdf8;
+    }
+    .dev-overlay input[type="checkbox"] {
+      accent-color: #38bdf8;
+    }
+  `
+  document.head.appendChild(style)
+  devOverlayStylesInjected = true
+}
+
+function createDevOverlay(config: DevConfig): HTMLDivElement {
+  ensureDevOverlayStyles()
+
+  const overlay = document.createElement('div')
+  overlay.className = 'dev-overlay'
+  overlay.setAttribute('aria-hidden', 'true')
+
+  const title = document.createElement('div')
+  title.className = 'dev-overlay__title'
+  title.textContent = 'Developer Options'
+
+  const hint = document.createElement('span')
+  hint.className = 'dev-overlay__hint'
+  hint.textContent = 'Press ` to toggle'
+  title.appendChild(hint)
+
+  const controls = document.createElement('div')
+  controls.className = 'dev-overlay__controls'
+
+  controls.appendChild(
+    createSliderControl('Paddle Speed', config.paddleSpeed, {
+      min: 100,
+      max: 600,
+      step: 10,
+      format: v => `${Math.round(v)} px/s`,
+      onInput: v => (config.paddleSpeed = v)
+    })
+  )
+
+  controls.appendChild(
+    createSliderControl('Ball Base Speed', config.baseBallSpeed, {
+      min: 120,
+      max: 600,
+      step: 10,
+      format: v => `${Math.round(v)} px/s`,
+      onInput: v => (config.baseBallSpeed = v)
+    })
+  )
+
+  controls.appendChild(
+    createSliderControl('Min Horizontal Ratio', config.minHorizontalRatio, {
+      min: 0.1,
+      max: 1,
+      step: 0.01,
+      format: v => v.toFixed(2),
+      onInput: v => (config.minHorizontalRatio = v)
+    })
+  )
+
+  controls.appendChild(
+    createSliderControl('Gravity Strength', config.gravityStrength, {
+      min: 0,
+      max: 8_000_000,
+      step: 100_000,
+      format: v => `${Math.round(v).toLocaleString()} ƒ`,
+      onInput: v => (config.gravityStrength = v)
+    })
+  )
+
+  controls.appendChild(
+    createSliderControl('Gravity Falloff', config.gravityFalloff, {
+      min: 0,
+      max: 30_000,
+      step: 500,
+      format: v => `${Math.round(v).toLocaleString()}`,
+      onInput: v => (config.gravityFalloff = v)
+    })
+  )
+
+  controls.appendChild(
+    createSliderControl('Hit Speed Multiplier', config.speedIncreaseOnHit, {
+      min: 1,
+      max: 1.3,
+      step: 0.01,
+      format: v => v.toFixed(2) + '×',
+      onInput: v => (config.speedIncreaseOnHit = v)
+    })
+  )
+
+  controls.appendChild(
+    createToggleControl('Enable Gravity Well', config.gravityEnabled, enabled => {
+      config.gravityEnabled = enabled
+    })
+  )
+
+  overlay.appendChild(title)
+  overlay.appendChild(controls)
+
+  return overlay
+}
+
+function toggleOverlay(overlay: HTMLDivElement) {
+  const visible = overlay.classList.toggle('dev-overlay--visible')
+  overlay.setAttribute('aria-hidden', visible ? 'false' : 'true')
+}
+
+interface SliderOptions {
+  min: number
+  max: number
+  step: number
+  format: (value: number) => string
+  onInput: (value: number) => void
+}
+
+function createSliderControl(label: string, value: number, options: SliderOptions) {
+  const wrapper = document.createElement('label')
+  wrapper.className = 'dev-overlay__control'
+
+  const title = document.createElement('div')
+  title.className = 'dev-overlay__label'
+  title.textContent = label
+
+  const valueEl = document.createElement('span')
+  valueEl.className = 'dev-overlay__value'
+  valueEl.textContent = options.format(value)
+  title.appendChild(valueEl)
+
+  const input = document.createElement('input')
+  input.type = 'range'
+  input.min = String(options.min)
+  input.max = String(options.max)
+  input.step = String(options.step)
+  input.value = String(value)
+
+  input.addEventListener('input', () => {
+    const next = Number(input.value)
+    options.onInput(next)
+    valueEl.textContent = options.format(next)
+  })
+
+  wrapper.appendChild(title)
+  wrapper.appendChild(input)
+
+  return wrapper
+}
+
+function createToggleControl(label: string, value: boolean, onInput: (value: boolean) => void) {
+  const wrapper = document.createElement('label')
+  wrapper.className = 'dev-overlay__control'
+
+  const title = document.createElement('div')
+  title.className = 'dev-overlay__label'
+  title.textContent = label
+
+  const checkbox = document.createElement('input')
+  checkbox.type = 'checkbox'
+  checkbox.checked = value
+
+  checkbox.addEventListener('change', () => {
+    onInput(checkbox.checked)
+  })
+
+  title.appendChild(checkbox)
+  wrapper.appendChild(title)
+
+  return wrapper
 }
