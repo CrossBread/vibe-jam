@@ -84,6 +84,15 @@ export function createPong(
     winner: null,
   }
 
+  const blackMoleState: MovingWellState = {
+    x: W * 0.5,
+    y: H * 0.5,
+    targetX: W * 0.5,
+    targetY: H * 0.5,
+    pauseTimer: 0,
+    hasTarget: false,
+  }
+
   function resetBall(toLeft: boolean) {
     state.ballX = W * 0.5
     state.ballY = H * 0.5
@@ -125,6 +134,8 @@ export function createPong(
   function tick(dt: number) {
     if (state.winner) return
 
+    updateBlackMoleState(dt)
+
     // Controls
     if (leftAIEnabled) {
       const target = state.ballY - PADDLE_H / 2
@@ -150,15 +161,14 @@ export function createPong(
     state.rightY = clamp(state.rightY, 0, H - PADDLE_H)
 
     // Gravity sink pull
-    const sinkX = W * 0.5
-    const sinkY = H * 0.5
-    const dx = sinkX - state.ballX
-    const dy = sinkY - state.ballY
-    const distSq = dx * dx + dy * dy
-    const dist = Math.sqrt(distSq) || 1
     const prevVx = state.vx
-    for (const well of getGravityWells(config.modifiers.arena)) {
+    for (const [key, well] of getGravityWellsEntries(config.modifiers.arena)) {
       if (!well.enabled) continue
+      const { x: sinkX, y: sinkY } = resolveGravityWellPosition(key)
+      const dx = sinkX - state.ballX
+      const dy = sinkY - state.ballY
+      const distSq = dx * dx + dy * dy
+      const dist = Math.sqrt(distSq) || 1
       const force = well.gravityStrength / (distSq + well.gravityFalloff)
       const ax = (dx / dist) * force
       const ay = (dy / dist) * force
@@ -232,6 +242,82 @@ export function createPong(
     }
   }
 
+  function resolveGravityWellPosition(key: GravityWellKey) {
+    if (key === 'blackMole') {
+      return { x: blackMoleState.x, y: blackMoleState.y }
+    }
+
+    return { x: W * 0.5, y: H * 0.5 }
+  }
+
+  function updateBlackMoleState(dt: number) {
+    const modifier = config.modifiers.arena.blackMole
+    if (!modifier.enabled) {
+      if (!blackMoleState.hasTarget) return
+      blackMoleState.x = W * 0.5
+      blackMoleState.y = H * 0.5
+      blackMoleState.targetX = W * 0.5
+      blackMoleState.targetY = H * 0.5
+      blackMoleState.pauseTimer = 0
+      blackMoleState.hasTarget = false
+      return
+    }
+
+    const widthPercentage = clamp(modifier.wanderWidthPercentage ?? 0.33, 0.05, 1)
+    const wanderSpeed = Math.max(0, modifier.wanderSpeed ?? 110)
+    const pauseDuration = Math.max(0, modifier.pauseDuration ?? 1.25)
+
+    const halfWidth = (W * widthPercentage) / 2
+    const halfHeight = (H * widthPercentage) / 2
+    const minX = W * 0.5 - halfWidth
+    const maxX = W * 0.5 + halfWidth
+    const minY = H * 0.5 - halfHeight
+    const maxY = H * 0.5 + halfHeight
+
+    blackMoleState.x = clamp(blackMoleState.x, minX, maxX)
+    blackMoleState.y = clamp(blackMoleState.y, minY, maxY)
+    blackMoleState.targetX = clamp(blackMoleState.targetX, minX, maxX)
+    blackMoleState.targetY = clamp(blackMoleState.targetY, minY, maxY)
+
+    const pickNextTarget = () => {
+      blackMoleState.targetX = randomRange(minX, maxX)
+      blackMoleState.targetY = randomRange(minY, maxY)
+      blackMoleState.hasTarget = true
+    }
+
+    if (!blackMoleState.hasTarget) {
+      pickNextTarget()
+    }
+
+    if (blackMoleState.pauseTimer > 0) {
+      blackMoleState.pauseTimer = Math.max(0, blackMoleState.pauseTimer - dt)
+      if (blackMoleState.pauseTimer === 0) {
+        pickNextTarget()
+      }
+      return
+    }
+
+    const dx = blackMoleState.targetX - blackMoleState.x
+    const dy = blackMoleState.targetY - blackMoleState.y
+    const dist = Math.hypot(dx, dy)
+    if (dist === 0) {
+      blackMoleState.pauseTimer = pauseDuration
+      return
+    }
+
+    const step = wanderSpeed * dt
+    if (dist <= step) {
+      blackMoleState.x = blackMoleState.targetX
+      blackMoleState.y = blackMoleState.targetY
+      blackMoleState.pauseTimer = pauseDuration
+      return
+    }
+
+    const invDist = 1 / dist
+    blackMoleState.x += dx * invDist * step
+    blackMoleState.y += dy * invDist * step
+  }
+
   function draw() {
     ctx.fillStyle = '#10172a'
     ctx.fillRect(0, 0, W, H)
@@ -247,12 +333,13 @@ export function createPong(
     for (const [key, well] of getGravityWellsEntries(config.modifiers.arena)) {
       if (!well.enabled) continue
       const visuals = GRAVITY_WELL_VISUALS[key]
+      const { x: sinkX, y: sinkY } = resolveGravityWellPosition(key)
       const sinkGradient = ctx.createRadialGradient(
-        W / 2,
-        H / 2,
+        sinkX,
+        sinkY,
         0,
-        W / 2,
-        H / 2,
+        sinkX,
+        sinkY,
         well.radius,
       )
       sinkGradient.addColorStop(0, visuals.inner)
@@ -260,7 +347,7 @@ export function createPong(
       sinkGradient.addColorStop(1, visuals.outer)
       ctx.fillStyle = sinkGradient
       ctx.beginPath()
-      ctx.arc(W / 2, H / 2, well.radius, 0, Math.PI * 2)
+      ctx.arc(sinkX, sinkY, well.radius, 0, Math.PI * 2)
       ctx.fill()
     }
 
@@ -284,6 +371,10 @@ export function createPong(
     }
   }
 
+  function randomRange(min: number, max: number) {
+    return Math.random() * (max - min) + min
+  }
+
   function clamp(v: number, a: number, b: number) {
     return Math.max(a, Math.min(b, v))
   }
@@ -291,7 +382,7 @@ export function createPong(
   return { state, reset, tick }
 }
 
-const GRAVITY_WELL_KEYS = ['blackHole', 'superMassive', 'whiteDwarf'] as const
+const GRAVITY_WELL_KEYS = ['blackHole', 'blackMole', 'superMassive', 'whiteDwarf'] as const
 type GravityWellKey = (typeof GRAVITY_WELL_KEYS)[number]
 
 interface ModifierBase {
@@ -304,6 +395,18 @@ interface GravityWellModifier extends ModifierBase {
   gravityStrength: number
   gravityFalloff: number
   radius: number
+  wanderWidthPercentage?: number
+  pauseDuration?: number
+  wanderSpeed?: number
+}
+
+interface MovingWellState {
+  x: number
+  y: number
+  targetX: number
+  targetY: number
+  pauseTimer: number
+  hasTarget: boolean
 }
 
 type ArenaModifiers = Record<GravityWellKey, GravityWellModifier>
@@ -332,6 +435,11 @@ const GRAVITY_WELL_VISUALS: Record<GravityWellKey, GravityWellVisual> = {
   blackHole: {
     inner: 'rgba(148, 163, 184, 0.75)',
     mid: 'rgba(148, 163, 184, 0.35)',
+    outer: 'rgba(15, 23, 42, 0)',
+  },
+  blackMole: {
+    inner: 'rgba(45, 212, 191, 0.65)',
+    mid: 'rgba(34, 197, 94, 0.3)',
     outer: 'rgba(15, 23, 42, 0)',
   },
   superMassive: {
@@ -628,6 +736,45 @@ function createDevOverlay(config: DevConfig, defaults: DevConfig): HTMLDivElemen
         })
       )
 
+      if ('wanderWidthPercentage' in modifier) {
+        const current = modifier.wanderWidthPercentage ?? 0.33
+        wrapper.appendChild(
+          createSliderControl('Wander Width', current, {
+            min: 0.1,
+            max: 1,
+            step: 0.01,
+            format: v => `${Math.round(v * 100)}%`,
+            onInput: v => (modifier.wanderWidthPercentage = v)
+          })
+        )
+      }
+
+      if ('pauseDuration' in modifier) {
+        const current = modifier.pauseDuration ?? 1.25
+        wrapper.appendChild(
+          createSliderControl('Pause Duration', current, {
+            min: 0,
+            max: 5,
+            step: 0.05,
+            format: v => `${v.toFixed(2)} s`,
+            onInput: v => (modifier.pauseDuration = v)
+          })
+        )
+      }
+
+      if ('wanderSpeed' in modifier) {
+        const current = modifier.wanderSpeed ?? 110
+        wrapper.appendChild(
+          createSliderControl('Wander Speed', current, {
+            min: 10,
+            max: 300,
+            step: 1,
+            format: v => `${Math.round(v)} px/s`,
+            onInput: v => (modifier.wanderSpeed = v)
+          })
+        )
+      }
+
       arenaSection.appendChild(wrapper)
     }
 
@@ -720,14 +867,33 @@ function isDevConfig(value: unknown): value is DevConfig {
 function isGravityWellModifier(value: unknown): value is GravityWellModifier {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<GravityWellModifier>
-  return (
-    typeof candidate.name === 'string' &&
-    typeof candidate.description === 'string' &&
-    typeof candidate.enabled === 'boolean' &&
-    typeof candidate.gravityStrength === 'number' &&
-    typeof candidate.gravityFalloff === 'number' &&
-    typeof candidate.radius === 'number'
-  )
+  if (
+    typeof candidate.name !== 'string' ||
+    typeof candidate.description !== 'string' ||
+    typeof candidate.enabled !== 'boolean' ||
+    typeof candidate.gravityStrength !== 'number' ||
+    typeof candidate.gravityFalloff !== 'number' ||
+    typeof candidate.radius !== 'number'
+  ) {
+    return false
+  }
+
+  if (
+    'wanderWidthPercentage' in candidate &&
+    typeof candidate.wanderWidthPercentage !== 'number'
+  ) {
+    return false
+  }
+
+  if ('pauseDuration' in candidate && typeof candidate.pauseDuration !== 'number') {
+    return false
+  }
+
+  if ('wanderSpeed' in candidate && typeof candidate.wanderSpeed !== 'number') {
+    return false
+  }
+
+  return true
 }
 
 function createOverlayButton(label: string) {

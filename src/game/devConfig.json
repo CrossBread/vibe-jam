@@ -13,6 +13,17 @@
         "gravityFalloff": 12000,
         "radius": 40
       },
+      "blackMole": {
+        "name": "Black Mole",
+        "description": "Moving gravity sink that prowls through the arena core",
+        "enabled": false,
+        "gravityStrength": 4600000,
+        "gravityFalloff": 14000,
+        "radius": 44,
+        "wanderWidthPercentage": 0.4,
+        "pauseDuration": 1.25,
+        "wanderSpeed": 110
+      },
       "superMassive": {
         "name": "Super Massive",
         "description": "Large low intensity gravity sink",
