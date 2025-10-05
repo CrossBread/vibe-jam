@@ -28,6 +28,9 @@ export function createPong(canvas: HTMLCanvasElement): PongAPI {
   const BALL_R = 8
   const SPEED = 310
   const BALL_SPEED = 320
+  const MIN_HORIZONTAL_SPEED = BALL_SPEED * 0.35
+  const GRAVITY_STRENGTH = 4800000
+  const GRAVITY_FALLOFF = 12000
   const WIN_SCORE = 11
 
   const keys: KeySet = {}
@@ -88,6 +91,27 @@ export function createPong(canvas: HTMLCanvasElement): PongAPI {
 
     state.leftY = clamp(state.leftY, 0, H - PADDLE_H)
     state.rightY = clamp(state.rightY, 0, H - PADDLE_H)
+
+    // Gravity sink pull
+    const sinkX = W * 0.5
+    const sinkY = H * 0.5
+    const dx = sinkX - state.ballX
+    const dy = sinkY - state.ballY
+    const dist = Math.hypot(dx, dy) || 1
+    const force = GRAVITY_STRENGTH / (dist * dist + GRAVITY_FALLOFF)
+    const ax = (dx / dist) * force
+    const ay = (dy / dist) * force
+    const prevVx = state.vx
+    state.vx += ax * dt
+    state.vy += ay * dt
+
+    if (prevVx !== 0) {
+      const direction = Math.sign(prevVx)
+      const minSpeed = MIN_HORIZONTAL_SPEED * direction
+      if (state.vx * direction < MIN_HORIZONTAL_SPEED) {
+        state.vx = minSpeed
+      }
+    }
 
     // Move ball
     state.ballX += state.vx * dt
@@ -153,6 +177,15 @@ export function createPong(canvas: HTMLCanvasElement): PongAPI {
     ctx.lineTo(W/2, H)
     ctx.stroke()
     ctx.setLineDash([])
+
+    const sinkGradient = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, 40)
+    sinkGradient.addColorStop(0, 'rgba(148, 163, 184, 0.75)')
+    sinkGradient.addColorStop(0.45, 'rgba(148, 163, 184, 0.35)')
+    sinkGradient.addColorStop(1, 'rgba(15, 23, 42, 0)')
+    ctx.fillStyle = sinkGradient
+    ctx.beginPath()
+    ctx.arc(W/2, H/2, 40, 0, Math.PI * 2)
+    ctx.fill()
 
     ctx.fillStyle = '#e7ecf3'
     ctx.fillRect(40, state.leftY, PADDLE_W, PADDLE_H)
