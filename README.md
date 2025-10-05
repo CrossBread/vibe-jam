@@ -1,6 +1,17 @@
-# Vibe Games Starter — Full (TypeScript + Vite + Canvas) ✨
+# NYGP - Not Your Grandaddy's Pong ✨
+## Pong + Modes
 
-**Goals:** vibe-code small web games; auto-test and auto-deploy on every push; drive changes by natural language via the **Assistants-in-Action** workflow.
+# Rules
+1. Game ends when the last ball leaves play.
+2. A ball leaves play when it crosses the left or right boundary of the arena.
+3. The Loser is the player who failed to defend. (On the side of the arena the last ball hit.)
+4. The Winner is the other player(s).
+
+# Terms and Definitions
+**Return** - When a paddle makes contact with a ball sending it back toward the other player
+**Paddle** - An object the player controls in order to prevent the ball from crossing their goal zone
+**Arena** - The play space which contains the player's paddles, one or more balls, solid walls at the top and bottom, and score zones each player must defend.
+**Modifier** - An alteration to the vanilla pong ruleset.
 
 ## Local dev
 ```bash
@@ -16,30 +27,3 @@ This repo includes a Pages workflow for branch **master**. On every push to `mas
 Enable:
 - Repo → Settings → Pages → Source = GitHub Actions (no further config needed).
 
-## Assistants-in-Action (no servers!)
-The action **edits this repo via OpenAI** and commits directly to **master**.
-
-### Setup
-1) Repo secret: `OPENAI_API_KEY` (Settings → Secrets → Actions).  
-2) (Optional) Label: create a label named `agent` for issues.
-
-### Use it
-- **Run workflow** (Actions → “Assistants in Action”) and paste your instruction, or
-- Open an **Issue** with title containing `[agent]` (or add label `agent`) and put your instruction in the body. The action will:
-  - inspect code,
-  - modify files/tests,
-  - commit to `master`,
-  - Pages deploy will update your public site.
-
-### Examples
-- “Add right-paddle AI with reaction 0.2s and max speed 300; set win score to 15.”
-- “Make the game slightly slower and swap the font to a monospace scoreboard.”
-
----
-
-## Optional: GitHub App (for external services)
-You **do not need** a GitHub App for this Actions-based flow. GHA’s built-in `GITHUB_TOKEN` plus your `OPENAI_API_KEY` is enough.
-
-Create a GitHub App **only if** you want to control commits from outside Actions (e.g., a separate worker or server).
-
-See `docs/SETUP_GITHUB_APP.md` for a minimal, safe configuration.
