@@ -9,10 +9,33 @@
 
 let devOverlayStylesInjected = false
 
+interface DevOverlayOptions {
+  onDockChange?: (docked: boolean) => void
+}
+
 function ensureDevOverlayStyles() {
   if (devOverlayStylesInjected) return
   const style = document.createElement('style')
   style.textContent = `
+    .dev-overlay-container {
+      position: relative;
+    }
+    .dev-overlay-container.dev-overlay-container--docked {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 16px;
+      flex-wrap: nowrap;
+    }
+    .dev-overlay-container.dev-overlay-container--docked canvas {
+      flex: 1 1 auto;
+      min-width: 0;
+      height: auto;
+      max-width: 100%;
+      max-height: calc(100vh - 32px);
+    }
     .dev-overlay {
       position: fixed;
       top: 16px;
@@ -36,6 +59,21 @@ function ensureDevOverlayStyles() {
     .dev-overlay.dev-overlay--visible {
       display: block;
     }
+    .dev-overlay.dev-overlay--docked {
+      position: relative;
+      top: 0;
+      right: 0;
+      margin: 0;
+      height: calc(100vh - 32px);
+      max-height: none;
+      width: 320px;
+      display: none;
+      flex: 0 0 320px;
+    }
+    .dev-overlay.dev-overlay--docked.dev-overlay--visible {
+      display: flex;
+      flex-direction: column;
+    }
     .dev-overlay__title {
       font-size: 14px;
       font-weight: 600;
@@ -49,6 +87,23 @@ function ensureDevOverlayStyles() {
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .dev-overlay__dock-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(226, 232, 240, 0.7);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .dev-overlay__dock-toggle input {
+      width: 14px;
+      height: 14px;
     }
     .dev-overlay__hint {
       color: rgba(226, 232, 240, 0.65);
@@ -264,12 +319,18 @@ function ensureDevOverlayStyles() {
   devOverlayStylesInjected = true
 }
 
-export function createDevOverlay(config: DevConfig, defaults: DevConfig): HTMLDivElement {
+export function createDevOverlay(
+  config: DevConfig,
+  defaults: DevConfig,
+  options: DevOverlayOptions = {},
+): HTMLDivElement {
   ensureDevOverlayStyles()
 
   const overlay = document.createElement('div')
   overlay.className = 'dev-overlay'
   overlay.setAttribute('aria-hidden', 'true')
+
+  const { onDockChange } = options
 
   const title = document.createElement('div')
   title.className = 'dev-overlay__title'
@@ -289,7 +350,25 @@ export function createDevOverlay(config: DevConfig, defaults: DevConfig): HTMLDi
   collapseAllButton.className = 'dev-overlay__collapse-all'
   collapseAllButton.textContent = 'Collapse All'
 
+  const dockToggleLabel = document.createElement('label')
+  dockToggleLabel.className = 'dev-overlay__dock-toggle'
+
+  const dockToggle = document.createElement('input')
+  dockToggle.type = 'checkbox'
+  dockToggle.addEventListener('change', () => {
+    const docked = dockToggle.checked
+    overlay.classList.toggle('dev-overlay--docked', docked)
+    onDockChange?.(docked)
+  })
+
+  const dockToggleText = document.createElement('span')
+  dockToggleText.textContent = 'Dock panel'
+
+  dockToggleLabel.appendChild(dockToggle)
+  dockToggleLabel.appendChild(dockToggleText)
+
   titleMeta.appendChild(hint)
+  titleMeta.appendChild(dockToggleLabel)
   titleMeta.appendChild(collapseAllButton)
   title.appendChild(heading)
   title.appendChild(titleMeta)
@@ -624,9 +703,11 @@ function isGravityWellModifier(value: unknown): value is GravityWellModifier {
     return false
   }
 
-  return !('wanderSpeed' in candidate && typeof candidate.wanderSpeed !== 'number');
+  if ('wanderSpeed' in candidate && typeof candidate.wanderSpeed !== 'number') {
+    return false
+  }
 
-
+  return true
 }
 
 function createOverlayButton(label: string) {

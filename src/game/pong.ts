@@ -69,8 +69,14 @@ export function createPong(
 
   const defaults = createDevConfig()
   const config = deepClone(defaults)
-  const overlay = createDevOverlay(config, defaults)
-  canvas.parentElement?.appendChild(overlay)
+  const container = canvas.parentElement
+  container?.classList.add('dev-overlay-container')
+
+  const overlay = createDevOverlay(config, defaults, {
+    onDockChange: () => syncOverlayLayout(),
+  })
+  container?.appendChild(overlay)
+  syncOverlayLayout()
 
   const keys: KeySet = {}
   let leftAIEnabled = true
@@ -80,6 +86,7 @@ export function createPong(
     window.addEventListener('keydown', (e) => {
       if (e.key === '`' && !e.repeat) {
         toggleOverlay(overlay)
+        syncOverlayLayout()
         e.preventDefault()
         return
       }
@@ -135,6 +142,13 @@ export function createPong(
     window.addEventListener('keypress', (e) => {
       if (e.key.toLowerCase() === 'r') reset()
     })
+  }
+
+  function syncOverlayLayout() {
+    if (!container) return
+    const docked = overlay.classList.contains('dev-overlay--docked')
+    const visible = overlay.classList.contains('dev-overlay--visible')
+    container.classList.toggle('dev-overlay-container--docked', docked && visible)
   }
 
   let last = performance.now()
