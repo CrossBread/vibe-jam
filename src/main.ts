@@ -14,6 +14,104 @@ app.appendChild(canvas)
 
 const game = createPong(canvas)
 
+type FullscreenCapableElement = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void>
+  msRequestFullscreen?: () => Promise<void>
+}
+
+const fullscreenTarget: FullscreenCapableElement = app
+
+const requestFullscreen = () => {
+  if (document.fullscreenElement === fullscreenTarget) {
+    return Promise.resolve()
+  }
+
+  if (document.fullscreenEnabled === false) {
+    return Promise.reject(new Error('Fullscreen disabled'))
+  }
+
+  const requestMethod =
+    fullscreenTarget.requestFullscreen?.bind(fullscreenTarget) ??
+    fullscreenTarget.webkitRequestFullscreen?.bind(fullscreenTarget) ??
+    fullscreenTarget.msRequestFullscreen?.bind(fullscreenTarget)
+
+  if (!requestMethod) {
+    return Promise.reject(new Error('Fullscreen not supported'))
+  }
+
+  try {
+    const result = requestMethod()
+    if (result && typeof (result as Promise<void>).then === 'function') {
+      return result as Promise<void>
+    }
+    return Promise.resolve()
+  } catch (error) {
+    return Promise.reject(error)
+  }
+}
+
+const interactionEvents: Array<keyof WindowEventMap> = [
+  'pointerdown',
+  'touchend',
+  'keydown',
+]
+
+const handleUserInteraction = () => {
+  requestFullscreen().catch(() => {
+    // ignore rejection – browsers will throw if user interaction is required
+  })
+}
+
+const removeFullscreenInteractionListeners = () => {
+  interactionEvents.forEach((event) =>
+    window.removeEventListener(event, handleUserInteraction),
+  )
+}
+
+const addFullscreenInteractionListeners = () => {
+  removeFullscreenInteractionListeners()
+  interactionEvents.forEach((event) =>
+    window.addEventListener(event, handleUserInteraction, { passive: true }),
+  )
+}
+
+const handleFullscreenChange = () => {
+  if (document.fullscreenElement === fullscreenTarget) {
+    removeFullscreenInteractionListeners()
+  } else {
+    addFullscreenInteractionListeners()
+  }
+}
+
+const shouldAutoRequestFullscreen = (() => {
+  const ua = navigator.userAgent ?? ''
+  const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i
+  if (mobileRegex.test(ua)) {
+    return true
+  }
+
+  const hasCoarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches ?? false
+  const maxViewportDimension = Math.max(window.innerWidth, window.innerHeight)
+  const isCompactViewport = Number.isFinite(maxViewportDimension)
+    ? maxViewportDimension <= 900
+    : false
+
+  return hasCoarsePointer && isCompactViewport
+})()
+
+if (shouldAutoRequestFullscreen) {
+  document.addEventListener('fullscreenchange', handleFullscreenChange)
+  document.addEventListener(
+    'webkitfullscreenchange',
+    handleFullscreenChange as EventListener,
+  )
+
+  addFullscreenInteractionListeners()
+  requestFullscreen().catch(() => {
+    // ignore rejection – browsers will throw if user interaction is required
+  })
+}
+
 function parsePixelValue(value: string) {
   const parsed = Number.parseFloat(value)
   return Number.isFinite(parsed) ? parsed : 0
