@@ -27,7 +27,7 @@
       "gopher": {
         "name": "Gopher",
         "description": "Mischievous gravity gopher that repels the ball as it tunnels",
-        "enabled": true,
+        "enabled": false,
         "gravityStrength": -6200000,
         "gravityFalloff": 45,
         "radius": 53,
@@ -64,9 +64,9 @@
       "ireland": {
         "name": "Ireland",
         "description": "Rolling gravity hills and a few towering peaks",
-        "enabled": false,
-        "gravityStrength": 3800000,
-        "gravityFalloff": 126,
+        "enabled": true,
+        "gravityStrength": -1200000,
+        "gravityFalloff": 7,
         "radius": 56,
         "wellCount": 16,
         "minGravityStrength": 1800000,
