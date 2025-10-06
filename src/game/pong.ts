@@ -1,13 +1,9 @@
 import {
-  GRAVITY_WELL_KEYS,
   GRAVITY_WELL_VISUALS,
   createDevConfig,
   deepClone,
   getGravityWellsEntries,
-  type ArenaModifiers,
-  type DevConfig,
   type GravityWellKey,
-  type GravityWellModifier,
 } from './devtools'
 import { createDevOverlay, toggleOverlay } from './devOverlay'
 
