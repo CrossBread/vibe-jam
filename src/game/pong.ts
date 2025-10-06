@@ -3,6 +3,7 @@ import {
   createDevConfig,
   deepClone,
   getGravityWellsEntries,
+  type ArenaModifiers,
   type GravityWellKey,
   type GravityWellModifier,
 } from './devtools'
@@ -38,6 +39,16 @@ export interface PongOptions {
    * Disable for headless/unit testing environments.
    */
   autoStart?: boolean
+
+  /**
+   * Duration in seconds before an announcement begins to fade.
+   */
+  announcementHoldDuration?: number
+
+  /**
+   * Duration in seconds for an announcement fade out effect.
+   */
+  announcementFadeDuration?: number
 }
 
 type KeySet = Record<string, boolean>
@@ -85,6 +96,13 @@ type IrelandModifier = GravityWellModifier & {
   maxRadius?: number
 }
 
+interface Announcement {
+  lines: string[]
+  elapsed: number
+  holdDuration: number
+  fadeDuration: number
+}
+
 export function createPong(
   canvas: HTMLCanvasElement,
   options: PongOptions = {},
@@ -93,7 +111,11 @@ export function createPong(
   if (!context) throw new Error('Canvas 2D context is required')
   const ctx = context
 
-  const { autoStart = true } = options
+  const {
+    autoStart = true,
+    announcementHoldDuration = 3.5,
+    announcementFadeDuration = 1.35,
+  } = options
   const W = canvas.width
   const H = canvas.height
   const PADDLE_H = 90
@@ -101,6 +123,8 @@ export function createPong(
   const BALL_R = 8
   const WIN_SCORE = 11
   const PIPS_PER_BITE = 8
+  const ARENA_BACKGROUND = '#10172a'
+  const ANNOUNCEMENT_COLOR = '#203275'
 
   const defaults = createDevConfig()
   const config = deepClone(defaults)
@@ -177,6 +201,10 @@ export function createPong(
   const irelandWells: StoredWell[] = []
   let irelandNeedsRegeneration = true
   let activeGravityWells: ActiveGravityWell[] = []
+  let announcement: Announcement | null = null
+  let lastEnabledArenaModifiers = new Set<GravityWellKey>(
+    getEnabledArenaModifierKeys(config.modifiers.arena),
+  )
 
   function resetBall(toLeft: boolean) {
     state.ballX = W * 0.5
@@ -203,6 +231,10 @@ export function createPong(
     irelandWells.length = 0
     irelandNeedsRegeneration = true
     activeGravityWells = []
+    announcement = null
+    lastEnabledArenaModifiers = new Set<GravityWellKey>(
+      getEnabledArenaModifierKeys(config.modifiers.arena),
+    )
     resetBall(Math.random() < 0.5)
   }
 
@@ -234,6 +266,9 @@ export function createPong(
   }
 
   function tick(dt: number) {
+    updateAnnouncement(dt)
+    checkModifierAnnouncements()
+
     if (state.winner) return
 
     updateMovingWellState('blackMole', dt)
@@ -350,6 +385,60 @@ export function createPong(
       resetBall(true)
       handlePointScored()
     }
+  }
+
+  function updateAnnouncement(dt: number) {
+    if (!announcement) return
+    announcement.elapsed += dt
+    const totalDuration = announcement.holdDuration + announcement.fadeDuration
+    if (announcement.elapsed >= totalDuration) {
+      announcement = null
+    }
+  }
+
+  function checkModifierAnnouncements() {
+    const enabledEntries = getEnabledArenaModifiers(config.modifiers.arena)
+    const enabledKeys = new Set<GravityWellKey>()
+    const newlyEnabled: string[] = []
+
+    for (const [key, modifier] of enabledEntries) {
+      enabledKeys.add(key)
+      if (!lastEnabledArenaModifiers.has(key)) {
+        newlyEnabled.push(modifier.name)
+      }
+    }
+
+    if (newlyEnabled.length > 0) {
+      showAnnouncement(newlyEnabled)
+    }
+
+    lastEnabledArenaModifiers = enabledKeys
+  }
+
+  function showAnnouncement(lines: string[]) {
+    const uppercased = lines
+      .flatMap(line => line.trim().split(/\s+/))
+      .filter(Boolean)
+      .map(segment => segment.toUpperCase())
+      .slice(0, 3)
+    if (uppercased.length === 0) return
+
+    announcement = {
+      lines: uppercased,
+      elapsed: 0,
+      holdDuration: Math.max(0, announcementHoldDuration),
+      fadeDuration: Math.max(0, announcementFadeDuration),
+    }
+  }
+
+  function getEnabledArenaModifiers(
+    arena: ArenaModifiers,
+  ): [GravityWellKey, GravityWellModifier][] {
+    return getGravityWellsEntries(arena).filter(([, modifier]) => modifier.enabled)
+  }
+
+  function getEnabledArenaModifierKeys(arena: ArenaModifiers): GravityWellKey[] {
+    return getEnabledArenaModifiers(arena).map(([key]) => key)
   }
 
   function handlePaddleReturn() {
@@ -638,8 +727,10 @@ export function createPong(
   }
 
   function draw() {
-    ctx.fillStyle = '#10172a'
+    ctx.fillStyle = ARENA_BACKGROUND
     ctx.fillRect(0, 0, W, H)
+
+    drawAnnouncement()
 
     ctx.strokeStyle = 'rgba(255,255,255,0.15)'
     ctx.setLineDash([6, 10])
@@ -707,6 +798,55 @@ export function createPong(
       ctx.font = 'bold 36px ui-sans-serif, system-ui'
       ctx.fillText(`${state.winner.toUpperCase()} WINS!`, W / 2, H / 2)
     }
+  }
+
+  function drawAnnouncement() {
+    if (!announcement) return
+
+    const { lines, elapsed, holdDuration, fadeDuration } = announcement
+    const totalDuration = holdDuration + fadeDuration
+    if (elapsed > totalDuration) return
+
+    let alpha = 1
+    if (elapsed > holdDuration) {
+      if (fadeDuration === 0) return
+      alpha = Math.max(0, 1 - (elapsed - holdDuration) / fadeDuration)
+    }
+
+    if (alpha <= 0) return
+
+    const visibleLines = lines.slice(0, 3)
+    const lineCount = visibleLines.length
+    if (lineCount === 0) return
+
+    const fontSize = lineCount === 1 ? 148 : lineCount === 2 ? 122 : 96
+    const lineHeight = fontSize * 1.12
+    const startY = H / 2 - ((lineCount - 1) * lineHeight) / 2
+
+    ctx.save()
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.font = `900 ${fontSize}px 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif`
+    ctx.fillStyle = applyAlphaToColor(ANNOUNCEMENT_COLOR, alpha)
+    ctx.shadowColor = applyAlphaToColor('#0f172a', alpha * 0.6)
+    ctx.shadowBlur = 22
+    ctx.shadowOffsetX = 0
+    ctx.shadowOffsetY = 0
+
+    for (let i = 0; i < lineCount; i++) {
+      ctx.fillText(visibleLines[i], W / 2, startY + i * lineHeight)
+    }
+
+    ctx.restore()
+  }
+
+  function applyAlphaToColor(hex: string, alpha: number) {
+    const clamped = Math.max(0, Math.min(1, alpha))
+    const value = hex.replace('#', '')
+    const r = parseInt(value.slice(0, 2), 16)
+    const g = parseInt(value.slice(2, 4), 16)
+    const b = parseInt(value.slice(4, 6), 16)
+    return `rgba(${r}, ${g}, ${b}, ${clamped})`
   }
 
   function randomRange(min: number, max: number) {
