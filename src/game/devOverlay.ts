@@ -8,6 +8,8 @@
   type KiteModifier,
   type BumShuffleModifier,
   type PollokModifier,
+  type SnowballModifier,
+  type MeteorModifier,
   type ModifiersConfig,
 } from './devtools'
 
@@ -557,7 +559,7 @@ export function createDevOverlay(
     ballList.className = 'dev-overlay__modifiers'
     ballSection.appendChild(ballList)
 
-    const { kite, bumShuffle, pollok } = config.modifiers.ball
+    const { kite, bumShuffle, pollok, snowball, meteor } = config.modifiers.ball
 
     ballList.appendChild(
       createModifierDetails(kite, body => {
@@ -611,6 +613,70 @@ export function createDevOverlay(
         body.appendChild(
           createColorControl('Neutral Color', pollok.neutralColor, value => {
             pollok.neutralColor = value
+          }),
+        )
+      }),
+    )
+
+    ballList.appendChild(
+      createModifierDetails(snowball, body => {
+        body.appendChild(
+          createSliderControl('Minimum Radius', snowball.minRadius, {
+            min: 2,
+            max: 12,
+            step: 0.5,
+            format: v => `${v.toFixed(1)} px`,
+            onInput: v => (snowball.minRadius = v),
+          }),
+        )
+        body.appendChild(
+          createSliderControl('Maximum Radius', snowball.maxRadius, {
+            min: 8,
+            max: 32,
+            step: 0.5,
+            format: v => `${v.toFixed(1)} px`,
+            onInput: v => (snowball.maxRadius = v),
+          }),
+        )
+        body.appendChild(
+          createSliderControl('Growth Rate', snowball.growthRate, {
+            min: 0.001,
+            max: 0.05,
+            step: 0.001,
+            format: v => `${v.toFixed(3)} px⁻¹`,
+            onInput: v => (snowball.growthRate = v),
+          }),
+        )
+      }),
+    )
+
+    ballList.appendChild(
+      createModifierDetails(meteor, body => {
+        body.appendChild(
+          createSliderControl('Starting Radius', meteor.startRadius, {
+            min: 8,
+            max: 32,
+            step: 0.5,
+            format: v => `${v.toFixed(1)} px`,
+            onInput: v => (meteor.startRadius = v),
+          }),
+        )
+        body.appendChild(
+          createSliderControl('Minimum Radius', meteor.minRadius, {
+            min: 2,
+            max: 16,
+            step: 0.5,
+            format: v => `${v.toFixed(1)} px`,
+            onInput: v => (meteor.minRadius = v),
+          }),
+        )
+        body.appendChild(
+          createSliderControl('Shrink Rate', meteor.shrinkRate, {
+            min: 0.001,
+            max: 0.05,
+            step: 0.001,
+            format: v => `${v.toFixed(3)} px⁻¹`,
+            onInput: v => (meteor.shrinkRate = v),
           }),
         )
       }),
@@ -835,6 +901,8 @@ function isDevConfig(value: unknown): value is DevConfig {
   if (!isKiteModifier(ball.kite)) return false
   if (!isBumShuffleModifier(ball.bumShuffle)) return false
   if (!isPollokModifier(ball.pollok)) return false
+  if (!isSnowballModifier(ball.snowball)) return false
+  if (!isMeteorModifier(ball.meteor)) return false
 
   return true
 }
@@ -952,6 +1020,26 @@ function isPollokModifier(value: unknown): value is PollokModifier {
     typeof candidate.leftColor === 'string' &&
     typeof candidate.rightColor === 'string' &&
     typeof candidate.neutralColor === 'string'
+  )
+}
+
+function isSnowballModifier(value: unknown): value is SnowballModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<SnowballModifier>
+  return (
+    typeof candidate.minRadius === 'number' &&
+    typeof candidate.maxRadius === 'number' &&
+    typeof candidate.growthRate === 'number'
+  )
+}
+
+function isMeteorModifier(value: unknown): value is MeteorModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<MeteorModifier>
+  return (
+    typeof candidate.startRadius === 'number' &&
+    typeof candidate.minRadius === 'number' &&
+    typeof candidate.shrinkRate === 'number'
   )
 }
 

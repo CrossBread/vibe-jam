@@ -15,6 +15,7 @@ export interface PongState {
   rightScore: number
   ballX: number
   ballY: number
+  ballRadius: number
   vx: number
   vy: number
   leftY: number
@@ -108,6 +109,7 @@ interface Announcement {
 interface TrailPoint {
   x: number
   y: number
+  radius?: number
 }
 
 interface ColoredTrailPoint extends TrailPoint {
@@ -184,6 +186,7 @@ export function createPong(
     rightScore: 0,
     ballX: W * 0.5,
     ballY: H * 0.5,
+    ballRadius: BALL_R,
     vx: config.baseBallSpeed * (Math.random() < 0.5 ? -1 : 1),
     vy: (Math.random() * 2 - 1) * config.baseBallSpeed * 0.6,
     leftY: H * 0.5 - PADDLE_H / 2,
@@ -229,8 +232,11 @@ export function createPong(
   const pollokTrail: ColoredTrailPoint[] = []
   let lastReturner: 'left' | 'right' | null = null
   let completedBitesSinceLastPoint = 0
+  let currentBallRadius = BALL_R
+  let ballTravelDistance = 0
 
   initializeActiveModState()
+  resetBallSize()
 
   function resetBall(toLeft: boolean) {
     state.ballX = W * 0.5
@@ -238,6 +244,7 @@ export function createPong(
     state.vx = config.baseBallSpeed * (toLeft ? -1 : 1)
     state.vy = (Math.random() * 2 - 1) * config.baseBallSpeed * 0.6
     lastReturner = null
+    resetBallSize()
     clearKiteTrail()
   }
 
@@ -358,63 +365,72 @@ export function createPong(
       }
     }
 
+    const speed = Math.hypot(state.vx, state.vy)
+
     // Move ball
     state.ballX += state.vx * dt
     state.ballY += state.vy * dt
 
+    applyBallSizeModifiers(speed * dt)
+
+    let radius = getBallRadius()
+
     // Top/Bottom bounce
-    if (state.ballY < BALL_R) {
-      state.ballY = BALL_R
+    if (state.ballY < radius) {
+      state.ballY = radius
       state.vy *= -1
     }
-    if (state.ballY > H - BALL_R) {
-      state.ballY = H - BALL_R
+    if (state.ballY > H - radius) {
+      state.ballY = H - radius
       state.vy *= -1
     }
 
     // Left paddle collision
     if (
-      state.ballX - BALL_R < 40 + PADDLE_W &&
-      state.ballX - BALL_R > 40 &&
+      state.ballX - radius < 40 + PADDLE_W &&
+      state.ballX - radius > 40 &&
       state.ballY > state.leftY &&
       state.ballY < state.leftY + PADDLE_H
     ) {
-      state.ballX = 40 + PADDLE_W + BALL_R
+      state.ballX = 40 + PADDLE_W + radius
       const rel = (state.ballY - (state.leftY + PADDLE_H / 2)) / (PADDLE_H / 2)
       const angle = rel * 0.8
-      const speed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
-      state.vx = Math.cos(angle) * speed
-      state.vy = Math.sin(angle) * speed
+      const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
+      state.vx = Math.cos(angle) * reboundSpeed
+      state.vy = Math.sin(angle) * reboundSpeed
       handlePaddleReturn('left')
+      radius = getBallRadius()
     }
 
     // Right paddle collision
     if (
-      state.ballX + BALL_R > W - 40 - PADDLE_W &&
-      state.ballX + BALL_R < W - 40 &&
+      state.ballX + radius > W - 40 - PADDLE_W &&
+      state.ballX + radius < W - 40 &&
       state.ballY > state.rightY &&
       state.ballY < state.rightY + PADDLE_H
     ) {
-      state.ballX = W - 40 - PADDLE_W - BALL_R
+      state.ballX = W - 40 - PADDLE_W - radius
       const rel = (state.ballY - (state.rightY + PADDLE_H / 2)) / (PADDLE_H / 2)
       const angle = Math.PI - rel * 0.8
-      const speed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
-      state.vx = Math.cos(angle) * speed
-      state.vy = Math.sin(angle) * speed
+      const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
+      state.vx = Math.cos(angle) * reboundSpeed
+      state.vy = Math.sin(angle) * reboundSpeed
       handlePaddleReturn('right')
+      radius = getBallRadius()
     }
 
     updateBallTrails()
 
     // Score
-    if (state.ballX < -BALL_R) {
+    if (state.ballX < -radius) {
       state.rightScore++
       if (state.rightScore >= WIN_SCORE) state.winner = 'right'
       clearDivotWells()
       resetBall(false)
       handlePointScored()
+      radius = getBallRadius()
     }
-    if (state.ballX > W + BALL_R) {
+    if (state.ballX > W + radius) {
       state.leftScore++
       if (state.leftScore >= WIN_SCORE) state.winner = 'left'
       clearDivotWells()
@@ -480,6 +496,7 @@ export function createPong(
   function handlePaddleReturn(side: 'left' | 'right') {
     lastReturner = side
     registerPipReturn()
+    resetBallSize()
     spawnDivotWell()
   }
 
@@ -628,28 +645,80 @@ export function createPong(
     return wells
   }
 
+  function getBallRadius() {
+    return currentBallRadius
+  }
+
+  function resetBallSize() {
+    ballTravelDistance = 0
+    applyBallSizeModifiers(0)
+  }
+
+  function applyBallSizeModifiers(distanceDelta: number) {
+    if (Number.isFinite(distanceDelta) && distanceDelta > 0) {
+      ballTravelDistance += distanceDelta
+    }
+
+    const { snowball, meteor } = config.modifiers.ball
+    let radius = BALL_R
+
+    if (snowball.enabled) {
+      const rawMin = Number.isFinite(snowball.minRadius) ? snowball.minRadius : BALL_R * 0.5
+      const rawMax = Number.isFinite(snowball.maxRadius) ? snowball.maxRadius : BALL_R * 2
+      const minRadius = clamp(rawMin, 1, 160)
+      const maxRadius = clamp(Math.max(rawMax, minRadius), minRadius, 200)
+      const growthRate = Number.isFinite(snowball.growthRate)
+        ? Math.max(0, snowball.growthRate)
+        : 0
+      radius = clamp(minRadius + ballTravelDistance * growthRate, minRadius, maxRadius)
+    }
+
+    if (meteor.enabled) {
+      const rawStart = Number.isFinite(meteor.startRadius) ? meteor.startRadius : BALL_R * 2
+      const startRadius = clamp(rawStart, 2, 220)
+      const rawMin = Number.isFinite(meteor.minRadius) ? meteor.minRadius : BALL_R * 0.75
+      const minRadius = clamp(Math.min(rawMin, startRadius), 1, startRadius)
+      const shrinkRate = Number.isFinite(meteor.shrinkRate)
+        ? Math.max(0, meteor.shrinkRate)
+        : 0
+      radius = clamp(startRadius - ballTravelDistance * shrinkRate, minRadius, startRadius)
+    }
+
+    currentBallRadius = radius
+    state.ballRadius = currentBallRadius
+  }
+
   function updateBallTrails() {
     const { ball } = config.modifiers
     const x = state.ballX
     const y = state.ballY
+    const radius = getBallRadius()
 
     if (ball.kite.enabled) {
       const maxLength = clampTrailLength(ball.kite.tailLength, 4, MAX_KITE_HISTORY)
-      addTrailPoint(kiteTrail, x, y, maxLength)
+      addTrailPoint(kiteTrail, x, y, maxLength, 0, radius)
     } else if (kiteTrail.length > 0) {
       clearKiteTrail()
     }
 
     if (ball.bumShuffle.enabled) {
       const maxLength = clampTrailLength(ball.bumShuffle.trailLength, 40, MAX_BUM_SHUFFLE_HISTORY)
-      addTrailPoint(bumShuffleTrail, x, y, maxLength, BUM_SHUFFLE_DISTANCE_SQ)
+      addTrailPoint(bumShuffleTrail, x, y, maxLength, BUM_SHUFFLE_DISTANCE_SQ, radius)
     } else if (bumShuffleTrail.length > 0) {
       clearBumShuffleTrail()
     }
 
     if (ball.pollok.enabled) {
       const maxLength = clampTrailLength(ball.pollok.trailLength, 80, MAX_POLLOK_HISTORY)
-      addColoredTrailPoint(pollokTrail, x, y, getPollokColor(), maxLength, POLLOK_DISTANCE_SQ)
+      addColoredTrailPoint(
+        pollokTrail,
+        x,
+        y,
+        getPollokColor(),
+        maxLength,
+        POLLOK_DISTANCE_SQ,
+        radius,
+      )
     } else if (pollokTrail.length > 0) {
       clearPollokTrail()
     }
@@ -930,8 +999,9 @@ export function createPong(
     ctx.fillRect(40, state.leftY, PADDLE_W, PADDLE_H)
     ctx.fillRect(W - 40 - PADDLE_W, state.rightY, PADDLE_W, PADDLE_H)
 
+    const ballRadius = getBallRadius()
     ctx.beginPath()
-    ctx.arc(state.ballX, state.ballY, BALL_R, 0, Math.PI * 2)
+    ctx.arc(state.ballX, state.ballY, ballRadius, 0, Math.PI * 2)
     ctx.fill()
 
     const pipRadius = 6
@@ -1014,7 +1084,9 @@ export function createPong(
     if (!modifier.enabled || bumShuffleTrail.length < 2) return
 
     ctx.save()
-    ctx.lineWidth = BALL_R * 1.35
+    const latestRadius =
+      bumShuffleTrail[bumShuffleTrail.length - 1]?.radius ?? getBallRadius()
+    ctx.lineWidth = Math.max(1, latestRadius * 1.35)
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
     ctx.strokeStyle = BALL_COLOR
@@ -1032,14 +1104,18 @@ export function createPong(
     if (!modifier.enabled || pollokTrail.length < 2) return
 
     ctx.save()
-    ctx.lineWidth = BALL_R * 1.45
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
 
+    const fallbackRadius = getBallRadius()
     for (let i = 1; i < pollokTrail.length; i++) {
       const prev = pollokTrail[i - 1]
       const current = pollokTrail[i]
       if (prev.x === current.x && prev.y === current.y) continue
+      const prevRadius = prev.radius ?? fallbackRadius
+      const currentRadius = current.radius ?? fallbackRadius
+      const averageRadius = (prevRadius + currentRadius) * 0.5
+      ctx.lineWidth = Math.max(1, averageRadius * 1.45)
       ctx.strokeStyle = current.color
       ctx.beginPath()
       ctx.moveTo(prev.x, prev.y)
@@ -1061,7 +1137,8 @@ export function createPong(
       const alpha = ((i + 1) / length) * 0.8
       ctx.fillStyle = applyAlphaToColor(BALL_COLOR, Math.min(1, alpha))
       ctx.beginPath()
-      ctx.arc(point.x, point.y, BALL_R, 0, Math.PI * 2)
+      const radius = point.radius ?? getBallRadius()
+      ctx.arc(point.x, point.y, radius, 0, Math.PI * 2)
       ctx.fill()
     }
     ctx.restore()
@@ -1126,6 +1203,7 @@ export function createPong(
     y: number,
     maxLength: number,
     minDistanceSq = 0,
+    radius?: number,
   ) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) return
     const last = points[points.length - 1]
@@ -1135,10 +1213,13 @@ export function createPong(
       if (dx * dx + dy * dy < minDistanceSq) {
         last.x = x
         last.y = y
+        if (radius !== undefined) last.radius = radius
         return
       }
     }
-    points.push({ x, y })
+    const nextPoint: TrailPoint = { x, y }
+    if (radius !== undefined) nextPoint.radius = radius
+    points.push(nextPoint)
     if (points.length > maxLength) {
       points.splice(0, points.length - maxLength)
     }
@@ -1151,6 +1232,7 @@ export function createPong(
     color: string,
     maxLength: number,
     minDistanceSq = 0,
+    radius?: number,
   ) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) return
     const last = points[points.length - 1]
@@ -1161,10 +1243,13 @@ export function createPong(
         last.x = x
         last.y = y
         last.color = color
+        if (radius !== undefined) last.radius = radius
         return
       }
     }
-    points.push({ x, y, color })
+    const nextPoint: ColoredTrailPoint = { x, y, color }
+    if (radius !== undefined) nextPoint.radius = radius
+    points.push(nextPoint)
     if (points.length > maxLength) {
       points.splice(0, points.length - maxLength)
     }

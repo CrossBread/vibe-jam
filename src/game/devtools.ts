@@ -12,7 +12,7 @@ export const GRAVITY_WELL_KEYS = [
 
 export type GravityWellKey = (typeof GRAVITY_WELL_KEYS)[number]
 
-export const BALL_MODIFIER_KEYS = ['kite', 'bumShuffle', 'pollok'] as const
+export const BALL_MODIFIER_KEYS = ['kite', 'bumShuffle', 'pollok', 'snowball', 'meteor'] as const
 
 export type BallModifierKey = (typeof BALL_MODIFIER_KEYS)[number]
 
@@ -48,10 +48,24 @@ export interface PollokModifier extends ModifierBase {
   neutralColor: string
 }
 
+export interface SnowballModifier extends ModifierBase {
+  minRadius: number
+  maxRadius: number
+  growthRate: number
+}
+
+export interface MeteorModifier extends ModifierBase {
+  startRadius: number
+  minRadius: number
+  shrinkRate: number
+}
+
 export type BallModifiers = {
   kite: KiteModifier
   bumShuffle: BumShuffleModifier
   pollok: PollokModifier
+  snowball: SnowballModifier
+  meteor: MeteorModifier
 }
 
 export interface ModifiersConfig {

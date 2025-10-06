@@ -98,6 +98,22 @@
         "leftColor": "#f472b6",
         "rightColor": "#38bdf8",
         "neutralColor": "#fbbf24"
+      },
+      "snowball": {
+        "name": "Snowball",
+        "description": "Ball starts small and grows as it travels, resetting on returns",
+        "enabled": false,
+        "minRadius": 4,
+        "maxRadius": 18,
+        "growthRate": 0.02
+      },
+      "meteor": {
+        "name": "Meteor",
+        "description": "Ball starts large and burns away as it travels, resetting on returns",
+        "enabled": false,
+        "startRadius": 18,
+        "minRadius": 5,
+        "shrinkRate": 0.02
       }
     },
     "paddle": {}
