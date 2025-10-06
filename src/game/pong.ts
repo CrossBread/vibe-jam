@@ -19,6 +19,9 @@ export interface PongState {
   rightY: number
   paused: boolean
   winner: 'left' | 'right' | null
+  currentPips: number
+  totalPips: number
+  totalBites: number
 }
 
 export interface PongAPI {
@@ -97,6 +100,7 @@ export function createPong(
   const PADDLE_W = 12
   const BALL_R = 8
   const WIN_SCORE = 11
+  const PIPS_PER_BITE = 8
 
   const defaults = createDevConfig()
   const config = deepClone(defaults)
@@ -145,6 +149,9 @@ export function createPong(
     rightY: H * 0.5 - PADDLE_H / 2,
     paused: false,
     winner: null,
+    currentPips: 0,
+    totalPips: 0,
+    totalBites: 0,
   }
 
   const movingWellStates: Record<MovingWellKey, MovingWellState> = {
@@ -184,6 +191,9 @@ export function createPong(
     state.leftY = H * 0.5 - PADDLE_H / 2
     state.rightY = H * 0.5 - PADDLE_H / 2
     state.winner = null
+    state.currentPips = 0
+    state.totalPips = 0
+    state.totalBites = 0
     leftAIEnabled = true
     rightAIEnabled = true
     for (const movingState of Object.values(movingWellStates)) {
@@ -343,6 +353,7 @@ export function createPong(
   }
 
   function handlePaddleReturn() {
+    registerPipReturn()
     spawnDivotWell()
   }
 
@@ -362,6 +373,12 @@ export function createPong(
     regenerateIrelandWells(modifier)
     irelandNeedsRegeneration = false
     activeGravityWells = collectActiveGravityWells()
+  }
+
+  function registerPipReturn() {
+    state.totalPips += 1
+    state.currentPips = ((state.totalPips - 1) % PIPS_PER_BITE) + 1
+    state.totalBites = Math.floor(state.totalPips / PIPS_PER_BITE)
   }
 
   function collectActiveGravityWells(): ActiveGravityWell[] {
@@ -659,6 +676,27 @@ export function createPong(
     ctx.arc(state.ballX, state.ballY, BALL_R, 0, Math.PI * 2)
     ctx.fill()
 
+    const pipRadius = 6
+    const pipSpacing = 22
+    const pipY = H - 24
+    const pipStartX = W / 2 - ((PIPS_PER_BITE - 1) * pipSpacing) / 2
+    ctx.lineWidth = 2
+    for (let i = 0; i < PIPS_PER_BITE; i++) {
+      const pipX = pipStartX + i * pipSpacing
+      const isFilled = state.currentPips > 0 && i < state.currentPips
+      ctx.beginPath()
+      ctx.arc(pipX, pipY, pipRadius, 0, Math.PI * 2)
+      if (isFilled) {
+        ctx.fillStyle = '#e7ecf3'
+        ctx.fill()
+      } else {
+        ctx.strokeStyle = 'rgba(231,236,243,0.35)'
+        ctx.stroke()
+      }
+    }
+    ctx.lineWidth = 1
+
+    ctx.fillStyle = '#e7ecf3'
     ctx.font =
       'bold 28px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto'
     ctx.textAlign = 'center'
