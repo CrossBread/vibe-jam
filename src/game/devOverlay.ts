@@ -533,9 +533,9 @@ export function createDevOverlay(
       body.appendChild(
         createSliderControl('Gravity Falloff', modifier.gravityFalloff, {
           min: 0,
-          max: 30_000,
-          step: 500,
-          format: v => `${Math.round(v).toLocaleString()}`,
+          max: 200,
+          step: 1,
+          format: v => `${Math.round(v)} px`,
           onInput: v => (modifier.gravityFalloff = v),
         }),
       )

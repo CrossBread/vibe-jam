@@ -10,7 +10,7 @@
         "description": "Gravity sink in the center of the playing field",
         "enabled": false,
         "gravityStrength": 4800000,
-        "gravityFalloff": 12000,
+        "gravityFalloff": 110,
         "radius": 40
       },
       "blackMole": {
@@ -18,7 +18,7 @@
         "description": "Moving gravity sink that prowls through the arena core",
         "enabled": false,
         "gravityStrength": 4600000,
-        "gravityFalloff": 14000,
+        "gravityFalloff": 118,
         "radius": 44,
         "wanderWidthPercentage": 0.4,
         "pauseDuration": 1.25,
@@ -29,7 +29,7 @@
         "description": "Mischievous gravity gopher that repels the ball as it tunnels",
         "enabled": true,
         "gravityStrength": -6200000,
-        "gravityFalloff": 2000,
+        "gravityFalloff": 45,
         "radius": 53,
         "wanderWidthPercentage": 0.45,
         "pauseDuration": 1.1,
@@ -40,7 +40,7 @@
         "description": "Large low intensity gravity sink",
         "enabled": false,
         "gravityStrength": 3200000,
-        "gravityFalloff": 20000,
+        "gravityFalloff": 141,
         "radius": 72
       },
       "whiteDwarf": {
@@ -48,7 +48,7 @@
         "description": "Small high intensity gravity sink",
         "enabled": false,
         "gravityStrength": 7200000,
-        "gravityFalloff": 6000,
+        "gravityFalloff": 77,
         "radius": 26
       },
       "divots": {
@@ -56,7 +56,7 @@
         "description": "A fresh crater spawns with every paddle return",
         "enabled": false,
         "gravityStrength": 5200000,
-        "gravityFalloff": 16000,
+        "gravityFalloff": 126,
         "radius": 38,
         "maxDivots": 14,
         "spawnMargin": 64
@@ -66,13 +66,13 @@
         "description": "Rolling gravity hills and a few towering peaks",
         "enabled": false,
         "gravityStrength": 3800000,
-        "gravityFalloff": 16000,
+        "gravityFalloff": 126,
         "radius": 56,
         "wellCount": 16,
         "minGravityStrength": 1800000,
         "maxGravityStrength": 6200000,
-        "minGravityFalloff": 9000,
-        "maxGravityFalloff": 26000,
+        "minGravityFalloff": 95,
+        "maxGravityFalloff": 161,
         "minRadius": 24,
         "maxRadius": 86
       }

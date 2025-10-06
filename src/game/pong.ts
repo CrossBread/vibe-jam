@@ -53,7 +53,7 @@ interface ActiveGravityWell {
   x: number
   y: number
   gravityStrength: number
-  gravityFalloff: number
+  gravityFalloff: number // squared falloff radius used for force calculations
   radius: number
 }
 
@@ -61,7 +61,7 @@ interface StoredWell {
   x: number
   y: number
   gravityStrength: number
-  gravityFalloff: number
+  gravityFalloff: number // squared falloff radius
   radius: number
 }
 
@@ -112,6 +112,11 @@ export function createPong(
   const keys: KeySet = {}
   let leftAIEnabled = true
   let rightAIEnabled = true
+
+  function toGravityFalloffValue(range: number): number {
+    const radius = Number.isFinite(range) ? Math.max(0, range) : 0
+    return radius * radius
+  }
 
   if (typeof window !== 'undefined') {
     window.addEventListener('keydown', (e) => {
@@ -349,7 +354,7 @@ export function createPong(
           x: state.x,
           y: state.y,
           gravityStrength: modifier.gravityStrength,
-          gravityFalloff: modifier.gravityFalloff,
+          gravityFalloff: toGravityFalloffValue(modifier.gravityFalloff),
           radius: modifier.radius,
         })
         continue
@@ -378,7 +383,7 @@ export function createPong(
                   x: W * 0.5,
                   y: H * 0.5,
                   gravityStrength: modifier.gravityStrength,
-                  gravityFalloff: modifier.gravityFalloff,
+                  gravityFalloff: toGravityFalloffValue(modifier.gravityFalloff),
                   radius: modifier.radius,
                 },
               ]
@@ -401,7 +406,7 @@ export function createPong(
         x: W * 0.5,
         y: H * 0.5,
         gravityStrength: modifier.gravityStrength,
-        gravityFalloff: modifier.gravityFalloff,
+        gravityFalloff: toGravityFalloffValue(modifier.gravityFalloff),
         radius: modifier.radius,
       })
     }
@@ -533,7 +538,13 @@ export function createPong(
       const y = minY <= maxY ? randomRange(minY, maxY) : H * 0.5
       const gravityStrength = randomRange(minStrength, maxStrength)
       const gravityFalloff = randomRange(minFalloff, maxFalloff)
-      irelandWells.push({ x, y, gravityStrength, gravityFalloff, radius })
+      irelandWells.push({
+        x,
+        y,
+        gravityStrength,
+        gravityFalloff: toGravityFalloffValue(gravityFalloff),
+        radius,
+      })
     }
   }
 
@@ -554,7 +565,7 @@ export function createPong(
       x,
       y,
       gravityStrength: modifier.gravityStrength,
-      gravityFalloff: modifier.gravityFalloff,
+      gravityFalloff: toGravityFalloffValue(modifier.gravityFalloff),
       radius: modifier.radius,
     }
     divotWells.push(newWell)
