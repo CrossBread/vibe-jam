@@ -126,7 +126,7 @@ function ensureDevOverlayStyles() {
     .dev-overlay__modifier summary {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-start;
       gap: 12px;
       padding: 10px;
       font-weight: 500;
@@ -143,10 +143,66 @@ function ensureDevOverlayStyles() {
       border-right: 2px solid rgba(226, 232, 240, 0.7);
       border-bottom: 2px solid rgba(226, 232, 240, 0.7);
       transform: rotate(45deg);
+      margin-left: auto;
       transition: transform 0.2s ease;
     }
     .dev-overlay__modifier[open] summary::after {
       transform: rotate(225deg);
+    }
+    .dev-overlay__modifier-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .dev-overlay__modifier-toggle {
+      flex-shrink: 0;
+    }
+    .dev-overlay__modifier-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .dev-overlay__collapsible {
+      border-top: 1px solid rgba(148, 163, 184, 0.35);
+      padding-top: 12px;
+      margin-top: 12px;
+    }
+    .dev-overlay__collapsible summary {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(226, 232, 240, 0.7);
+      cursor: pointer;
+      list-style: none;
+    }
+    .dev-overlay__collapsible summary::-webkit-details-marker {
+      display: none;
+    }
+    .dev-overlay__collapsible summary::after {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-right: 2px solid rgba(226, 232, 240, 0.7);
+      border-bottom: 2px solid rgba(226, 232, 240, 0.7);
+      transform: rotate(45deg);
+      margin-left: auto;
+      transition: transform 0.2s ease;
+    }
+    .dev-overlay__collapsible[open] summary::after {
+      transform: rotate(225deg);
+    }
+    .dev-overlay__collapsible-body {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-top: 12px;
+      margin-top: 12px;
+      border-top: 1px solid rgba(148, 163, 184, 0.35);
     }
     .dev-overlay__modifier-body {
       display: flex;
@@ -274,7 +330,19 @@ export function createDevOverlay(config: DevConfig, defaults: DevConfig): HTMLDi
     arenaSection.innerHTML = ''
     modifierSections.length = 0
 
-    controls.appendChild(
+    const baseSection = document.createElement('details')
+    baseSection.className = 'dev-overlay__collapsible'
+    baseSection.open = true
+
+    const baseSummary = document.createElement('summary')
+    baseSummary.textContent = 'Game Parameters'
+    baseSection.appendChild(baseSummary)
+
+    const baseBody = document.createElement('div')
+    baseBody.className = 'dev-overlay__collapsible-body'
+    baseSection.appendChild(baseBody)
+
+    baseBody.appendChild(
       createSliderControl('Paddle Speed', config.paddleSpeed, {
         min: 120,
         max: 360,
@@ -284,7 +352,7 @@ export function createDevOverlay(config: DevConfig, defaults: DevConfig): HTMLDi
       }),
     )
 
-    controls.appendChild(
+    baseBody.appendChild(
       createSliderControl('Ball Base Speed', config.baseBallSpeed, {
         min: 120,
         max: 600,
@@ -294,7 +362,7 @@ export function createDevOverlay(config: DevConfig, defaults: DevConfig): HTMLDi
       }),
     )
 
-    controls.appendChild(
+    baseBody.appendChild(
       createSliderControl('Min Horizontal Ratio', config.minHorizontalRatio, {
         min: 0.1,
         max: 1,
@@ -304,7 +372,7 @@ export function createDevOverlay(config: DevConfig, defaults: DevConfig): HTMLDi
       }),
     )
 
-    controls.appendChild(
+    baseBody.appendChild(
       createSliderControl('Hit Speed Multiplier', config.speedIncreaseOnHit, {
         min: 1,
         max: 1.3,
@@ -313,6 +381,8 @@ export function createDevOverlay(config: DevConfig, defaults: DevConfig): HTMLDi
         onInput: v => (config.speedIncreaseOnHit = v),
       }),
     )
+
+    controls.appendChild(baseSection)
 
     const arenaTitle = document.createElement('div')
     arenaTitle.className = 'dev-overlay__section-title'
@@ -330,21 +400,27 @@ export function createDevOverlay(config: DevConfig, defaults: DevConfig): HTMLDi
       modifierSections.push(details)
 
       const summary = document.createElement('summary')
-      summary.className = 'dev-overlay__modifier-summary'
 
-      const summaryLabel = document.createElement('span')
-      summaryLabel.textContent = modifier.name
+      const summaryHeader = document.createElement('div')
+      summaryHeader.className = 'dev-overlay__modifier-header'
 
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
       toggle.checked = modifier.enabled
+      toggle.className = 'dev-overlay__modifier-toggle'
       toggle.addEventListener('click', event => event.stopPropagation())
       toggle.addEventListener('change', () => {
         modifier.enabled = toggle.checked
       })
 
-      summary.appendChild(summaryLabel)
-      summary.appendChild(toggle)
+      const summaryLabel = document.createElement('span')
+      summaryLabel.className = 'dev-overlay__modifier-name'
+      summaryLabel.textContent = modifier.name
+
+      summaryHeader.appendChild(toggle)
+      summaryHeader.appendChild(summaryLabel)
+
+      summary.appendChild(summaryHeader)
       details.appendChild(summary)
 
       const body = document.createElement('div')
@@ -548,11 +624,9 @@ function isGravityWellModifier(value: unknown): value is GravityWellModifier {
     return false
   }
 
-  if ('wanderSpeed' in candidate && typeof candidate.wanderSpeed !== 'number') {
-    return false
-  }
+  return !('wanderSpeed' in candidate && typeof candidate.wanderSpeed !== 'number');
 
-  return true
+
 }
 
 function createOverlayButton(label: string) {
