@@ -524,6 +524,34 @@ export function createDevOverlay(
     )
 
     baseBody.appendChild(
+      createSliderControl(
+        'Left Paddle Speed Multiplier',
+        config.leftPaddleSpeedMultiplier,
+        {
+          min: 0.5,
+          max: 1.5,
+          step: 0.05,
+          format: v => `${v.toFixed(2)}×`,
+          onInput: v => (config.leftPaddleSpeedMultiplier = v),
+        },
+      ),
+    )
+
+    baseBody.appendChild(
+      createSliderControl(
+        'Right Paddle Speed Multiplier',
+        config.rightPaddleSpeedMultiplier,
+        {
+          min: 0.5,
+          max: 1.5,
+          step: 0.05,
+          format: v => `${v.toFixed(2)}×`,
+          onInput: v => (config.rightPaddleSpeedMultiplier = v),
+        },
+      ),
+    )
+
+    baseBody.appendChild(
       createSliderControl('Ball Base Speed', config.baseBallSpeed, {
         min: 120,
         max: 600,
@@ -551,6 +579,34 @@ export function createDevOverlay(
         format: v => `${v.toFixed(2)}×`,
         onInput: v => (config.speedIncreaseOnHit = v),
       }),
+    )
+
+    baseBody.appendChild(
+      createSliderControl(
+        'Left Paddle Size Multiplier',
+        config.leftPaddleSizeMultiplier,
+        {
+          min: 0.5,
+          max: 1.75,
+          step: 0.05,
+          format: v => `${v.toFixed(2)}×`,
+          onInput: v => (config.leftPaddleSizeMultiplier = v),
+        },
+      ),
+    )
+
+    baseBody.appendChild(
+      createSliderControl(
+        'Right Paddle Size Multiplier',
+        config.rightPaddleSizeMultiplier,
+        {
+          min: 0.5,
+          max: 1.75,
+          step: 0.05,
+          format: v => `${v.toFixed(2)}×`,
+          onInput: v => (config.rightPaddleSizeMultiplier = v),
+        },
+      ),
     )
 
     collapsibleSections.push(baseSection)
@@ -919,6 +975,10 @@ export function createDevOverlay(
 
 function applyConfig(target: DevConfig, source: DevConfig) {
   target.paddleSpeed = source.paddleSpeed
+  target.leftPaddleSpeedMultiplier = source.leftPaddleSpeedMultiplier
+  target.rightPaddleSpeedMultiplier = source.rightPaddleSpeedMultiplier
+  target.leftPaddleSizeMultiplier = source.leftPaddleSizeMultiplier
+  target.rightPaddleSizeMultiplier = source.rightPaddleSizeMultiplier
   target.baseBallSpeed = source.baseBallSpeed
   target.minHorizontalRatio = source.minHorizontalRatio
   target.speedIncreaseOnHit = source.speedIncreaseOnHit
@@ -930,6 +990,10 @@ function isDevConfig(value: unknown): value is DevConfig {
   const candidate = value as Partial<DevConfig>
   if (
     typeof candidate.paddleSpeed !== 'number' ||
+    typeof candidate.leftPaddleSpeedMultiplier !== 'number' ||
+    typeof candidate.rightPaddleSpeedMultiplier !== 'number' ||
+    typeof candidate.leftPaddleSizeMultiplier !== 'number' ||
+    typeof candidate.rightPaddleSizeMultiplier !== 'number' ||
     typeof candidate.baseBallSpeed !== 'number' ||
     typeof candidate.minHorizontalRatio !== 'number' ||
     typeof candidate.speedIncreaseOnHit !== 'number'

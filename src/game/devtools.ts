@@ -88,6 +88,10 @@ export interface ModifiersConfig {
 
 export interface DevConfig {
   paddleSpeed: number
+  leftPaddleSpeedMultiplier: number
+  rightPaddleSpeedMultiplier: number
+  leftPaddleSizeMultiplier: number
+  rightPaddleSizeMultiplier: number
   baseBallSpeed: number
   minHorizontalRatio: number
   speedIncreaseOnHit: number
