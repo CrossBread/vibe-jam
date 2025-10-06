@@ -28,14 +28,16 @@ export function createModManager(world: any, services: Services, scheduler: Sche
     function on<T extends Parameters<Services['bus']['on']>[0]>(
       type: T,
       handler: Parameters<Services['bus']['on']>[1]
-    ) {
+    ): Unsubscribe {
       const unsub = services.bus.on(type as any, handler as any);
       teardowns.push(unsub);
+      return unsub;
     }
 
-    function registerSystem(phase: Phase, fn: SystemFn, order = 0) {
+    function registerSystem(phase: Phase, fn: SystemFn, order = 0): Unsubscribe {
       const unreg = scheduler.register(phase, fn, order);
       teardowns.push(unreg);
+      return unreg;
     }
 
     // Bridge to world; adapt as your ECS exposes stores/CRUD.

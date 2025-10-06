@@ -17,8 +17,8 @@ export interface ModContext {
   on<T extends Parameters<Services['bus']['on']>[0]>(
     type: T,
     handler: Parameters<Services['bus']['on']>[1]
-  ): void;
-  registerSystem(phase: Phase, fn: SystemFn, order?: number): void;
+  ): Unsubscribe;
+  registerSystem(phase: Phase, fn: SystemFn, order?: number): Unsubscribe;
 }
 
 export type ModKind = 'ball' | 'paddle' | 'arena' | 'global';
