@@ -24,6 +24,7 @@ export interface PongState {
   currentPips: number
   totalPips: number
   totalBites: number
+  completedBitesSinceLastPoint: number
 }
 
 export interface PongAPI {
@@ -192,6 +193,7 @@ export function createPong(
     currentPips: 0,
     totalPips: 0,
     totalBites: 0,
+    completedBitesSinceLastPoint: 0,
   }
 
   const movingWellStates: Record<MovingWellKey, MovingWellState> = {
@@ -226,6 +228,7 @@ export function createPong(
   const bumShuffleTrail: TrailPoint[] = []
   const pollokTrail: ColoredTrailPoint[] = []
   let lastReturner: 'left' | 'right' | null = null
+  let completedBitesSinceLastPoint = 0
 
   initializeActiveModState()
 
@@ -247,6 +250,8 @@ export function createPong(
     state.currentPips = 0
     state.totalPips = 0
     state.totalBites = 0
+    state.completedBitesSinceLastPoint = 0
+    completedBitesSinceLastPoint = 0
     leftAIEnabled = true
     rightAIEnabled = true
     for (const movingState of Object.values(movingWellStates)) {
@@ -483,6 +488,19 @@ export function createPong(
   }
 
   function handlePointScored() {
+    if (completedBitesSinceLastPoint > 0) {
+      const previousActive = activeModKey
+      disableAllMods()
+      let excludeKey = previousActive
+      for (let i = 0; i < completedBitesSinceLastPoint; i++) {
+        const nextKey = pickRandomMod(excludeKey)
+        setActiveMod(nextKey)
+        excludeKey = activeModKey
+      }
+      completedBitesSinceLastPoint = 0
+      state.completedBitesSinceLastPoint = 0
+    }
+
     irelandNeedsRegeneration = true
     clearBumShuffleTrail()
 
@@ -504,13 +522,38 @@ export function createPong(
 
     if (state.currentPips === PIPS_PER_BITE) {
       state.currentPips = 0
-      cycleRandomMod()
+      completedBitesSinceLastPoint += 1
+      state.completedBitesSinceLastPoint = completedBitesSinceLastPoint
+      return
     }
+
+    state.completedBitesSinceLastPoint = completedBitesSinceLastPoint
   }
 
-  function cycleRandomMod() {
-    const nextKey = pickRandomMod(activeModKey)
-    setActiveMod(nextKey)
+  function disableAllMods() {
+    let anyDisabled = false
+    for (const key of GRAVITY_WELL_KEYS) {
+      const modifier = config.modifiers.arena[key]
+      if (!modifier.enabled) continue
+
+      modifier.enabled = false
+      anyDisabled = true
+
+      if (key === 'divots') clearDivotWells()
+      if (key === 'ireland') {
+        irelandWells.length = 0
+        irelandNeedsRegeneration = true
+      }
+      if (key === 'blackMole' || key === 'gopher') {
+        resetMovingWellState(movingWellStates[key])
+      }
+    }
+
+    if (anyDisabled) {
+      activeGravityWells = collectActiveGravityWells()
+    }
+
+    activeModKey = null
   }
 
   function collectActiveGravityWells(): ActiveGravityWell[] {
@@ -895,7 +938,43 @@ export function createPong(
     const pipSpacing = 22
     const pipY = H - 24
     const pipStartX = W / 2 - ((PIPS_PER_BITE - 1) * pipSpacing) / 2
+    const meterLeft = pipStartX - pipRadius
+    const meterRight = pipStartX + (PIPS_PER_BITE - 1) * pipSpacing + pipRadius
     ctx.lineWidth = 2
+
+    if (state.completedBitesSinceLastPoint > 0) {
+      const chevronWidth = 12
+      const chevronHeight = 22
+      const chevronSpacing = 6
+      const previousLineCap = ctx.lineCap
+      const previousLineJoin = ctx.lineJoin
+      ctx.strokeStyle = '#e7ecf3'
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      for (let i = 0; i < state.completedBitesSinceLastPoint; i++) {
+        const offset = i * (chevronWidth + chevronSpacing)
+        const leftInnerX = meterLeft - chevronSpacing - offset
+        const leftOuterX = leftInnerX - chevronWidth
+        ctx.beginPath()
+        ctx.moveTo(leftInnerX, pipY - chevronHeight / 2)
+        ctx.lineTo(leftOuterX, pipY)
+        ctx.moveTo(leftInnerX, pipY + chevronHeight / 2)
+        ctx.lineTo(leftOuterX, pipY)
+        ctx.stroke()
+
+        const rightInnerX = meterRight + chevronSpacing + offset
+        const rightOuterX = rightInnerX + chevronWidth
+        ctx.beginPath()
+        ctx.moveTo(rightInnerX, pipY - chevronHeight / 2)
+        ctx.lineTo(rightOuterX, pipY)
+        ctx.moveTo(rightInnerX, pipY + chevronHeight / 2)
+        ctx.lineTo(rightOuterX, pipY)
+        ctx.stroke()
+      }
+      ctx.lineCap = previousLineCap
+      ctx.lineJoin = previousLineJoin
+    }
+
     for (let i = 0; i < PIPS_PER_BITE; i++) {
       const pipX = pipStartX + i * pipSpacing
       const isFilled = state.currentPips > 0 && i < state.currentPips
