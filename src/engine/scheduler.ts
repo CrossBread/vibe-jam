@@ -3,6 +3,8 @@
 export type Phase = 'preUpdate' | 'update' | 'postUpdate';
 export type SystemFn = (dt: number) => void;
 export type Unregister = () => void;
+export const phases = ['preUpdate', 'update', 'postUpdate'] as const
+
 
 export interface Scheduler {
   tick(dt: number): void;
@@ -10,35 +12,49 @@ export interface Scheduler {
   clear(): void;
 }
 
+interface Entry {
+  order: number
+  index: number
+  fn: SystemFn
+}
+
 export function createScheduler(): Scheduler {
-  type Entry = { order: number; fn: SystemFn };
-  const phases: Record<Phase, Entry[]> = {
+  const buckets: Record<Phase, Entry[]> = {
     preUpdate: [],
     update: [],
     postUpdate: []
-  };
+  }
+
+  let nextIndex = 0
 
   function register(phase: Phase, fn: SystemFn, order = 0): Unregister {
-    const list = phases[phase];
-    const entry: Entry = { order, fn };
-    list.push(entry);
-    list.sort((a, b) => a.order - b.order);
+    const entry: Entry = { order, fn, index: nextIndex++ }
+    const list = buckets[phase]
+    list.push(entry)
+    list.sort((a, b) => (a.order === b.order ? a.index - b.index : a.order - b.order))
+
     return () => {
-      const i = list.indexOf(entry);
-      if (i >= 0) list.splice(i, 1);
-    };
+      const idx = list.indexOf(entry)
+      if (idx !== -1) {
+        list.splice(idx, 1)
+      }
+    }
   }
 
   function tick(dt: number) {
-    for (const phase of ['preUpdate', 'update', 'postUpdate'] as Phase[]) {
-      const list = phases[phase];
-      for (let i = 0; i < list.length; i++) list[i].fn(dt);
+    for (const phase of phases) {
+      const list = buckets[phase]
+      for (const { fn } of list.slice()) {
+        fn(dt)
+      }
     }
   }
 
   function clear() {
-    (['preUpdate', 'update', 'postUpdate'] as Phase[]).forEach((p) => (phases[p].length = 0));
+    for (const phase of phases) {
+      buckets[phase].length = 0
+    }
   }
 
-  return { tick, register, clear };
+  return { register, tick, clear }
 }
