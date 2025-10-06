@@ -15,7 +15,9 @@
         "enabled": false,
         "gravityStrength": 4800000,
         "gravityFalloff": 110,
-        "radius": 40
+        "radius": 40,
+        "positiveTint": "#94a3b8",
+        "negativeTint": "#e2e8f0"
       },
       "blackMole": {
         "name": "Black Mole",
@@ -26,7 +28,9 @@
         "radius": 44,
         "wanderWidthPercentage": 0.4,
         "pauseDuration": 1.25,
-        "wanderSpeed": 110
+        "wanderSpeed": 110,
+        "positiveTint": "#2dd4bf",
+        "negativeTint": "#99f6e4"
       },
       "gopher": {
         "name": "Gopher",
@@ -37,7 +41,9 @@
         "radius": 53,
         "wanderWidthPercentage": 0.45,
         "pauseDuration": 1.1,
-        "wanderSpeed": 125
+        "wanderSpeed": 125,
+        "positiveTint": "#f472b6",
+        "negativeTint": "#fce7f3"
       },
       "superMassive": {
         "name": "Super Massive",
@@ -45,7 +51,9 @@
         "enabled": false,
         "gravityStrength": 3200000,
         "gravityFalloff": 141,
-        "radius": 72
+        "radius": 72,
+        "positiveTint": "#60a5fa",
+        "negativeTint": "#bfdbfe"
       },
       "whiteDwarf": {
         "name": "White Dwarf",
@@ -53,7 +61,9 @@
         "enabled": false,
         "gravityStrength": 7200000,
         "gravityFalloff": 77,
-        "radius": 26
+        "radius": 26,
+        "positiveTint": "#e2e8f0",
+        "negativeTint": "#f8fafc"
       },
       "divots": {
         "name": "Divots",
@@ -63,7 +73,9 @@
         "gravityFalloff": 126,
         "radius": 38,
         "maxDivots": 14,
-        "spawnMargin": 64
+        "spawnMargin": 64,
+        "positiveTint": "#fbbf24",
+        "negativeTint": "#fef3c7"
       },
       "ireland": {
         "name": "Ireland",
@@ -78,7 +90,9 @@
         "minGravityFalloff": 95,
         "maxGravityFalloff": 161,
         "minRadius": 24,
-        "maxRadius": 86
+        "maxRadius": 86,
+        "positiveTint": "#4ade80",
+        "negativeTint": "#bbf7d0"
       }
     },
     "ball": {

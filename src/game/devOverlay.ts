@@ -893,6 +893,18 @@ export function createDevOverlay(
         }),
       )
 
+      body.appendChild(
+        createColorControl('Positive Gravity Tint', modifier.positiveTint, value => {
+          modifier.positiveTint = value
+        }),
+      )
+
+      body.appendChild(
+        createColorControl('Negative Gravity Tint', modifier.negativeTint, value => {
+          modifier.negativeTint = value
+        }),
+      )
+
       if ('wanderWidthPercentage' in modifier) {
         const current = modifier.wanderWidthPercentage ?? 0.33
         body.appendChild(
@@ -1064,7 +1076,9 @@ function isGravityWellModifier(value: unknown): value is GravityWellModifier {
     typeof candidate.enabled !== 'boolean' ||
     typeof candidate.gravityStrength !== 'number' ||
     typeof candidate.gravityFalloff !== 'number' ||
-    typeof candidate.radius !== 'number'
+    typeof candidate.radius !== 'number' ||
+    typeof candidate.positiveTint !== 'string' ||
+    typeof candidate.negativeTint !== 'string'
   ) {
     return false
   }

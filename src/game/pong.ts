@@ -1,6 +1,5 @@
 import {
   GRAVITY_WELL_KEYS,
-  GRAVITY_WELL_VISUALS,
   createDevConfig,
   deepClone,
   getGravityWellsEntries,
@@ -74,6 +73,8 @@ interface ActiveGravityWell {
   gravityStrength: number
   gravityFalloff: number // squared falloff radius used for force calculations
   radius: number
+  positiveTint: string
+  negativeTint: string
 }
 
 interface StoredWell {
@@ -118,6 +119,12 @@ interface ColoredTrailPoint extends TrailPoint {
   color: string
 }
 
+interface RGBColor {
+  r: number
+  g: number
+  b: number
+}
+
 interface PaddleHeightOptions {
   center?: boolean
   preserveCenter?: boolean
@@ -151,6 +158,10 @@ export function createPong(
   const MAX_POLLOK_HISTORY = 6000
   const BUM_SHUFFLE_DISTANCE_SQ = 4
   const POLLOK_DISTANCE_SQ = 9
+  const MAX_GRAVITY_VISUAL_STRENGTH = 8_000_000
+  const ARENA_BACKGROUND_RGB = hexToRgb(ARENA_BACKGROUND)
+  const BLACK_RGB: RGBColor = { r: 0, g: 0, b: 0 }
+  const WHITE_RGB: RGBColor = { r: 255, g: 255, b: 255 }
 
   const defaults = createDevConfig()
   const config = deepClone(defaults)
@@ -1108,6 +1119,8 @@ export function createPong(
           gravityStrength: modifier.gravityStrength,
           gravityFalloff: toGravityFalloffValue(modifier.gravityFalloff),
           radius: modifier.radius,
+          positiveTint: modifier.positiveTint,
+          negativeTint: modifier.negativeTint,
         })
         continue
       }
@@ -1121,6 +1134,8 @@ export function createPong(
             gravityStrength: well.gravityStrength,
             gravityFalloff: well.gravityFalloff,
             radius: well.radius,
+            positiveTint: modifier.positiveTint,
+            negativeTint: modifier.negativeTint,
           })
         }
         continue
@@ -1148,6 +1163,8 @@ export function createPong(
             gravityStrength: well.gravityStrength,
             gravityFalloff: well.gravityFalloff,
             radius: well.radius,
+            positiveTint: modifier.positiveTint,
+            negativeTint: modifier.negativeTint,
           })
         }
         continue
@@ -1160,6 +1177,8 @@ export function createPong(
         gravityStrength: modifier.gravityStrength,
         gravityFalloff: toGravityFalloffValue(modifier.gravityFalloff),
         radius: modifier.radius,
+        positiveTint: modifier.positiveTint,
+        negativeTint: modifier.negativeTint,
       })
     }
 
@@ -1481,6 +1500,43 @@ export function createPong(
     return [min, max]
   }
 
+  function createGravityWellGradient(
+    context: CanvasRenderingContext2D,
+    well: ActiveGravityWell,
+  ): CanvasGradient {
+    const gradient = context.createRadialGradient(
+      well.x,
+      well.y,
+      0,
+      well.x,
+      well.y,
+      well.radius,
+    )
+
+    const magnitude = clamp01(Math.abs(well.gravityStrength) / MAX_GRAVITY_VISUAL_STRENGTH)
+    const tintHex = well.gravityStrength >= 0 ? well.positiveTint : well.negativeTint
+    const tint = parseColorToRgb(tintHex, ARENA_BACKGROUND_RGB)
+
+    if (well.gravityStrength >= 0) {
+      const innerColor = mixRgb(tint, BLACK_RGB, 0.6 + 0.4 * magnitude)
+      const midColor = mixRgb(tint, WHITE_RGB, 0.3 + 0.35 * magnitude)
+      const innerAlpha = 0.35 + 0.45 * magnitude
+      const midAlpha = 0.18 + 0.22 * magnitude
+      gradient.addColorStop(0, rgbaString(innerColor, innerAlpha))
+      gradient.addColorStop(0.45, rgbaString(midColor, midAlpha))
+    } else {
+      const innerColor = mixRgb(tint, WHITE_RGB, 0.55 + 0.45 * magnitude)
+      const midColor = mixRgb(tint, ARENA_BACKGROUND_RGB, 0.1 + 0.25 * magnitude)
+      const innerAlpha = 0.45 + 0.45 * magnitude
+      const midAlpha = 0.25 + 0.25 * magnitude
+      gradient.addColorStop(0, rgbaString(innerColor, innerAlpha))
+      gradient.addColorStop(0.45, rgbaString(midColor, midAlpha))
+    }
+
+    gradient.addColorStop(1, rgbaString(ARENA_BACKGROUND_RGB, 0))
+    return gradient
+  }
+
   function draw() {
     ctx.fillStyle = ARENA_BACKGROUND
     ctx.fillRect(0, 0, W, H)
@@ -1496,19 +1552,8 @@ export function createPong(
     ctx.setLineDash([])
 
     for (const well of activeGravityWells) {
-      const visuals = GRAVITY_WELL_VISUALS[well.key]
-      const sinkGradient = ctx.createRadialGradient(
-        well.x,
-        well.y,
-        0,
-        well.x,
-        well.y,
-        well.radius,
-      )
-      sinkGradient.addColorStop(0, visuals.inner)
-      sinkGradient.addColorStop(0.45, visuals.mid)
-      sinkGradient.addColorStop(1, visuals.outer)
-      ctx.fillStyle = sinkGradient
+      const gradient = createGravityWellGradient(ctx, well)
+      ctx.fillStyle = gradient
       ctx.beginPath()
       ctx.arc(well.x, well.y, well.radius, 0, Math.PI * 2)
       ctx.fill()
@@ -1787,6 +1832,77 @@ export function createPong(
   function clearPollokTrail() {
     if (pollokTrail.length > 0) pollokTrail.length = 0
     lastReturner = null
+  }
+
+  function parseColorToRgb(color: string, fallback: RGBColor): RGBColor {
+    if (typeof color !== 'string') return fallback
+    const trimmed = color.trim()
+    if (trimmed.length === 0) return fallback
+    if (trimmed.startsWith('#')) {
+      return hexToRgb(trimmed)
+    }
+
+    const rgbMatch = trimmed.match(/^rgba?\(([^)]+)\)$/i)
+    if (rgbMatch) {
+      const parts = rgbMatch[1]
+        .split(',')
+        .map(part => Number.parseFloat(part.trim()))
+        .filter(Number.isFinite)
+      if (parts.length >= 3) {
+        return {
+          r: clampByte(parts[0]),
+          g: clampByte(parts[1]),
+          b: clampByte(parts[2]),
+        }
+      }
+    }
+
+    return fallback
+  }
+
+  function hexToRgb(hex: string): RGBColor {
+    const value = hex.trim().replace('#', '')
+    if (value.length === 3) {
+      const r = Number.parseInt(value[0] + value[0], 16)
+      const g = Number.parseInt(value[1] + value[1], 16)
+      const b = Number.parseInt(value[2] + value[2], 16)
+      if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)) {
+        return { r, g, b }
+      }
+    }
+    if (value.length === 6) {
+      const r = Number.parseInt(value.slice(0, 2), 16)
+      const g = Number.parseInt(value.slice(2, 4), 16)
+      const b = Number.parseInt(value.slice(4, 6), 16)
+      if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)) {
+        return { r, g, b }
+      }
+    }
+    return { r: 255, g: 255, b: 255 }
+  }
+
+  function mixRgb(a: RGBColor, b: RGBColor, t: number): RGBColor {
+    const amount = clamp01(t)
+    return {
+      r: a.r + (b.r - a.r) * amount,
+      g: a.g + (b.g - a.g) * amount,
+      b: a.b + (b.b - a.b) * amount,
+    }
+  }
+
+  function rgbaString(color: RGBColor, alpha: number): string {
+    const clampedAlpha = clamp01(alpha)
+    return `rgba(${clampByte(color.r)}, ${clampByte(color.g)}, ${clampByte(color.b)}, ${clampedAlpha})`
+  }
+
+  function clamp01(value: number): number {
+    if (!Number.isFinite(value)) return 0
+    return Math.max(0, Math.min(1, value))
+  }
+
+  function clampByte(value: number): number {
+    if (!Number.isFinite(value)) return 0
+    return Math.max(0, Math.min(255, Math.round(value)))
   }
 
   function applyAlphaToColor(hex: string, alpha: number) {
