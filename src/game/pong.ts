@@ -330,16 +330,32 @@ export function createPong(
       state.rightScore++
       if (state.rightScore >= WIN_SCORE) state.winner = 'right'
       resetBall(false)
+      handlePointScored()
     }
     if (state.ballX > W + BALL_R) {
       state.leftScore++
       if (state.leftScore >= WIN_SCORE) state.winner = 'left'
       resetBall(true)
+      handlePointScored()
     }
   }
 
   function handlePaddleReturn() {
     spawnDivotWell()
+  }
+
+  function handlePointScored() {
+    irelandNeedsRegeneration = true
+
+    const modifier = config.modifiers.arena.ireland as IrelandModifier
+    if (!modifier.enabled) {
+      irelandWells.length = 0
+      return
+    }
+
+    regenerateIrelandWells(modifier)
+    irelandNeedsRegeneration = false
+    activeGravityWells = collectActiveGravityWells()
   }
 
   function collectActiveGravityWells(): ActiveGravityWell[] {
