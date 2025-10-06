@@ -612,14 +612,20 @@ export function createPong(
     checkModifierAnnouncements()
     updatePaddleModifierState()
 
-    if (state.winner) return
+    const gamepadInput = getGamepadInput()
+
+    if (state.winner) {
+      if (isRestartInputActive(gamepadInput)) {
+        reset()
+      }
+      return
+    }
 
     updateMovingWellState('blackMole', dt)
     updateMovingWellState('gopher', dt)
     updateDivotsState()
     updateIrelandState()
 
-    const gamepadInput = getGamepadInput()
     const leftGamepadActive =
       gamepadInput.leftAxis !== 0 || gamepadInput.leftUp || gamepadInput.leftDown
     const rightGamepadActive =
@@ -783,6 +789,28 @@ export function createPong(
       resetBall(true)
       handlePointScored()
     }
+  }
+
+  function isRestartInputActive(gamepadInput: GamepadInput): boolean {
+    const leftKeyActive = Boolean(keys['w'] || keys['s'])
+    const rightKeyActive = Boolean(keys['ArrowUp'] || keys['ArrowDown'])
+    const leftTouchActive =
+      touchControls.left.direction !== 0 || touchControls.left.relativeDelta !== 0
+    const rightTouchActive =
+      touchControls.right.direction !== 0 || touchControls.right.relativeDelta !== 0
+    const leftGamepadActive =
+      gamepadInput.leftAxis !== 0 || gamepadInput.leftUp || gamepadInput.leftDown
+    const rightGamepadActive =
+      gamepadInput.rightAxis !== 0 || gamepadInput.rightUp || gamepadInput.rightDown
+
+    return (
+      leftKeyActive ||
+      rightKeyActive ||
+      leftTouchActive ||
+      rightTouchActive ||
+      leftGamepadActive ||
+      rightGamepadActive
+    )
   }
 
   function updateAnnouncement(dt: number) {
