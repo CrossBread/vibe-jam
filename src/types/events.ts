@@ -1,5 +1,8 @@
 ﻿// File: src/types/events.ts
 // Core events extended with mod activation signals; keeps mods from growing this union.
+type ModActivatedEvent = { type: 'mod:activated'; id: string };
+type ModDeactivatedEvent = { type: 'mod:deactivated'; id: string };
+
 export type GameEvent =
   | { type: 'tick'; dt: number }
   | { type: 'ball:spawned'; entityId: number }
@@ -7,8 +10,8 @@ export type GameEvent =
   | { type: 'collision'; a: number; b: number }
   | { type: 'score'; side: 'left' | 'right' }
   | { type: 'arena:resize'; width: number; height: number }
-  | { type: 'mod:activated'; id: string }
-  | { type: 'mod:deactivated'; id: string };
+  | ModActivatedEvent
+  | ModDeactivatedEvent;
 
 export type Unsubscribe = () => void;
 
