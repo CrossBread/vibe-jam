@@ -85,10 +85,14 @@ function ensureDevOverlayStyles() {
     }
     .dev-overlay__title-meta {
       display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+    }
+    .dev-overlay__title-actions {
+      display: flex;
       align-items: center;
       gap: 8px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
     }
     .dev-overlay__dock-toggle {
       display: flex;
@@ -341,6 +345,9 @@ export function createDevOverlay(
   const titleMeta = document.createElement('div')
   titleMeta.className = 'dev-overlay__title-meta'
 
+  const titleActions = document.createElement('div')
+  titleActions.className = 'dev-overlay__title-actions'
+
   const hint = document.createElement('span')
   hint.className = 'dev-overlay__hint'
   hint.textContent = 'Press ` to toggle'
@@ -367,9 +374,11 @@ export function createDevOverlay(
   dockToggleLabel.appendChild(dockToggle)
   dockToggleLabel.appendChild(dockToggleText)
 
+  titleActions.appendChild(dockToggleLabel)
+  titleActions.appendChild(collapseAllButton)
+
   titleMeta.appendChild(hint)
-  titleMeta.appendChild(dockToggleLabel)
-  titleMeta.appendChild(collapseAllButton)
+  titleMeta.appendChild(titleActions)
   title.appendChild(heading)
   title.appendChild(titleMeta)
 
@@ -397,7 +406,7 @@ export function createDevOverlay(
     overlay.scrollTo({ top: 0, behavior: 'smooth' })
   })
 
-  const modifierSections: HTMLDetailsElement[] = []
+  const collapsibleSections: HTMLDetailsElement[] = []
 
   function setStatus(message: string, variant: 'default' | 'error' = 'default') {
     status.textContent = message
@@ -407,7 +416,7 @@ export function createDevOverlay(
   function renderControls() {
     controls.innerHTML = ''
     arenaSection.innerHTML = ''
-    modifierSections.length = 0
+    collapsibleSections.length = 0
 
     const baseSection = document.createElement('details')
     baseSection.className = 'dev-overlay__collapsible'
@@ -461,6 +470,7 @@ export function createDevOverlay(
       }),
     )
 
+    collapsibleSections.push(baseSection)
     controls.appendChild(baseSection)
 
     const arenaTitle = document.createElement('div')
@@ -476,7 +486,7 @@ export function createDevOverlay(
       const details = document.createElement('details')
       details.className = 'dev-overlay__modifier'
       details.open = true
-      modifierSections.push(details)
+      collapsibleSections.push(details)
 
       const summary = document.createElement('summary')
 
@@ -621,7 +631,7 @@ export function createDevOverlay(
   })
 
   collapseAllButton.addEventListener('click', () => {
-    modifierSections.forEach(section => {
+    collapsibleSections.forEach(section => {
       section.open = false
     })
   })
