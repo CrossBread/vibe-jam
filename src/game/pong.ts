@@ -1,4 +1,5 @@
 import {
+  GRAVITY_WELL_KEYS,
   GRAVITY_WELL_VISUALS,
   createDevConfig,
   deepClone,
@@ -205,6 +206,9 @@ export function createPong(
   let lastEnabledArenaModifiers = new Set<GravityWellKey>(
     getEnabledArenaModifierKeys(config.modifiers.arena),
   )
+  let activeModKey: GravityWellKey | null = null
+
+  initializeActiveModState()
 
   function resetBall(toLeft: boolean) {
     state.ballX = W * 0.5
@@ -468,6 +472,16 @@ export function createPong(
     state.totalPips += 1
     state.currentPips = ((state.totalPips - 1) % PIPS_PER_BITE) + 1
     state.totalBites = Math.floor(state.totalPips / PIPS_PER_BITE)
+
+    if (state.currentPips === PIPS_PER_BITE) {
+      state.currentPips = 0
+      cycleRandomMod()
+    }
+  }
+
+  function cycleRandomMod() {
+    const nextKey = pickRandomMod(activeModKey)
+    setActiveMod(nextKey)
   }
 
   function collectActiveGravityWells(): ActiveGravityWell[] {
@@ -710,6 +724,58 @@ export function createPong(
     state.targetY = H * 0.5
     state.pauseTimer = 0
     state.hasTarget = false
+  }
+
+  function initializeActiveModState() {
+    const enabledMods = GRAVITY_WELL_KEYS.filter(key => config.modifiers.arena[key].enabled)
+    if (enabledMods.length === 0) {
+      setActiveMod(pickRandomMod(null))
+      return
+    }
+
+    if (enabledMods.length === 1) {
+      activeModKey = enabledMods[0]
+      return
+    }
+
+    setActiveMod(enabledMods[0])
+  }
+
+  function setActiveMod(nextKey: GravityWellKey) {
+    if (activeModKey === nextKey && config.modifiers.arena[nextKey].enabled) return
+
+    for (const key of GRAVITY_WELL_KEYS) {
+      const modifier = config.modifiers.arena[key]
+      const shouldEnable = key === nextKey
+      if (modifier.enabled === shouldEnable) continue
+
+      modifier.enabled = shouldEnable
+
+      if (!shouldEnable) {
+        if (key === 'divots') clearDivotWells()
+        if (key === 'ireland') {
+          irelandWells.length = 0
+          irelandNeedsRegeneration = true
+        }
+        if (key === 'blackMole' || key === 'gopher') {
+          resetMovingWellState(movingWellStates[key])
+        }
+      }
+    }
+
+    activeModKey = nextKey
+
+    if (nextKey === 'ireland') {
+      irelandNeedsRegeneration = true
+    }
+
+    activeGravityWells = collectActiveGravityWells()
+  }
+
+  function pickRandomMod(exclude: GravityWellKey | null) {
+    const available = GRAVITY_WELL_KEYS.filter(key => key !== exclude)
+    const pool = available.length > 0 ? available : GRAVITY_WELL_KEYS
+    return pool[Math.floor(Math.random() * pool.length)]
   }
 
   function resolveRange(
