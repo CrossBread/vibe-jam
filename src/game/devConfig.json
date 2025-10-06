@@ -8,7 +8,7 @@
       "blackHole": {
         "name": "Black Hole",
         "description": "Gravity sink in the center of the playing field",
-        "enabled": true,
+        "enabled": false,
         "gravityStrength": 4800000,
         "gravityFalloff": 12000,
         "radius": 40
@@ -23,6 +23,17 @@
         "wanderWidthPercentage": 0.4,
         "pauseDuration": 1.25,
         "wanderSpeed": 110
+      },
+      "gopher": {
+        "name": "Gopher",
+        "description": "Mischievous gravity gopher that repels the ball as it tunnels",
+        "enabled": true,
+        "gravityStrength": -6200000,
+        "gravityFalloff": 2000,
+        "radius": 53,
+        "wanderWidthPercentage": 0.45,
+        "pauseDuration": 1.1,
+        "wanderSpeed": 125
       },
       "superMassive": {
         "name": "Super Massive",
@@ -39,6 +50,31 @@
         "gravityStrength": 7200000,
         "gravityFalloff": 6000,
         "radius": 26
+      },
+      "divots": {
+        "name": "Divots",
+        "description": "A fresh crater spawns with every paddle return",
+        "enabled": false,
+        "gravityStrength": 5200000,
+        "gravityFalloff": 16000,
+        "radius": 38,
+        "maxDivots": 14,
+        "spawnMargin": 64
+      },
+      "ireland": {
+        "name": "Ireland",
+        "description": "Rolling gravity hills and a few towering peaks",
+        "enabled": false,
+        "gravityStrength": 3800000,
+        "gravityFalloff": 16000,
+        "radius": 56,
+        "wellCount": 16,
+        "minGravityStrength": 1800000,
+        "maxGravityStrength": 6200000,
+        "minGravityFalloff": 9000,
+        "maxGravityFalloff": 26000,
+        "minRadius": 24,
+        "maxRadius": 86
       }
     },
     "ball": {},

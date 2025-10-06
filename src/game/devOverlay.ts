@@ -522,7 +522,7 @@ export function createDevOverlay(
 
       body.appendChild(
         createSliderControl('Gravity Strength', modifier.gravityStrength, {
-          min: 0,
+          min: -8_000_000,
           max: 8_000_000,
           step: 100_000,
           format: v => `${Math.round(v).toLocaleString()} ƒ`,
@@ -713,9 +713,62 @@ function isGravityWellModifier(value: unknown): value is GravityWellModifier {
     return false
   }
 
-  return !('wanderSpeed' in candidate && typeof candidate.wanderSpeed !== 'number');
+  if ('wanderSpeed' in candidate && typeof candidate.wanderSpeed !== 'number') {
+    return false
+  }
 
+  if ('maxDivots' in candidate && typeof (candidate as { maxDivots?: unknown }).maxDivots !== 'number') {
+    return false
+  }
 
+  if (
+    'spawnMargin' in candidate &&
+    typeof (candidate as { spawnMargin?: unknown }).spawnMargin !== 'number'
+  ) {
+    return false
+  }
+
+  if ('wellCount' in candidate && typeof (candidate as { wellCount?: unknown }).wellCount !== 'number') {
+    return false
+  }
+
+  if (
+    'minGravityStrength' in candidate &&
+    typeof (candidate as { minGravityStrength?: unknown }).minGravityStrength !== 'number'
+  ) {
+    return false
+  }
+
+  if (
+    'maxGravityStrength' in candidate &&
+    typeof (candidate as { maxGravityStrength?: unknown }).maxGravityStrength !== 'number'
+  ) {
+    return false
+  }
+
+  if (
+    'minGravityFalloff' in candidate &&
+    typeof (candidate as { minGravityFalloff?: unknown }).minGravityFalloff !== 'number'
+  ) {
+    return false
+  }
+
+  if (
+    'maxGravityFalloff' in candidate &&
+    typeof (candidate as { maxGravityFalloff?: unknown }).maxGravityFalloff !== 'number'
+  ) {
+    return false
+  }
+
+  if ('minRadius' in candidate && typeof (candidate as { minRadius?: unknown }).minRadius !== 'number') {
+    return false
+  }
+
+  if ('maxRadius' in candidate && typeof (candidate as { maxRadius?: unknown }).maxRadius !== 'number') {
+    return false
+  }
+
+  return true
 }
 
 function createOverlayButton(label: string) {
