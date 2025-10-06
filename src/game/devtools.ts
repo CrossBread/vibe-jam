@@ -12,6 +12,10 @@ export const GRAVITY_WELL_KEYS = [
 
 export type GravityWellKey = (typeof GRAVITY_WELL_KEYS)[number]
 
+export const BALL_MODIFIER_KEYS = ['kite', 'bumShuffle', 'pollok'] as const
+
+export type BallModifierKey = (typeof BALL_MODIFIER_KEYS)[number]
+
 export interface ModifierBase {
   name: string
   description: string
@@ -29,9 +33,30 @@ export interface GravityWellModifier extends ModifierBase {
 
 export type ArenaModifiers = Record<GravityWellKey, GravityWellModifier>
 
+export interface KiteModifier extends ModifierBase {
+  tailLength: number
+}
+
+export interface BumShuffleModifier extends ModifierBase {
+  trailLength: number
+}
+
+export interface PollokModifier extends ModifierBase {
+  trailLength: number
+  leftColor: string
+  rightColor: string
+  neutralColor: string
+}
+
+export type BallModifiers = {
+  kite: KiteModifier
+  bumShuffle: BumShuffleModifier
+  pollok: PollokModifier
+}
+
 export interface ModifiersConfig {
   arena: ArenaModifiers
-  ball: Record<string, unknown>
+  ball: BallModifiers
   paddle: Record<string, unknown>
 }
 
@@ -101,4 +126,10 @@ export function getGravityWellsEntries(
   arena: ArenaModifiers,
 ): [GravityWellKey, GravityWellModifier][] {
   return GRAVITY_WELL_KEYS.map(key => [key, arena[key]])
+}
+
+export function getBallModifiersEntries(
+  ball: BallModifiers,
+): [BallModifierKey, BallModifiers[BallModifierKey]][] {
+  return BALL_MODIFIER_KEYS.map(key => [key, ball[key]])
 }

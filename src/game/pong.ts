@@ -104,6 +104,15 @@ interface Announcement {
   fadeDuration: number
 }
 
+interface TrailPoint {
+  x: number
+  y: number
+}
+
+interface ColoredTrailPoint extends TrailPoint {
+  color: string
+}
+
 export function createPong(
   canvas: HTMLCanvasElement,
   options: PongOptions = {},
@@ -126,6 +135,12 @@ export function createPong(
   const PIPS_PER_BITE = 8
   const ARENA_BACKGROUND = '#10172a'
   const ANNOUNCEMENT_COLOR = '#203275'
+  const BALL_COLOR = '#e7ecf3'
+  const MAX_KITE_HISTORY = 240
+  const MAX_BUM_SHUFFLE_HISTORY = 4000
+  const MAX_POLLOK_HISTORY = 6000
+  const BUM_SHUFFLE_DISTANCE_SQ = 4
+  const POLLOK_DISTANCE_SQ = 9
 
   const defaults = createDevConfig()
   const config = deepClone(defaults)
@@ -207,6 +222,10 @@ export function createPong(
     getEnabledArenaModifierKeys(config.modifiers.arena),
   )
   let activeModKey: GravityWellKey | null = null
+  const kiteTrail: TrailPoint[] = []
+  const bumShuffleTrail: TrailPoint[] = []
+  const pollokTrail: ColoredTrailPoint[] = []
+  let lastReturner: 'left' | 'right' | null = null
 
   initializeActiveModState()
 
@@ -215,6 +234,8 @@ export function createPong(
     state.ballY = H * 0.5
     state.vx = config.baseBallSpeed * (toLeft ? -1 : 1)
     state.vy = (Math.random() * 2 - 1) * config.baseBallSpeed * 0.6
+    lastReturner = null
+    clearKiteTrail()
   }
 
   function reset() {
@@ -239,6 +260,10 @@ export function createPong(
     lastEnabledArenaModifiers = new Set<GravityWellKey>(
       getEnabledArenaModifierKeys(config.modifiers.arena),
     )
+    clearKiteTrail()
+    clearBumShuffleTrail()
+    clearPollokTrail()
+    lastReturner = null
     resetBall(Math.random() < 0.5)
   }
 
@@ -355,7 +380,7 @@ export function createPong(
       const speed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
       state.vx = Math.cos(angle) * speed
       state.vy = Math.sin(angle) * speed
-      handlePaddleReturn()
+      handlePaddleReturn('left')
     }
 
     // Right paddle collision
@@ -371,8 +396,10 @@ export function createPong(
       const speed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
       state.vx = Math.cos(angle) * speed
       state.vy = Math.sin(angle) * speed
-      handlePaddleReturn()
+      handlePaddleReturn('right')
     }
+
+    updateBallTrails()
 
     // Score
     if (state.ballX < -BALL_R) {
@@ -445,7 +472,8 @@ export function createPong(
     return getEnabledArenaModifiers(arena).map(([key]) => key)
   }
 
-  function handlePaddleReturn() {
+  function handlePaddleReturn(side: 'left' | 'right') {
+    lastReturner = side
     registerPipReturn()
     spawnDivotWell()
   }
@@ -456,6 +484,7 @@ export function createPong(
 
   function handlePointScored() {
     irelandNeedsRegeneration = true
+    clearBumShuffleTrail()
 
     const modifier = config.modifiers.arena.ireland as IrelandModifier
     if (!modifier.enabled) {
@@ -554,6 +583,33 @@ export function createPong(
     }
 
     return wells
+  }
+
+  function updateBallTrails() {
+    const { ball } = config.modifiers
+    const x = state.ballX
+    const y = state.ballY
+
+    if (ball.kite.enabled) {
+      const maxLength = clampTrailLength(ball.kite.tailLength, 4, MAX_KITE_HISTORY)
+      addTrailPoint(kiteTrail, x, y, maxLength)
+    } else if (kiteTrail.length > 0) {
+      clearKiteTrail()
+    }
+
+    if (ball.bumShuffle.enabled) {
+      const maxLength = clampTrailLength(ball.bumShuffle.trailLength, 40, MAX_BUM_SHUFFLE_HISTORY)
+      addTrailPoint(bumShuffleTrail, x, y, maxLength, BUM_SHUFFLE_DISTANCE_SQ)
+    } else if (bumShuffleTrail.length > 0) {
+      clearBumShuffleTrail()
+    }
+
+    if (ball.pollok.enabled) {
+      const maxLength = clampTrailLength(ball.pollok.trailLength, 80, MAX_POLLOK_HISTORY)
+      addColoredTrailPoint(pollokTrail, x, y, getPollokColor(), maxLength, POLLOK_DISTANCE_SQ)
+    } else if (pollokTrail.length > 0) {
+      clearPollokTrail()
+    }
   }
 
   function updateMovingWellState(key: MovingWellKey, dt: number) {
@@ -825,7 +881,9 @@ export function createPong(
       ctx.fill()
     }
 
-    ctx.fillStyle = '#e7ecf3'
+    drawBallTrails()
+
+    ctx.fillStyle = BALL_COLOR
     ctx.fillRect(40, state.leftY, PADDLE_W, PADDLE_H)
     ctx.fillRect(W - 40 - PADDLE_W, state.rightY, PADDLE_W, PADDLE_H)
 
@@ -844,7 +902,7 @@ export function createPong(
       ctx.beginPath()
       ctx.arc(pipX, pipY, pipRadius, 0, Math.PI * 2)
       if (isFilled) {
-        ctx.fillStyle = '#e7ecf3'
+        ctx.fillStyle = BALL_COLOR
         ctx.fill()
       } else {
         ctx.strokeStyle = 'rgba(231,236,243,0.35)'
@@ -853,7 +911,7 @@ export function createPong(
     }
     ctx.lineWidth = 1
 
-    ctx.fillStyle = '#e7ecf3'
+    ctx.fillStyle = BALL_COLOR
     ctx.font =
       'bold 28px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto'
     ctx.textAlign = 'center'
@@ -864,6 +922,70 @@ export function createPong(
       ctx.font = 'bold 36px ui-sans-serif, system-ui'
       ctx.fillText(`${state.winner.toUpperCase()} WINS!`, W / 2, H / 2)
     }
+  }
+
+  function drawBallTrails() {
+    drawBumShuffleTrail()
+    drawPollokTrail()
+    drawKiteTrail()
+  }
+
+  function drawBumShuffleTrail() {
+    const modifier = config.modifiers.ball.bumShuffle
+    if (!modifier.enabled || bumShuffleTrail.length < 2) return
+
+    ctx.save()
+    ctx.lineWidth = BALL_R * 1.35
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.strokeStyle = BALL_COLOR
+    ctx.beginPath()
+    ctx.moveTo(bumShuffleTrail[0].x, bumShuffleTrail[0].y)
+    for (let i = 1; i < bumShuffleTrail.length; i++) {
+      ctx.lineTo(bumShuffleTrail[i].x, bumShuffleTrail[i].y)
+    }
+    ctx.stroke()
+    ctx.restore()
+  }
+
+  function drawPollokTrail() {
+    const modifier = config.modifiers.ball.pollok
+    if (!modifier.enabled || pollokTrail.length < 2) return
+
+    ctx.save()
+    ctx.lineWidth = BALL_R * 1.45
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+
+    for (let i = 1; i < pollokTrail.length; i++) {
+      const prev = pollokTrail[i - 1]
+      const current = pollokTrail[i]
+      if (prev.x === current.x && prev.y === current.y) continue
+      ctx.strokeStyle = current.color
+      ctx.beginPath()
+      ctx.moveTo(prev.x, prev.y)
+      ctx.lineTo(current.x, current.y)
+      ctx.stroke()
+    }
+
+    ctx.restore()
+  }
+
+  function drawKiteTrail() {
+    const modifier = config.modifiers.ball.kite
+    if (!modifier.enabled || kiteTrail.length === 0) return
+
+    ctx.save()
+    const length = kiteTrail.length
+    for (let i = 0; i < length; i++) {
+      const point = kiteTrail[i]
+      const alpha = ((i + 1) / length) * 0.8
+      ctx.fillStyle = applyAlphaToColor(BALL_COLOR, Math.min(1, alpha))
+      ctx.beginPath()
+      ctx.arc(point.x, point.y, BALL_R, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.restore()
   }
 
   function drawAnnouncement() {
@@ -904,6 +1026,82 @@ export function createPong(
     }
 
     ctx.restore()
+  }
+
+  function getPollokColor() {
+    const modifier = config.modifiers.ball.pollok
+    if (lastReturner === 'left') return modifier.leftColor
+    if (lastReturner === 'right') return modifier.rightColor
+    return modifier.neutralColor
+  }
+
+  function clampTrailLength(value: number | undefined, min: number, max: number) {
+    if (!Number.isFinite(value)) return min
+    const length = Math.floor(value as number)
+    return Math.max(min, Math.min(max, length))
+  }
+
+  function addTrailPoint(
+    points: TrailPoint[],
+    x: number,
+    y: number,
+    maxLength: number,
+    minDistanceSq = 0,
+  ) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return
+    const last = points[points.length - 1]
+    if (last && minDistanceSq > 0) {
+      const dx = last.x - x
+      const dy = last.y - y
+      if (dx * dx + dy * dy < minDistanceSq) {
+        last.x = x
+        last.y = y
+        return
+      }
+    }
+    points.push({ x, y })
+    if (points.length > maxLength) {
+      points.splice(0, points.length - maxLength)
+    }
+  }
+
+  function addColoredTrailPoint(
+    points: ColoredTrailPoint[],
+    x: number,
+    y: number,
+    color: string,
+    maxLength: number,
+    minDistanceSq = 0,
+  ) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return
+    const last = points[points.length - 1]
+    if (last && minDistanceSq > 0) {
+      const dx = last.x - x
+      const dy = last.y - y
+      if (dx * dx + dy * dy < minDistanceSq) {
+        last.x = x
+        last.y = y
+        last.color = color
+        return
+      }
+    }
+    points.push({ x, y, color })
+    if (points.length > maxLength) {
+      points.splice(0, points.length - maxLength)
+    }
+  }
+
+  function clearKiteTrail() {
+    if (kiteTrail.length > 0) kiteTrail.length = 0
+  }
+
+  function clearBumShuffleTrail() {
+    if (bumShuffleTrail.length > 0) bumShuffleTrail.length = 0
+  }
+
+  function clearPollokTrail() {
+    if (pollokTrail.length > 0) pollokTrail.length = 0
+    lastReturner = null
   }
 
   function applyAlphaToColor(hex: string, alpha: number) {

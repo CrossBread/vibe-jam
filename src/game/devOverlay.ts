@@ -4,6 +4,10 @@
   getGravityWellsEntries,
   type DevConfig,
   type GravityWellModifier,
+  type ModifierBase,
+  type KiteModifier,
+  type BumShuffleModifier,
+  type PollokModifier,
   type ModifiersConfig,
 } from './devtools'
 
@@ -314,6 +318,26 @@ function ensureDevOverlayStyles() {
     .dev-overlay input[type='range'] {
       width: 100%;
     }
+    .dev-overlay__color-input {
+      width: 100%;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.35);
+      padding: 0;
+      cursor: pointer;
+    }
+    .dev-overlay__color-input::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+    .dev-overlay__color-input::-webkit-color-swatch {
+      border: none;
+      border-radius: 6px;
+    }
+    .dev-overlay__color-input::-moz-color-swatch {
+      border: none;
+      border-radius: 6px;
+    }
     .dev-overlay input[type='checkbox'] {
       width: 16px;
       height: 16px;
@@ -388,6 +412,9 @@ export function createDevOverlay(
   const controls = document.createElement('div')
   controls.className = 'dev-overlay__controls'
 
+  const ballSection = document.createElement('div')
+  ballSection.className = 'dev-overlay__section'
+
   const arenaSection = document.createElement('div')
   arenaSection.className = 'dev-overlay__section'
 
@@ -415,8 +442,56 @@ export function createDevOverlay(
 
   function renderControls() {
     controls.innerHTML = ''
+    ballSection.innerHTML = ''
     arenaSection.innerHTML = ''
     collapsibleSections.length = 0
+
+    function createModifierDetails<T extends ModifierBase>(
+      modifier: T,
+      buildBody: (body: HTMLDivElement) => void,
+    ) {
+      const details = document.createElement('details')
+      details.className = 'dev-overlay__modifier'
+      details.open = true
+      collapsibleSections.push(details)
+
+      const summary = document.createElement('summary')
+
+      const summaryHeader = document.createElement('div')
+      summaryHeader.className = 'dev-overlay__modifier-header'
+
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.checked = modifier.enabled
+      toggle.className = 'dev-overlay__modifier-toggle'
+      toggle.addEventListener('click', event => event.stopPropagation())
+      toggle.addEventListener('change', () => {
+        modifier.enabled = toggle.checked
+      })
+
+      const summaryLabel = document.createElement('span')
+      summaryLabel.className = 'dev-overlay__modifier-name'
+      summaryLabel.textContent = modifier.name
+
+      summaryHeader.appendChild(toggle)
+      summaryHeader.appendChild(summaryLabel)
+      summary.appendChild(summaryHeader)
+      details.appendChild(summary)
+
+      const body = document.createElement('div')
+      body.className = 'dev-overlay__modifier-body'
+
+      const description = document.createElement('p')
+      description.className = 'dev-overlay__description'
+      description.textContent = modifier.description
+      body.appendChild(description)
+
+      buildBody(body)
+
+      details.appendChild(body)
+
+      return details
+    }
 
     const baseSection = document.createElement('details')
     baseSection.className = 'dev-overlay__collapsible'
@@ -472,6 +547,74 @@ export function createDevOverlay(
 
     collapsibleSections.push(baseSection)
     controls.appendChild(baseSection)
+
+    const ballTitle = document.createElement('div')
+    ballTitle.className = 'dev-overlay__section-title'
+    ballTitle.textContent = 'Ball Modifiers'
+    ballSection.appendChild(ballTitle)
+
+    const ballList = document.createElement('div')
+    ballList.className = 'dev-overlay__modifiers'
+    ballSection.appendChild(ballList)
+
+    const { kite, bumShuffle, pollok } = config.modifiers.ball
+
+    ballList.appendChild(
+      createModifierDetails(kite, body => {
+        body.appendChild(
+          createSliderControl('Tail Length', kite.tailLength, {
+            min: 4,
+            max: 120,
+            step: 1,
+            format: v => `${Math.round(v)} samples`,
+            onInput: v => (kite.tailLength = v),
+          }),
+        )
+      }),
+    )
+
+    ballList.appendChild(
+      createModifierDetails(bumShuffle, body => {
+        body.appendChild(
+          createSliderControl('Trail Length', bumShuffle.trailLength, {
+            min: 40,
+            max: 2000,
+            step: 10,
+            format: v => `${Math.round(v)} samples`,
+            onInput: v => (bumShuffle.trailLength = v),
+          }),
+        )
+      }),
+    )
+
+    ballList.appendChild(
+      createModifierDetails(pollok, body => {
+        body.appendChild(
+          createSliderControl('Trail Length', pollok.trailLength, {
+            min: 80,
+            max: 4000,
+            step: 20,
+            format: v => `${Math.round(v)} samples`,
+            onInput: v => (pollok.trailLength = v),
+          }),
+        )
+        body.appendChild(
+          createColorControl('Left Return Color', pollok.leftColor, value => {
+            pollok.leftColor = value
+          }),
+        )
+        body.appendChild(
+          createColorControl('Right Return Color', pollok.rightColor, value => {
+            pollok.rightColor = value
+          }),
+        )
+        body.appendChild(
+          createColorControl('Neutral Color', pollok.neutralColor, value => {
+            pollok.neutralColor = value
+          }),
+        )
+      }),
+    )
 
     const arenaTitle = document.createElement('div')
     arenaTitle.className = 'dev-overlay__section-title'
@@ -642,6 +785,7 @@ export function createDevOverlay(
   buttons.appendChild(buttonsRow)
 
   content.appendChild(controls)
+  content.appendChild(ballSection)
   content.appendChild(arenaSection)
 
   overlay.appendChild(title)
@@ -684,6 +828,13 @@ function isDevConfig(value: unknown): value is DevConfig {
   for (const key of GRAVITY_WELL_KEYS) {
     if (!isGravityWellModifier(arena[key])) return false
   }
+
+  const ball = modifiers.ball as Partial<Record<string, unknown>> | undefined
+  if (!ball || typeof ball !== 'object') return false
+
+  if (!isKiteModifier(ball.kite)) return false
+  if (!isBumShuffleModifier(ball.bumShuffle)) return false
+  if (!isPollokModifier(ball.pollok)) return false
 
   return true
 }
@@ -771,6 +922,39 @@ function isGravityWellModifier(value: unknown): value is GravityWellModifier {
   return true
 }
 
+function hasModifierBaseFields(value: unknown): value is ModifierBase {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<ModifierBase>
+  return (
+    typeof candidate.name === 'string' &&
+    typeof candidate.description === 'string' &&
+    typeof candidate.enabled === 'boolean'
+  )
+}
+
+function isKiteModifier(value: unknown): value is KiteModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<KiteModifier>
+  return typeof candidate.tailLength === 'number'
+}
+
+function isBumShuffleModifier(value: unknown): value is BumShuffleModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<BumShuffleModifier>
+  return typeof candidate.trailLength === 'number'
+}
+
+function isPollokModifier(value: unknown): value is PollokModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<PollokModifier>
+  return (
+    typeof candidate.trailLength === 'number' &&
+    typeof candidate.leftColor === 'string' &&
+    typeof candidate.rightColor === 'string' &&
+    typeof candidate.neutralColor === 'string'
+  )
+}
+
 function createOverlayButton(label: string) {
   const button = document.createElement('button')
   button.type = 'button'
@@ -811,6 +995,35 @@ function createSliderControl(label: string, value: number, options: SliderOption
     const next = Number(input.value)
     options.onInput(next)
     valueEl.textContent = options.format(next)
+  })
+
+  wrapper.appendChild(title)
+  wrapper.appendChild(input)
+
+  return wrapper
+}
+
+function createColorControl(label: string, value: string, onInput: (value: string) => void) {
+  const wrapper = document.createElement('label')
+  wrapper.className = 'dev-overlay__control'
+
+  const title = document.createElement('div')
+  title.className = 'dev-overlay__label'
+  title.textContent = label
+
+  const valueEl = document.createElement('span')
+  valueEl.className = 'dev-overlay__value'
+  valueEl.textContent = value.toUpperCase()
+  title.appendChild(valueEl)
+
+  const input = document.createElement('input')
+  input.type = 'color'
+  input.value = value
+  input.className = 'dev-overlay__color-input'
+
+  input.addEventListener('input', () => {
+    onInput(input.value)
+    valueEl.textContent = input.value.toUpperCase()
   })
 
   wrapper.appendChild(title)

@@ -77,7 +77,29 @@
         "maxRadius": 86
       }
     },
-    "ball": {},
+    "ball": {
+      "kite": {
+        "name": "Kite",
+        "description": "Short, fading tail that follows the ball",
+        "enabled": false,
+        "tailLength": 28
+      },
+      "bumShuffle": {
+        "name": "Bum Shuffle",
+        "description": "Persistent trail that resets on the next point",
+        "enabled": false,
+        "trailLength": 320
+      },
+      "pollok": {
+        "name": "Pollok",
+        "description": "Persistent technicolor streaks based on the returning paddle",
+        "enabled": false,
+        "trailLength": 1200,
+        "leftColor": "#f472b6",
+        "rightColor": "#38bdf8",
+        "neutralColor": "#fbbf24"
+      }
+    },
     "paddle": {}
   }
 }
