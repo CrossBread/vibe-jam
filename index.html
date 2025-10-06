@@ -4,26 +4,38 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vibe Games — Pong</title>
-    <style>
-      html, body { height: 100%; margin: 0; background: #0e1220; color: #e7ecf3; }
-      #app { display:flex; align-items:center; justify-content:center; height:100%; }
-      .hud { position: fixed; top: 10px; left: 10px; background: rgba(255,255,255,0.06); padding: 8px 10px; border-radius: 8px; font-family: ui-sans-serif, system-ui; }
-      a { color: #8bd5ff; }
-      canvas { box-shadow: 0 10px 40px rgba(0,0,0,0.4); border-radius: 12px; }
-    </style>
+      <style>
+        html,
+        body {
+          height: 100%;
+          margin: 0;
+          background: #0e1220;
+          color: #e7ecf3;
+        }
+
+        #app {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          width: 100%;
+          padding: 16px;
+          box-sizing: border-box;
+        }
+
+        canvas {
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+          border-radius: 12px;
+          width: min(100vw, calc(100vh * 5 / 3));
+          max-width: 100%;
+          max-height: 100%;
+          aspect-ratio: 5 / 3;
+          height: auto;
+        }
+      </style>
   </head>
-  <body>
-    <div class="hud">
-      <div><strong>Pong</strong> — Arrow Up/Down vs W/S</div>
-      <div>Score 11 to win • Press R to reset</div>
-      <div><a id="repoLink" href="#" target="_blank" rel="noreferrer">Repo</a></div>
-    </div>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
-    <script>
-      // Filled in by GH Pages URL if available
-      const m = location.href.match(/https:\/\/([^\.]+)\.github\.io\/([^\/]+)/)
-      if (m) document.getElementById('repoLink').href = "https://github.com/" + m[1] + "/" + m[2]
-    </script>
-  </body>
-</html>
+    <body>
+      <div id="app"></div>
+      <script type="module" src="/src/main.ts"></script>
+    </body>
+  </html>
