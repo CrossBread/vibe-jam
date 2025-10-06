@@ -1,10 +1,10 @@
 import {
-  GRAVITY_WELL_KEYS,
-  GRAVITY_WELL_VISUALS,
+  type ArenaModifiers,
   createDevConfig,
   deepClone,
   getGravityWellsEntries,
-  type ArenaModifiers,
+  GRAVITY_WELL_KEYS,
+  GRAVITY_WELL_VISUALS,
   type GravityWellKey,
   type GravityWellModifier,
 } from './devtools'
@@ -177,7 +177,10 @@ export function createPong(
   }
 
   const activeTouches = new Map<number, ActiveTouchControl>()
-  const touchControls: Record<TouchSide, { direction: number; relativeDelta: number }> = {
+  const touchControls: Record<
+    TouchSide,
+    { direction: number; relativeDelta: number }
+  > = {
     left: { direction: 0, relativeDelta: 0 },
     right: { direction: 0, relativeDelta: 0 },
   }
@@ -571,7 +574,18 @@ export function createPong(
     if (!container) return
     const docked = overlay.classList.contains('dev-overlay--docked')
     const visible = overlay.classList.contains('dev-overlay--visible')
-    container.classList.toggle('dev-overlay-container--docked', docked && visible)
+    const isDockedAndVisible = docked && visible
+    container.classList.toggle(
+      'dev-overlay-container--docked',
+      isDockedAndVisible,
+    )
+    container.dispatchEvent(
+      new CustomEvent('pong:layout-changed', {
+        bubbles: true,
+        composed: true,
+        detail: { docked: isDockedAndVisible },
+      }),
+    )
   }
 
   let last = performance.now()
@@ -602,16 +616,22 @@ export function createPong(
 
     const gamepadInput = getGamepadInput()
     const leftGamepadActive =
-      gamepadInput.leftAxis !== 0 || gamepadInput.leftUp || gamepadInput.leftDown
+      gamepadInput.leftAxis !== 0 ||
+      gamepadInput.leftUp ||
+      gamepadInput.leftDown
     const rightGamepadActive =
-      gamepadInput.rightAxis !== 0 || gamepadInput.rightUp || gamepadInput.rightDown
+      gamepadInput.rightAxis !== 0 ||
+      gamepadInput.rightUp ||
+      gamepadInput.rightDown
 
     if (leftGamepadActive) leftAIEnabled = false
     if (rightGamepadActive) rightAIEnabled = false
 
     // Controls
-    const leftPaddleSpeed = config.paddleSpeed * getPaddleSpeedMultiplier('left')
-    const rightPaddleSpeed = config.paddleSpeed * getPaddleSpeedMultiplier('right')
+    const leftPaddleSpeed =
+      config.paddleSpeed * getPaddleSpeedMultiplier('left')
+    const rightPaddleSpeed =
+      config.paddleSpeed * getPaddleSpeedMultiplier('right')
 
     if (leftAIEnabled) {
       const target = state.ballY - leftPaddleHeight / 2
@@ -620,7 +640,7 @@ export function createPong(
       state.leftY += clamp(diff, -maxStep, maxStep)
     } else {
       const keyDirection = (keys['w'] ? -1 : 0) + (keys['s'] ? 1 : 0)
-      let gamePadDirection = 0;
+      let gamePadDirection = 0
       if (gamepadInput.leftAxis)
         gamePadDirection += gamepadInput.leftAxis * config.paddleSpeed * dt
       if (gamepadInput.leftUp) gamePadDirection -= config.paddleSpeed * dt
@@ -644,8 +664,9 @@ export function createPong(
       const maxStep = rightPaddleSpeed * dt
       state.rightY += clamp(diff, -maxStep, maxStep)
     } else {
-      const keyDirection = (keys['ArrowUp'] ? -1 : 0) + (keys['ArrowDown'] ? 1 : 0)
-      let gamePadDirection = 0;
+      const keyDirection =
+        (keys['ArrowUp'] ? -1 : 0) + (keys['ArrowDown'] ? 1 : 0)
+      let gamePadDirection = 0
       if (gamepadInput.rightAxis)
         gamePadDirection += gamepadInput.rightAxis * config.paddleSpeed * dt
       if (gamepadInput.rightUp) gamePadDirection -= config.paddleSpeed * dt
@@ -682,7 +703,8 @@ export function createPong(
 
     if (prevVx !== 0) {
       const direction = Math.sign(prevVx)
-      const minHorizontalSpeed = config.baseBallSpeed * config.minHorizontalRatio
+      const minHorizontalSpeed =
+        config.baseBallSpeed * config.minHorizontalRatio
       const minSpeed = minHorizontalSpeed * direction
       if (state.vx * direction < minHorizontalSpeed) {
         state.vx = minSpeed
@@ -718,9 +740,11 @@ export function createPong(
     ) {
       state.ballX = 40 + PADDLE_W + radius
       const rel =
-        (state.ballY - (state.leftY + leftPaddleHeight / 2)) / (leftPaddleHeight / 2)
+        (state.ballY - (state.leftY + leftPaddleHeight / 2)) /
+        (leftPaddleHeight / 2)
       const angle = rel * 0.8
-      const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
+      const reboundSpeed =
+        Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
       state.vx = Math.cos(angle) * reboundSpeed
       state.vy = Math.sin(angle) * reboundSpeed
       handlePaddleReturn('left')
@@ -739,7 +763,8 @@ export function createPong(
         (state.ballY - (state.rightY + rightPaddleHeight / 2)) /
         (rightPaddleHeight / 2)
       const angle = Math.PI - rel * 0.8
-      const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
+      const reboundSpeed =
+        Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
       state.vx = Math.cos(angle) * reboundSpeed
       state.vy = Math.sin(angle) * reboundSpeed
       handlePaddleReturn('right')
@@ -796,9 +821,9 @@ export function createPong(
 
   function showAnnouncement(lines: string[]) {
     const uppercased = lines
-      .flatMap(line => line.trim().split(/\s+/))
+      .flatMap((line) => line.trim().split(/\s+/))
       .filter(Boolean)
-      .map(segment => segment.toUpperCase())
+      .map((segment) => segment.toUpperCase())
       .slice(0, 3)
     if (uppercased.length === 0) return
 
@@ -813,10 +838,14 @@ export function createPong(
   function getEnabledArenaModifiers(
     arena: ArenaModifiers,
   ): [GravityWellKey, GravityWellModifier][] {
-    return getGravityWellsEntries(arena).filter(([, modifier]) => modifier.enabled)
+    return getGravityWellsEntries(arena).filter(
+      ([, modifier]) => modifier.enabled,
+    )
   }
 
-  function getEnabledArenaModifierKeys(arena: ArenaModifiers): GravityWellKey[] {
+  function getEnabledArenaModifierKeys(
+    arena: ArenaModifiers,
+  ): GravityWellKey[] {
     return getEnabledArenaModifiers(arena).map(([key]) => key)
   }
 
@@ -886,41 +915,54 @@ export function createPong(
     const leftMultiplier = getPaddleSizeMultiplier('left')
     const rightMultiplier = getPaddleSizeMultiplier('right')
     const multiplierChanged =
-      leftMultiplier !== previousLeftSizeMultiplier || rightMultiplier !== previousRightSizeMultiplier
+      leftMultiplier !== previousLeftSizeMultiplier ||
+      rightMultiplier !== previousRightSizeMultiplier
 
     if (modifier.enabled) {
       const leftSettings = getChillySettingsForSide('left', modifier)
       const rightSettings = getChillySettingsForSide('right', modifier)
       if (!previousChillyEnabled || multiplierChanged) {
-        setPaddleHeight('left', leftSettings.startingHeight, { preserveCenter: true })
-        setPaddleHeight('right', rightSettings.startingHeight, { preserveCenter: true })
+        setPaddleHeight('left', leftSettings.startingHeight, {
+          preserveCenter: true,
+        })
+        setPaddleHeight('right', rightSettings.startingHeight, {
+          preserveCenter: true,
+        })
       } else {
-        const clampedLeft = clamp(
+        const clampedLeftHeight = clamp(
           leftPaddleHeight,
           leftSettings.minimumHeight,
           leftSettings.startingHeight,
         )
-        const clampedRight = clamp(
+        const clampedRightHeight = clamp(
           rightPaddleHeight,
           rightSettings.minimumHeight,
           rightSettings.startingHeight,
         )
-        if (clampedLeft !== leftPaddleHeight) {
-          setPaddleHeight('left', clampedLeft, { preserveCenter: true })
+        if (clampedLeftHeight !== leftPaddleHeight) {
+          setPaddleHeight('left', clampedLeftHeight, { preserveCenter: true })
         }
-        if (clampedRight !== rightPaddleHeight) {
-          setPaddleHeight('right', clampedRight, { preserveCenter: true })
+        if (clampedRightHeight !== rightPaddleHeight) {
+          setPaddleHeight('right', clampedRightHeight, { preserveCenter: true })
         }
       }
       previousChillyEnabled = true
     } else {
-      const leftBase = getBasePaddleHeight('left')
-      const rightBase = getBasePaddleHeight('right')
-      if (previousChillyEnabled || leftPaddleHeight !== leftBase || multiplierChanged) {
-        setPaddleHeight('left', leftBase, { preserveCenter: true })
+      const leftBaseHeight = getBasePaddleHeight('left')
+      const rightBaseHeight = getBasePaddleHeight('right')
+      if (
+        previousChillyEnabled ||
+        leftPaddleHeight !== leftBaseHeight ||
+        multiplierChanged
+      ) {
+        setPaddleHeight('left', leftBaseHeight, { preserveCenter: true })
       }
-      if (previousChillyEnabled || rightPaddleHeight !== rightBase || multiplierChanged) {
-        setPaddleHeight('right', rightBase, { preserveCenter: true })
+      if (
+        previousChillyEnabled ||
+        rightPaddleHeight !== rightBaseHeight ||
+        multiplierChanged
+      ) {
+        setPaddleHeight('right', rightBaseHeight, { preserveCenter: true })
       }
       previousChillyEnabled = false
     }
@@ -937,7 +979,10 @@ export function createPong(
   function applyChillyShrink(side: 'left' | 'right') {
     const modifier = config.modifiers.paddle.chilly
     if (!modifier.enabled) return
-    const { shrinkAmount, minimumHeight } = getChillySettingsForSide(side, modifier)
+    const { shrinkAmount, minimumHeight } = getChillySettingsForSide(
+      side,
+      modifier,
+    )
     if (shrinkAmount <= 0) return
 
     const currentHeight = side === 'left' ? leftPaddleHeight : rightPaddleHeight
@@ -996,14 +1041,18 @@ export function createPong(
 
   function getPaddleSpeedMultiplier(side: 'left' | 'right') {
     const value =
-      side === 'left' ? config.leftPaddleSpeedMultiplier : config.rightPaddleSpeedMultiplier
+      side === 'left'
+        ? config.leftPaddleSpeedMultiplier
+        : config.rightPaddleSpeedMultiplier
     const multiplier = Number.isFinite(value) ? value : 1
     return Math.max(0, multiplier)
   }
 
   function getPaddleSizeMultiplier(side: 'left' | 'right') {
     const value =
-      side === 'left' ? config.leftPaddleSizeMultiplier : config.rightPaddleSizeMultiplier
+      side === 'left'
+        ? config.leftPaddleSizeMultiplier
+        : config.rightPaddleSizeMultiplier
     const multiplier = Number.isFinite(value) ? value : 1
     return Math.max(0.1, multiplier)
   }
@@ -1013,14 +1062,17 @@ export function createPong(
   }
 
   function getChillySettings(modifier = config.modifiers.paddle.chilly) {
-    const maxHeight = H
     const startingHeight = clamp(
-      Number.isFinite(modifier.startingHeight) ? modifier.startingHeight : BASE_PADDLE_H,
+      Number.isFinite(modifier.startingHeight)
+        ? modifier.startingHeight
+        : BASE_PADDLE_H,
       40,
-      maxHeight,
+      H,
     )
     const minimumHeight = clamp(
-      Number.isFinite(modifier.minimumHeight) ? modifier.minimumHeight : BASE_PADDLE_H * 0.75,
+      Number.isFinite(modifier.minimumHeight)
+        ? modifier.minimumHeight
+        : BASE_PADDLE_H * 0.75,
       20,
       startingHeight,
     )
@@ -1088,7 +1140,9 @@ export function createPong(
 
   function collectActiveGravityWells(): ActiveGravityWell[] {
     const wells: ActiveGravityWell[] = []
-    for (const [key, modifier] of getGravityWellsEntries(config.modifiers.arena)) {
+    for (const [key, modifier] of getGravityWellsEntries(
+      config.modifiers.arena,
+    )) {
       if (!modifier.enabled) continue
 
       if (key === 'blackMole' || key === 'gopher') {
@@ -1127,7 +1181,9 @@ export function createPong(
                   x: W * 0.5,
                   y: H * 0.5,
                   gravityStrength: modifier.gravityStrength,
-                  gravityFalloff: toGravityFalloffValue(modifier.gravityFalloff),
+                  gravityFalloff: toGravityFalloffValue(
+                    modifier.gravityFalloff,
+                  ),
                   radius: modifier.radius,
                 },
               ]
@@ -1176,25 +1232,41 @@ export function createPong(
     let radius = BALL_R
 
     if (snowball.enabled) {
-      const rawMin = Number.isFinite(snowball.minRadius) ? snowball.minRadius : BALL_R * 0.5
-      const rawMax = Number.isFinite(snowball.maxRadius) ? snowball.maxRadius : BALL_R * 2
+      const rawMin = Number.isFinite(snowball.minRadius)
+        ? snowball.minRadius
+        : BALL_R * 0.5
+      const rawMax = Number.isFinite(snowball.maxRadius)
+        ? snowball.maxRadius
+        : BALL_R * 2
       const minRadius = clamp(rawMin, 1, 160)
       const maxRadius = clamp(Math.max(rawMax, minRadius), minRadius, 200)
       const growthRate = Number.isFinite(snowball.growthRate)
         ? Math.max(0, snowball.growthRate)
         : 0
-      radius = clamp(minRadius + ballTravelDistance * growthRate, minRadius, maxRadius)
+      radius = clamp(
+        minRadius + ballTravelDistance * growthRate,
+        minRadius,
+        maxRadius,
+      )
     }
 
     if (meteor.enabled) {
-      const rawStart = Number.isFinite(meteor.startRadius) ? meteor.startRadius : BALL_R * 2
+      const rawStart = Number.isFinite(meteor.startRadius)
+        ? meteor.startRadius
+        : BALL_R * 2
       const startRadius = clamp(rawStart, 2, 220)
-      const rawMin = Number.isFinite(meteor.minRadius) ? meteor.minRadius : BALL_R * 0.75
+      const rawMin = Number.isFinite(meteor.minRadius)
+        ? meteor.minRadius
+        : BALL_R * 0.75
       const minRadius = clamp(Math.min(rawMin, startRadius), 1, startRadius)
       const shrinkRate = Number.isFinite(meteor.shrinkRate)
         ? Math.max(0, meteor.shrinkRate)
         : 0
-      radius = clamp(startRadius - ballTravelDistance * shrinkRate, minRadius, startRadius)
+      radius = clamp(
+        startRadius - ballTravelDistance * shrinkRate,
+        minRadius,
+        startRadius,
+      )
     }
 
     currentBallRadius = radius
@@ -1208,21 +1280,40 @@ export function createPong(
     const radius = getBallRadius()
 
     if (ball.kite.enabled) {
-      const maxLength = clampTrailLength(ball.kite.tailLength, 4, MAX_KITE_HISTORY)
+      const maxLength = clampTrailLength(
+        ball.kite.tailLength,
+        4,
+        MAX_KITE_HISTORY,
+      )
       addTrailPoint(kiteTrail, x, y, maxLength, 0, radius)
     } else if (kiteTrail.length > 0) {
       clearKiteTrail()
     }
 
     if (ball.bumShuffle.enabled) {
-      const maxLength = clampTrailLength(ball.bumShuffle.trailLength, 40, MAX_BUM_SHUFFLE_HISTORY)
-      addTrailPoint(bumShuffleTrail, x, y, maxLength, BUM_SHUFFLE_DISTANCE_SQ, radius)
+      const maxLength = clampTrailLength(
+        ball.bumShuffle.trailLength,
+        40,
+        MAX_BUM_SHUFFLE_HISTORY,
+      )
+      addTrailPoint(
+        bumShuffleTrail,
+        x,
+        y,
+        maxLength,
+        BUM_SHUFFLE_DISTANCE_SQ,
+        radius,
+      )
     } else if (bumShuffleTrail.length > 0) {
       clearBumShuffleTrail()
     }
 
     if (ball.pollok.enabled) {
-      const maxLength = clampTrailLength(ball.pollok.trailLength, 80, MAX_POLLOK_HISTORY)
+      const maxLength = clampTrailLength(
+        ball.pollok.trailLength,
+        80,
+        MAX_POLLOK_HISTORY,
+      )
       addColoredTrailPoint(
         pollokTrail,
         x,
@@ -1245,7 +1336,11 @@ export function createPong(
       return
     }
 
-    const widthPercentage = clamp(modifier.wanderWidthPercentage ?? 0.33, 0.05, 1)
+    const widthPercentage = clamp(
+      modifier.wanderWidthPercentage ?? 0.33,
+      0.05,
+      1,
+    )
     const wanderSpeed = Math.max(0, modifier.wanderSpeed ?? 110)
     const pauseDuration = Math.max(0, modifier.pauseDuration ?? 1.25)
 
@@ -1408,7 +1503,9 @@ export function createPong(
   }
 
   function initializeActiveModState() {
-    const enabledMods = GRAVITY_WELL_KEYS.filter(key => config.modifiers.arena[key].enabled)
+    const enabledMods = GRAVITY_WELL_KEYS.filter(
+      (key) => config.modifiers.arena[key].enabled,
+    )
     if (enabledMods.length === 0) {
       setActiveMod(pickRandomMod(null))
       return
@@ -1423,7 +1520,8 @@ export function createPong(
   }
 
   function setActiveMod(nextKey: GravityWellKey) {
-    if (activeModKey === nextKey && config.modifiers.arena[nextKey].enabled) return
+    if (activeModKey === nextKey && config.modifiers.arena[nextKey].enabled)
+      return
 
     for (const key of GRAVITY_WELL_KEYS) {
       const modifier = config.modifiers.arena[key]
@@ -1454,7 +1552,7 @@ export function createPong(
   }
 
   function pickRandomMod(exclude: GravityWellKey | null) {
-    const available = GRAVITY_WELL_KEYS.filter(key => key !== exclude)
+    const available = GRAVITY_WELL_KEYS.filter((key) => key !== exclude)
     const pool = available.length > 0 ? available : GRAVITY_WELL_KEYS
     return pool[Math.floor(Math.random() * pool.length)]
   }
@@ -1465,8 +1563,14 @@ export function createPong(
     fallbackMin: number,
     fallbackMax: number,
   ): [number, number] {
-    let min = typeof minValue === 'number' && Number.isFinite(minValue) ? minValue : fallbackMin
-    let max = typeof maxValue === 'number' && Number.isFinite(maxValue) ? maxValue : fallbackMax
+    let min =
+      typeof minValue === 'number' && Number.isFinite(minValue)
+        ? minValue
+        : fallbackMin
+    let max =
+      typeof maxValue === 'number' && Number.isFinite(maxValue)
+        ? maxValue
+        : fallbackMax
     if (min > max) {
       ;[min, max] = [max, min]
     }
@@ -1510,7 +1614,12 @@ export function createPong(
 
     ctx.fillStyle = BALL_COLOR
     ctx.fillRect(40, state.leftY, PADDLE_W, state.leftPaddleHeight)
-    ctx.fillRect(W - 40 - PADDLE_W, state.rightY, PADDLE_W, state.rightPaddleHeight)
+    ctx.fillRect(
+      W - 40 - PADDLE_W,
+      state.rightY,
+      PADDLE_W,
+      state.rightPaddleHeight,
+    )
 
     const ballRadius = getBallRadius()
     ctx.beginPath()
@@ -1704,7 +1813,11 @@ export function createPong(
     return modifier.neutralColor
   }
 
-  function clampTrailLength(value: number | undefined, min: number, max: number) {
+  function clampTrailLength(
+    value: number | undefined,
+    min: number,
+    max: number,
+  ) {
     if (!Number.isFinite(value)) return min
     const length = Math.floor(value as number)
     return Math.max(min, Math.min(max, length))

@@ -84,6 +84,25 @@ function ensureDevOverlayStyles() {
       display: flex;
       flex-direction: column;
     }
+    @media (max-width: 768px) {
+      .dev-overlay-container.dev-overlay-container--docked {
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: center;
+        gap: 12px;
+        padding: 12px;
+      }
+      .dev-overlay-container.dev-overlay-container--docked canvas {
+        max-height: none;
+        width: 100%;
+      }
+      .dev-overlay.dev-overlay--docked {
+        width: 100%;
+        max-width: none;
+        height: auto;
+        max-height: min(70vh, 520px);
+      }
+    }
     .dev-overlay__title {
       font-size: 14px;
       font-weight: 600;

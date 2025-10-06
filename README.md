@@ -1,4 +1,4 @@
-# NYGP - Not Your Grandaddy's Pong ✨
+# NYGP - Not Your Grandaddy's Video Tennis ✨
 ## Pong + Modes
 ## [Play the latest build in your browser](https://crossbread.github.io/vibe-jam/)
 
