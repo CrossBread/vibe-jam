@@ -20,6 +20,8 @@ export interface PongState {
   vy: number
   leftY: number
   rightY: number
+  leftPaddleHeight: number
+  rightPaddleHeight: number
   paused: boolean
   winner: 'left' | 'right' | null
   currentPips: number
@@ -116,6 +118,11 @@ interface ColoredTrailPoint extends TrailPoint {
   color: string
 }
 
+interface PaddleHeightOptions {
+  center?: boolean
+  preserveCenter?: boolean
+}
+
 export function createPong(
   canvas: HTMLCanvasElement,
   options: PongOptions = {},
@@ -131,7 +138,7 @@ export function createPong(
   } = options
   const W = canvas.width
   const H = canvas.height
-  const PADDLE_H = 90
+  const BASE_PADDLE_H = 90
   const PADDLE_W = 12
   const BALL_R = 8
   const WIN_SCORE = 11
@@ -189,8 +196,10 @@ export function createPong(
     ballRadius: BALL_R,
     vx: config.baseBallSpeed * (Math.random() < 0.5 ? -1 : 1),
     vy: (Math.random() * 2 - 1) * config.baseBallSpeed * 0.6,
-    leftY: H * 0.5 - PADDLE_H / 2,
-    rightY: H * 0.5 - PADDLE_H / 2,
+    leftY: H * 0.5 - BASE_PADDLE_H / 2,
+    rightY: H * 0.5 - BASE_PADDLE_H / 2,
+    leftPaddleHeight: BASE_PADDLE_H,
+    rightPaddleHeight: BASE_PADDLE_H,
     paused: false,
     winner: null,
     currentPips: 0,
@@ -198,6 +207,10 @@ export function createPong(
     totalBites: 0,
     completedBitesSinceLastPoint: 0,
   }
+
+  let leftPaddleHeight = state.leftPaddleHeight
+  let rightPaddleHeight = state.rightPaddleHeight
+  let previousChillyEnabled = config.modifiers.paddle.chilly.enabled
 
   const movingWellStates: Record<MovingWellKey, MovingWellState> = {
     blackMole: {
@@ -237,6 +250,7 @@ export function createPong(
 
   initializeActiveModState()
   resetBallSize()
+  initializePaddleHeights(true)
 
   function resetBall(toLeft: boolean) {
     state.ballX = W * 0.5
@@ -251,8 +265,6 @@ export function createPong(
   function reset() {
     state.leftScore = 0
     state.rightScore = 0
-    state.leftY = H * 0.5 - PADDLE_H / 2
-    state.rightY = H * 0.5 - PADDLE_H / 2
     state.winner = null
     state.currentPips = 0
     state.totalPips = 0
@@ -276,6 +288,7 @@ export function createPong(
     clearBumShuffleTrail()
     clearPollokTrail()
     lastReturner = null
+    initializePaddleHeights(true)
     resetBall(Math.random() < 0.5)
   }
 
@@ -309,6 +322,7 @@ export function createPong(
   function tick(dt: number) {
     updateAnnouncement(dt)
     checkModifierAnnouncements()
+    updatePaddleModifierState()
 
     if (state.winner) return
 
@@ -319,7 +333,7 @@ export function createPong(
 
     // Controls
     if (leftAIEnabled) {
-      const target = state.ballY - PADDLE_H / 2
+      const target = state.ballY - leftPaddleHeight / 2
       const diff = target - state.leftY
       const maxStep = config.paddleSpeed * dt
       state.leftY += clamp(diff, -maxStep, maxStep)
@@ -329,7 +343,7 @@ export function createPong(
     }
 
     if (rightAIEnabled) {
-      const target = state.ballY - PADDLE_H / 2
+      const target = state.ballY - rightPaddleHeight / 2
       const diff = target - state.rightY
       const maxStep = config.paddleSpeed * dt
       state.rightY += clamp(diff, -maxStep, maxStep)
@@ -338,8 +352,8 @@ export function createPong(
       if (keys['ArrowDown']) state.rightY += config.paddleSpeed * dt
     }
 
-    state.leftY = clamp(state.leftY, 0, H - PADDLE_H)
-    state.rightY = clamp(state.rightY, 0, H - PADDLE_H)
+    state.leftY = clamp(state.leftY, 0, H - leftPaddleHeight)
+    state.rightY = clamp(state.rightY, 0, H - rightPaddleHeight)
 
     // Gravity well influence
     activeGravityWells = collectActiveGravityWells()
@@ -390,10 +404,11 @@ export function createPong(
       state.ballX - radius < 40 + PADDLE_W &&
       state.ballX - radius > 40 &&
       state.ballY > state.leftY &&
-      state.ballY < state.leftY + PADDLE_H
+      state.ballY < state.leftY + leftPaddleHeight
     ) {
       state.ballX = 40 + PADDLE_W + radius
-      const rel = (state.ballY - (state.leftY + PADDLE_H / 2)) / (PADDLE_H / 2)
+      const rel =
+        (state.ballY - (state.leftY + leftPaddleHeight / 2)) / (leftPaddleHeight / 2)
       const angle = rel * 0.8
       const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
       state.vx = Math.cos(angle) * reboundSpeed
@@ -407,10 +422,12 @@ export function createPong(
       state.ballX + radius > W - 40 - PADDLE_W &&
       state.ballX + radius < W - 40 &&
       state.ballY > state.rightY &&
-      state.ballY < state.rightY + PADDLE_H
+      state.ballY < state.rightY + rightPaddleHeight
     ) {
       state.ballX = W - 40 - PADDLE_W - radius
-      const rel = (state.ballY - (state.rightY + PADDLE_H / 2)) / (PADDLE_H / 2)
+      const rel =
+        (state.ballY - (state.rightY + rightPaddleHeight / 2)) /
+        (rightPaddleHeight / 2)
       const angle = Math.PI - rel * 0.8
       const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
       state.vx = Math.cos(angle) * reboundSpeed
@@ -498,6 +515,7 @@ export function createPong(
     registerPipReturn()
     resetBallSize()
     spawnDivotWell()
+    applyChillyShrink(side)
   }
 
   function clearDivotWells() {
@@ -505,6 +523,7 @@ export function createPong(
   }
 
   function handlePointScored() {
+    initializePaddleHeights(true)
     if (completedBitesSinceLastPoint > 0) {
       const previousActive = activeModKey
       disableAllMods()
@@ -530,6 +549,137 @@ export function createPong(
     regenerateIrelandWells(modifier)
     irelandNeedsRegeneration = false
     activeGravityWells = collectActiveGravityWells()
+  }
+
+  function initializePaddleHeights(center: boolean) {
+    const { chilly } = config.modifiers.paddle
+    const options: PaddleHeightOptions = { center }
+    if (chilly.enabled) {
+      const { startingHeight } = getChillySettings(chilly)
+      setPaddleHeight('left', startingHeight, options)
+      setPaddleHeight('right', startingHeight, options)
+      previousChillyEnabled = true
+    } else {
+      setPaddleHeight('left', BASE_PADDLE_H, options)
+      setPaddleHeight('right', BASE_PADDLE_H, options)
+      previousChillyEnabled = false
+    }
+    clampPaddlePosition('left')
+    clampPaddlePosition('right')
+  }
+
+  function updatePaddleModifierState() {
+    const modifier = config.modifiers.paddle.chilly
+    if (modifier.enabled) {
+      const settings = getChillySettings(modifier)
+      if (!previousChillyEnabled) {
+        setPaddleHeight('left', settings.startingHeight, { preserveCenter: true })
+        setPaddleHeight('right', settings.startingHeight, { preserveCenter: true })
+      } else {
+        const clampedLeft = clamp(leftPaddleHeight, settings.minimumHeight, settings.startingHeight)
+        const clampedRight = clamp(rightPaddleHeight, settings.minimumHeight, settings.startingHeight)
+        if (clampedLeft !== leftPaddleHeight) {
+          setPaddleHeight('left', clampedLeft, { preserveCenter: true })
+        }
+        if (clampedRight !== rightPaddleHeight) {
+          setPaddleHeight('right', clampedRight, { preserveCenter: true })
+        }
+      }
+      previousChillyEnabled = true
+    } else {
+      if (previousChillyEnabled || leftPaddleHeight !== BASE_PADDLE_H) {
+        setPaddleHeight('left', BASE_PADDLE_H, { preserveCenter: true })
+      }
+      if (previousChillyEnabled || rightPaddleHeight !== BASE_PADDLE_H) {
+        setPaddleHeight('right', BASE_PADDLE_H, { preserveCenter: true })
+      }
+      previousChillyEnabled = false
+    }
+
+    clampPaddlePosition('left')
+    clampPaddlePosition('right')
+    state.leftPaddleHeight = leftPaddleHeight
+    state.rightPaddleHeight = rightPaddleHeight
+  }
+
+  function applyChillyShrink(side: 'left' | 'right') {
+    const modifier = config.modifiers.paddle.chilly
+    if (!modifier.enabled) return
+    const { shrinkAmount, minimumHeight } = getChillySettings(modifier)
+    if (shrinkAmount <= 0) return
+
+    const currentHeight = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+    const nextHeight = Math.max(minimumHeight, currentHeight - shrinkAmount)
+    if (nextHeight === currentHeight) return
+
+    setPaddleHeight(side, nextHeight, { preserveCenter: true })
+    clampPaddlePosition(side)
+    state.leftPaddleHeight = leftPaddleHeight
+    state.rightPaddleHeight = rightPaddleHeight
+  }
+
+  function setPaddleHeight(
+    side: 'left' | 'right',
+    height: number,
+    options: PaddleHeightOptions = {},
+  ) {
+    const { center = false, preserveCenter = true } = options
+    const prevHeight = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+
+    if (side === 'left') {
+      leftPaddleHeight = height
+      state.leftPaddleHeight = height
+    } else {
+      rightPaddleHeight = height
+      state.rightPaddleHeight = height
+    }
+
+    if (center) {
+      const y = clamp(H * 0.5 - height / 2, 0, H - height)
+      if (side === 'left') state.leftY = y
+      else state.rightY = y
+      return
+    }
+
+    if (preserveCenter) {
+      const currentY = side === 'left' ? state.leftY : state.rightY
+      const centerY = currentY + prevHeight / 2
+      const newY = clamp(centerY - height / 2, 0, H - height)
+      if (side === 'left') state.leftY = newY
+      else state.rightY = newY
+      return
+    }
+
+    clampPaddlePosition(side)
+  }
+
+  function clampPaddlePosition(side: 'left' | 'right') {
+    const height = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+    if (side === 'left') {
+      state.leftY = clamp(state.leftY, 0, H - height)
+    } else {
+      state.rightY = clamp(state.rightY, 0, H - height)
+    }
+  }
+
+  function getChillySettings(modifier = config.modifiers.paddle.chilly) {
+    const maxHeight = H
+    const startingHeight = clamp(
+      Number.isFinite(modifier.startingHeight) ? modifier.startingHeight : BASE_PADDLE_H,
+      40,
+      maxHeight,
+    )
+    const minimumHeight = clamp(
+      Number.isFinite(modifier.minimumHeight) ? modifier.minimumHeight : BASE_PADDLE_H * 0.75,
+      20,
+      startingHeight,
+    )
+    const shrinkAmount = Math.max(
+      0,
+      Number.isFinite(modifier.shrinkAmount) ? modifier.shrinkAmount : 0,
+    )
+
+    return { startingHeight, minimumHeight, shrinkAmount }
   }
 
   function registerPipReturn() {
@@ -996,8 +1146,8 @@ export function createPong(
     drawBallTrails()
 
     ctx.fillStyle = BALL_COLOR
-    ctx.fillRect(40, state.leftY, PADDLE_W, PADDLE_H)
-    ctx.fillRect(W - 40 - PADDLE_W, state.rightY, PADDLE_W, PADDLE_H)
+    ctx.fillRect(40, state.leftY, PADDLE_W, state.leftPaddleHeight)
+    ctx.fillRect(W - 40 - PADDLE_W, state.rightY, PADDLE_W, state.rightPaddleHeight)
 
     const ballRadius = getBallRadius()
     ctx.beginPath()

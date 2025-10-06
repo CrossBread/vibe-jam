@@ -2,6 +2,7 @@
   GRAVITY_WELL_KEYS,
   deepClone,
   getGravityWellsEntries,
+  getPaddleModifiersEntries,
   type DevConfig,
   type GravityWellModifier,
   type ModifierBase,
@@ -10,6 +11,7 @@
   type PollokModifier,
   type SnowballModifier,
   type MeteorModifier,
+  type ChillyModifier,
   type ModifiersConfig,
 } from './devtools'
 
@@ -414,6 +416,9 @@ export function createDevOverlay(
   const controls = document.createElement('div')
   controls.className = 'dev-overlay__controls'
 
+  const paddleSection = document.createElement('div')
+  paddleSection.className = 'dev-overlay__section'
+
   const ballSection = document.createElement('div')
   ballSection.className = 'dev-overlay__section'
 
@@ -444,6 +449,7 @@ export function createDevOverlay(
 
   function renderControls() {
     controls.innerHTML = ''
+    paddleSection.innerHTML = ''
     ballSection.innerHTML = ''
     arenaSection.innerHTML = ''
     collapsibleSections.length = 0
@@ -549,6 +555,51 @@ export function createDevOverlay(
 
     collapsibleSections.push(baseSection)
     controls.appendChild(baseSection)
+
+    const paddleTitle = document.createElement('div')
+    paddleTitle.className = 'dev-overlay__section-title'
+    paddleTitle.textContent = 'Paddle Modifiers'
+    paddleSection.appendChild(paddleTitle)
+
+    const paddleList = document.createElement('div')
+    paddleList.className = 'dev-overlay__modifiers'
+    paddleSection.appendChild(paddleList)
+
+    for (const [, modifier] of getPaddleModifiersEntries(config.modifiers.paddle)) {
+      paddleList.appendChild(
+        createModifierDetails(modifier, body => {
+          body.appendChild(
+            createSliderControl('Starting Height', modifier.startingHeight, {
+              min: 60,
+              max: 200,
+              step: 1,
+              format: v => `${Math.round(v)} px`,
+              onInput: v => (modifier.startingHeight = v),
+            }),
+          )
+
+          body.appendChild(
+            createSliderControl('Shrink Per Return', modifier.shrinkAmount, {
+              min: 0,
+              max: 20,
+              step: 1,
+              format: v => `${Math.round(v)} px`,
+              onInput: v => (modifier.shrinkAmount = v),
+            }),
+          )
+
+          body.appendChild(
+            createSliderControl('Minimum Height', modifier.minimumHeight, {
+              min: 40,
+              max: 140,
+              step: 1,
+              format: v => `${Math.round(v)} px`,
+              onInput: v => (modifier.minimumHeight = v),
+            }),
+          )
+        }),
+      )
+    }
 
     const ballTitle = document.createElement('div')
     ballTitle.className = 'dev-overlay__section-title'
@@ -851,6 +902,7 @@ export function createDevOverlay(
   buttons.appendChild(buttonsRow)
 
   content.appendChild(controls)
+  content.appendChild(paddleSection)
   content.appendChild(ballSection)
   content.appendChild(arenaSection)
 
@@ -903,6 +955,11 @@ function isDevConfig(value: unknown): value is DevConfig {
   if (!isPollokModifier(ball.pollok)) return false
   if (!isSnowballModifier(ball.snowball)) return false
   if (!isMeteorModifier(ball.meteor)) return false
+
+  const paddle = modifiers.paddle as Partial<Record<string, unknown>> | undefined
+  if (!paddle || typeof paddle !== 'object') return false
+
+  if (!isChillyModifier(paddle.chilly)) return false
 
   return true
 }
@@ -1040,6 +1097,16 @@ function isMeteorModifier(value: unknown): value is MeteorModifier {
     typeof candidate.startRadius === 'number' &&
     typeof candidate.minRadius === 'number' &&
     typeof candidate.shrinkRate === 'number'
+  )
+}
+
+function isChillyModifier(value: unknown): value is ChillyModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<ChillyModifier>
+  return (
+    typeof candidate.startingHeight === 'number' &&
+    typeof candidate.shrinkAmount === 'number' &&
+    typeof candidate.minimumHeight === 'number'
   )
 }
 

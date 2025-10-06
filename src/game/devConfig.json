@@ -116,6 +116,15 @@
         "shrinkRate": 0.02
       }
     },
-    "paddle": {}
+    "paddle": {
+      "chilly": {
+        "name": "Chilly",
+        "description": "Paddles start large then shrink after each return; reset on point",
+        "enabled": false,
+        "startingHeight": 132,
+        "shrinkAmount": 6,
+        "minimumHeight": 78
+      }
+    }
   }
 }
