@@ -329,12 +329,14 @@ export function createPong(
     if (state.ballX < -BALL_R) {
       state.rightScore++
       if (state.rightScore >= WIN_SCORE) state.winner = 'right'
+      clearDivotWells()
       resetBall(false)
       handlePointScored()
     }
     if (state.ballX > W + BALL_R) {
       state.leftScore++
       if (state.leftScore >= WIN_SCORE) state.winner = 'left'
+      clearDivotWells()
       resetBall(true)
       handlePointScored()
     }
@@ -342,6 +344,10 @@ export function createPong(
 
   function handlePaddleReturn() {
     spawnDivotWell()
+  }
+
+  function clearDivotWells() {
+    if (divotWells.length > 0) divotWells.length = 0
   }
 
   function handlePointScored() {
