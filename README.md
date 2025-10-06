@@ -1,5 +1,6 @@
 # NYGP - Not Your Grandaddy's Pong ✨
 ## Pong + Modes
+## [Play the latest build in your browser](https://crossbread.github.io/vibe-jam/)
 
 # Rules
 1. Game ends when the last ball leaves play.
