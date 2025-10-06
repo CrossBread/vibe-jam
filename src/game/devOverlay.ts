@@ -63,6 +63,8 @@ function ensureDevOverlayStyles() {
       backdrop-filter: blur(10px);
       max-height: calc(100vh - 32px);
       overflow-y: auto;
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
     }
     .dev-overlay.dev-overlay--visible {
       display: block;
@@ -307,6 +309,12 @@ function ensureDevOverlayStyles() {
       background: rgba(71, 85, 105, 0.65);
       border-color: rgba(148, 163, 184, 0.6);
     }
+    .dev-overlay input,
+    .dev-overlay button,
+    .dev-overlay select,
+    .dev-overlay summary {
+      touch-action: manipulation;
+    }
     .dev-overlay__status {
       margin-top: 12px;
       font-size: 12px;
@@ -378,7 +386,7 @@ export function createDevOverlay(
 
   const hint = document.createElement('span')
   hint.className = 'dev-overlay__hint'
-  hint.textContent = 'Press ` to toggle'
+  hint.textContent = 'Press ` or hold 3 fingers to open'
 
   const collapseAllButton = document.createElement('button')
   collapseAllButton.type = 'button'
@@ -1254,6 +1262,12 @@ function createColorControl(label: string, value: string, onInput: (value: strin
 export function toggleOverlay(overlay: HTMLDivElement) {
   const visible = overlay.classList.toggle('dev-overlay--visible')
   overlay.setAttribute('aria-hidden', visible ? 'false' : 'true')
+}
+
+export function showOverlay(overlay: HTMLDivElement) {
+  if (overlay.classList.contains('dev-overlay--visible')) return
+  overlay.classList.add('dev-overlay--visible')
+  overlay.setAttribute('aria-hidden', 'false')
 }
 
 export type { DevConfig } from './devtools'

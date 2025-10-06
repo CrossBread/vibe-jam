@@ -8,7 +8,7 @@ import {
   type GravityWellKey,
   type GravityWellModifier,
 } from './devtools'
-import { createDevOverlay, toggleOverlay } from './devOverlay'
+import { createDevOverlay, showOverlay, toggleOverlay } from './devOverlay'
 
 export interface PongState {
   leftScore: number
@@ -163,6 +163,33 @@ export function createPong(
   container?.appendChild(overlay)
   syncOverlayLayout()
 
+  type TouchSide = 'left' | 'right'
+  type TouchMode = 'direct' | 'relative'
+
+  interface ActiveTouchControl {
+    id: number
+    side: TouchSide
+    mode: TouchMode
+    directDirection: -1 | 0 | 1
+    lastCanvasY: number
+    canvasX: number
+    canvasY: number
+  }
+
+  const activeTouches = new Map<number, ActiveTouchControl>()
+  const touchControls: Record<TouchSide, { direction: number; relativeDelta: number }> = {
+    left: { direction: 0, relativeDelta: 0 },
+    right: { direction: 0, relativeDelta: 0 },
+  }
+  let tripleTouchTimeout: number | null = null
+
+  canvas.style.touchAction = 'none'
+
+  canvas.addEventListener('touchstart', handleTouchStart, { passive: false })
+  canvas.addEventListener('touchmove', handleTouchMove, { passive: false })
+  canvas.addEventListener('touchend', handleTouchEnd)
+  canvas.addEventListener('touchcancel', handleTouchEnd)
+
   const keys: KeySet = {}
   let leftAIEnabled = true
   let rightAIEnabled = true
@@ -248,6 +275,185 @@ export function createPong(
 
   const initialLeftHeight = getBasePaddleHeight('left')
   const initialRightHeight = getBasePaddleHeight('right')
+
+  function handleTouchStart(event: TouchEvent) {
+    if (event.cancelable) event.preventDefault()
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = rect.width !== 0 ? W / rect.width : 1
+    const scaleY = rect.height !== 0 ? H / rect.height : 1
+
+    for (let i = 0; i < event.changedTouches.length; i++) {
+      const touch = event.changedTouches.item(i)
+      if (!touch) continue
+      const x = (touch.clientX - rect.left) * scaleX
+      const y = (touch.clientY - rect.top) * scaleY
+      const control = createTouchControl(touch.identifier, x, y)
+      if (!control) continue
+      activeTouches.set(touch.identifier, control)
+      if (control.side === 'left') leftAIEnabled = false
+      else rightAIEnabled = false
+    }
+
+    recalculateDirectDirections()
+    updateTripleTouchHold()
+  }
+
+  function handleTouchMove(event: TouchEvent) {
+    if (event.cancelable) event.preventDefault()
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = rect.width !== 0 ? W / rect.width : 1
+    const scaleY = rect.height !== 0 ? H / rect.height : 1
+    let leftNeedsUpdate = false
+    let rightNeedsUpdate = false
+
+    for (let i = 0; i < event.changedTouches.length; i++) {
+      const touch = event.changedTouches.item(i)
+      if (!touch) continue
+      const control = activeTouches.get(touch.identifier)
+      if (!control) continue
+      const x = (touch.clientX - rect.left) * scaleX
+      const y = (touch.clientY - rect.top) * scaleY
+      control.canvasX = x
+      control.canvasY = y
+      if (control.mode === 'direct') {
+        const nextDirection = getDirectDirection(y)
+        if (nextDirection !== control.directDirection) {
+          control.directDirection = nextDirection
+          if (control.side === 'left') leftNeedsUpdate = true
+          else rightNeedsUpdate = true
+        }
+      } else {
+        const delta = y - control.lastCanvasY
+        if (delta !== 0) {
+          touchControls[control.side].relativeDelta += delta
+          control.lastCanvasY = y
+        }
+      }
+    }
+
+    if (leftNeedsUpdate) recalculateDirectDirection('left')
+    if (rightNeedsUpdate) recalculateDirectDirection('right')
+    updateTripleTouchHold()
+  }
+
+  function handleTouchEnd(event: TouchEvent) {
+    if (event.cancelable) event.preventDefault()
+    let leftNeedsUpdate = false
+    let rightNeedsUpdate = false
+
+    for (let i = 0; i < event.changedTouches.length; i++) {
+      const touch = event.changedTouches.item(i)
+      if (!touch) continue
+      const control = activeTouches.get(touch.identifier)
+      if (!control) continue
+      activeTouches.delete(touch.identifier)
+      if (control.side === 'left') leftNeedsUpdate = true
+      else rightNeedsUpdate = true
+    }
+
+    if (leftNeedsUpdate) recalculateDirectDirection('left')
+    if (rightNeedsUpdate) recalculateDirectDirection('right')
+    updateTripleTouchHold()
+  }
+
+  function createTouchControl(
+    id: number,
+    x: number,
+    y: number,
+  ): ActiveTouchControl | null {
+    const leftBoundary = W / 3
+    const rightBoundary = (2 * W) / 3
+
+    if (x < leftBoundary) {
+      return {
+        id,
+        side: 'left',
+        mode: 'direct',
+        directDirection: getDirectDirection(y),
+        lastCanvasY: y,
+        canvasX: x,
+        canvasY: y,
+      }
+    }
+
+    if (x > rightBoundary) {
+      return {
+        id,
+        side: 'right',
+        mode: 'direct',
+        directDirection: getDirectDirection(y),
+        lastCanvasY: y,
+        canvasX: x,
+        canvasY: y,
+      }
+    }
+
+    const side: TouchSide = x < W / 2 ? 'left' : 'right'
+    return {
+      id,
+      side,
+      mode: 'relative',
+      directDirection: 0,
+      lastCanvasY: y,
+      canvasX: x,
+      canvasY: y,
+    }
+  }
+
+  function getDirectDirection(y: number): -1 | 0 | 1 {
+    const upper = H / 3
+    const lower = (2 * H) / 3
+    if (y < upper) return -1
+    if (y > lower) return 1
+    return 0
+  }
+
+  function recalculateDirectDirections() {
+    recalculateDirectDirection('left')
+    recalculateDirectDirection('right')
+  }
+
+  function recalculateDirectDirection(side: TouchSide) {
+    let direction = 0
+    for (const control of activeTouches.values()) {
+      if (control.side !== side || control.mode !== 'direct') continue
+      direction += control.directDirection
+    }
+    touchControls[side].direction = Math.max(-1, Math.min(1, direction))
+  }
+
+  function updateTripleTouchHold() {
+    const shouldHold = hasThreeCenterTouches()
+    if (!shouldHold && tripleTouchTimeout !== null) {
+      window.clearTimeout(tripleTouchTimeout)
+      tripleTouchTimeout = null
+    }
+
+    if (
+      shouldHold &&
+      tripleTouchTimeout === null &&
+      !overlay.classList.contains('dev-overlay--visible')
+    ) {
+      tripleTouchTimeout = window.setTimeout(() => {
+        tripleTouchTimeout = null
+        showOverlay(overlay)
+        syncOverlayLayout()
+      }, 3000)
+    }
+  }
+
+  function hasThreeCenterTouches() {
+    const leftBoundary = W / 3
+    const rightBoundary = (2 * W) / 3
+    let count = 0
+    for (const control of activeTouches.values()) {
+      if (control.canvasX >= leftBoundary && control.canvasX <= rightBoundary) {
+        count += 1
+      }
+      if (count >= 3) return true
+    }
+    return false
+  }
 
   const state: PongState = {
     leftScore: 0,
@@ -413,12 +619,23 @@ export function createPong(
       const maxStep = leftPaddleSpeed * dt
       state.leftY += clamp(diff, -maxStep, maxStep)
     } else {
-      if (keys['w']) state.leftY -= leftPaddleSpeed * dt
-      if (keys['s']) state.leftY += leftPaddleSpeed * dt
+      const keyDirection = (keys['w'] ? -1 : 0) + (keys['s'] ? 1 : 0)
+      let gamePadDirection = 0;
       if (gamepadInput.leftAxis)
-        state.leftY += gamepadInput.leftAxis * config.paddleSpeed * dt
-      if (gamepadInput.leftUp) state.leftY -= config.paddleSpeed * dt
-      if (gamepadInput.leftDown) state.leftY += config.paddleSpeed * dt
+        gamePadDirection += gamepadInput.leftAxis * config.paddleSpeed * dt
+      if (gamepadInput.leftUp) gamePadDirection -= config.paddleSpeed * dt
+      if (gamepadInput.leftDown) gamePadDirection += config.paddleSpeed * dt
+
+      const totalDirection = clamp(
+        keyDirection + touchControls.left.direction + gamePadDirection,
+        -1,
+        1,
+      )
+      state.leftY += totalDirection * config.paddleSpeed * dt
+      if (touchControls.left.relativeDelta !== 0) {
+        state.leftY += touchControls.left.relativeDelta
+        touchControls.left.relativeDelta = 0
+      }
     }
 
     if (rightAIEnabled) {
@@ -427,12 +644,22 @@ export function createPong(
       const maxStep = rightPaddleSpeed * dt
       state.rightY += clamp(diff, -maxStep, maxStep)
     } else {
-      if (keys['ArrowUp']) state.rightY -= rightPaddleSpeed * dt
-      if (keys['ArrowDown']) state.rightY += rightPaddleSpeed * dt
+      const keyDirection = (keys['ArrowUp'] ? -1 : 0) + (keys['ArrowDown'] ? 1 : 0)
+      let gamePadDirection = 0;
       if (gamepadInput.rightAxis)
-        state.rightY += gamepadInput.rightAxis * config.paddleSpeed * dt
-      if (gamepadInput.rightUp) state.rightY -= config.paddleSpeed * dt
-      if (gamepadInput.rightDown) state.rightY += config.paddleSpeed * dt
+        gamePadDirection += gamepadInput.rightAxis * config.paddleSpeed * dt
+      if (gamepadInput.rightUp) gamePadDirection -= config.paddleSpeed * dt
+      if (gamepadInput.rightDown) gamePadDirection += config.paddleSpeed * dt
+      const totalDirection = clamp(
+        keyDirection + touchControls.right.direction + gamePadDirection,
+        -1,
+        1,
+      )
+      state.rightY += totalDirection * config.paddleSpeed * dt
+      if (touchControls.right.relativeDelta !== 0) {
+        state.rightY += touchControls.right.relativeDelta
+        touchControls.right.relativeDelta = 0
+      }
     }
 
     state.leftY = clamp(state.leftY, 0, H - leftPaddleHeight)
