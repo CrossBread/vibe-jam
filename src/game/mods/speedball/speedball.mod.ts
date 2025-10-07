@@ -1,34 +1,51 @@
 ﻿// File: src/game/mods/speedball/speedball.mod.ts
-// Example mutator: increases ball speed during update; teardown is automatic.
-import type { BallMod, ModContext } from '../mod.types';
-import { Phase } from '../../../engine/scheduler'
+import type { BallMod } from '../mod.types'
 
-// Local component store types would live in this mod folder or shared components.
-interface Velocity { x: number; y: number }
-declare const VelocityStore: import('../mod.types').ComponentStore<Velocity>;
-
-// Utility to iterate your ECS; adapt to your actual world API.
-function forEachWith<T>(world: any, store: import('../mod.types').ComponentStore<T>, fn: (e: number, c: T) => void) {
-  // Example shape; replace with your ECS query.
-  const view = world.view(store);
-  for (const e of view) fn(e, view.get(e));
+interface SpeedBoost {
+  multiplier: number
+  accelerationPerSecond: number
+  maxMultiplier: number
 }
+
+const SpeedBoostStore = {} as import('../mod.types').ComponentStore<SpeedBoost>
+
+const trackedBoosts = new Map<number, SpeedBoost>()
 
 const SpeedBall: BallMod = {
   id: 'mod.speedball',
   kind: 'ball',
   tags: ['mutator', 'speed'],
-  enable(ctx: ModContext) {
-    const factor = 1.25;
+  enable(ctx) {
+    trackedBoosts.clear()
 
-    ctx.registerSystem('update' satisfies Phase, (dt) => {
-      // Scale velocity every frame in a controlled way.
-      forEachWith(ctx as any, VelocityStore, (_e, vel) => {
-        vel.x *= factor;
-        vel.y *= factor;
-      });
-    }, /* order */ 10);
+
+    ctx.on('ball:spawned', (event) => {
+      if (event.type !== 'ball:spawned') return
+      const { entityId } = event
+      const boost: SpeedBoost = {
+        multiplier: 1,
+        accelerationPerSecond: 0.25,
+        maxMultiplier: 3
+      }
+
+      trackedBoosts.set(entityId, boost)
+      ctx.addComponent(entityId, SpeedBoostStore, boost)
+    })
+
+    ctx.on('ball:despawned', (event) => {
+      if (event.type !== 'ball:despawned') return
+      trackedBoosts.delete(event.entityId)
+    })
+
+    ctx.registerSystem('update', (dt) => {
+      for (const boost of trackedBoosts.values()) {
+        boost.multiplier = Math.min(
+          boost.maxMultiplier,
+          boost.multiplier + boost.accelerationPerSecond * dt
+        )
+      }
+    }, 20)
   }
-};
+}
 
-export default SpeedBall;
+export default SpeedBall
