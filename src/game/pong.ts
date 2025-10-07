@@ -55,6 +55,10 @@ export interface PongOptions {
   announcementFadeDuration?: number
 }
 
+export interface PongRuntimeHooks {
+  onTick?(dt: number): void
+}
+
 type KeySet = Record<string, boolean>
 
 interface MovingWellState {
@@ -133,6 +137,7 @@ interface PaddleHeightOptions {
 export function createPong(
   canvas: HTMLCanvasElement,
   options: PongOptions = {},
+  hooks: PongRuntimeHooks = {},
 ): PongAPI {
   const context = canvas.getContext('2d')
   if (!context) throw new Error('Canvas 2D context is required')
@@ -608,6 +613,8 @@ export function createPong(
   }
 
   function tick(dt: number) {
+    hooks.onTick?.(dt)
+
     updateAnnouncement(dt)
     checkModifierAnnouncements()
     updatePaddleModifierState()

@@ -1,3 +1,4 @@
+import { bootstrapGame, createTickEmitter } from './game/bootstrap'
 import { createPong } from './game/pong'
 
 const BASE_WIDTH = 800
@@ -12,7 +13,12 @@ canvas.style.maxWidth = '100%'
 canvas.style.maxHeight = '100%'
 app.appendChild(canvas)
 
-const game = createPong(canvas)
+const runtime = bootstrapGame()
+const emitTick = createTickEmitter(runtime)
+
+const game = createPong(canvas, undefined, {
+  onTick: (dt) => emitTick({ type: 'tick', dt }),
+})
 
 type FullscreenCapableElement = HTMLElement & {
   webkitRequestFullscreen?: () => Promise<void>

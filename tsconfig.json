@@ -16,7 +16,8 @@
     "noEmit": false,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "types": ["vite/client"],
   },
   "include": [
     "src/**/*",
