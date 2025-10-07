@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
+    "gen:mod": "tsx scripts/gen-mod.ts",
     "format": "prettier --write .",
     "lint": "eslint ."
   },
@@ -23,6 +24,7 @@
     "playwright": "^1.48.0",
     "prettier": "^3.2.5",
     "start-server-and-test": "^2.0.0",
+    "tsx": "^4.19.2",
     "typescript": "^5.4.0",
     "vite": "^5.0.0",
     "vitest": "^2.0.0"
