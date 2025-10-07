@@ -32,7 +32,7 @@ const requestFullscreen = () => {
     return Promise.resolve()
   }
 
-  if (document.fullscreenEnabled === false) {
+  if (!document.fullscreenEnabled) {
     return Promise.reject(new Error('Fullscreen disabled'))
   }
 
