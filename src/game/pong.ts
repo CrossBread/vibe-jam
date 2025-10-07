@@ -8,6 +8,16 @@ import {
   type GravityWellModifier,
 } from './devtools'
 import { createDevOverlay, showOverlay, toggleOverlay } from './devOverlay'
+import { createScheduler } from '../engine/scheduler'
+import { createArenaSystem } from './systems/arenaSystem'
+import {
+  createPaddleSystem,
+  type GamepadInput,
+} from './systems/paddleSystem'
+import {
+  createBallSystem,
+  type ActiveGravityWell,
+} from './systems/ballSystem'
 
 export interface PongState {
   leftScore: number
@@ -70,16 +80,6 @@ interface MovingWellState {
   hasTarget: boolean
 }
 
-interface ActiveGravityWell {
-  key: GravityWellKey
-  x: number
-  y: number
-  gravityStrength: number
-  gravityFalloff: number // squared falloff radius used for force calculations
-  radius: number
-  positiveTint: string
-  negativeTint: string
-}
 
 interface StoredWell {
   x: number
@@ -207,17 +207,7 @@ export function createPong(
   canvas.addEventListener('touchcancel', handleTouchEnd)
 
   const keys: KeySet = {}
-  let leftAIEnabled = true
-  let rightAIEnabled = true
-
-  interface GamepadInput {
-    leftAxis: number
-    leftUp: boolean
-    leftDown: boolean
-    rightAxis: number
-    rightUp: boolean
-    rightDown: boolean
-  }
+  const aiState = { left: true, right: true }
 
   const GAMEPAD_DEADZONE = 0.2
 
@@ -229,6 +219,8 @@ export function createPong(
     rightUp: false,
     rightDown: false,
   }
+
+  let latestGamepadInput: GamepadInput = defaultGamepadInput
 
   function withDeadzone(value: number, deadzone = GAMEPAD_DEADZONE): number {
     return Math.abs(value) < deadzone ? 0 : value
@@ -283,8 +275,8 @@ export function createPong(
       }
       keys[e.key] = true
       const key = e.key.toLowerCase()
-      if (key === 'w' || key === 's') leftAIEnabled = false
-      if (key === 'arrowup' || key === 'arrowdown') rightAIEnabled = false
+      if (key === 'w' || key === 's') aiState.left = false
+      if (key === 'arrowup' || key === 'arrowdown') aiState.right = false
     })
     window.addEventListener('keyup', (e) => (keys[e.key] = false))
   }
@@ -306,8 +298,8 @@ export function createPong(
       const control = createTouchControl(touch.identifier, x, y)
       if (!control) continue
       activeTouches.set(touch.identifier, control)
-      if (control.side === 'left') leftAIEnabled = false
-      else rightAIEnabled = false
+      if (control.side === 'left') aiState.left = false
+      else aiState.right = false
     }
 
     recalculateDirectDirections()
@@ -537,6 +529,59 @@ export function createPong(
   resetBallSize()
   initializePaddleHeights(true)
 
+  const scheduler = createScheduler()
+
+  const arenaSystem = createArenaSystem({
+    updateMovingWellState,
+    updateDivotsState,
+    updateIrelandState,
+  })
+
+  const paddleSystem = createPaddleSystem({
+    state,
+    config,
+    aiState,
+    keys,
+    touchControls,
+    getPaddleSpeedMultiplier,
+    getPaddleHeight: (side) =>
+      side === 'left' ? leftPaddleHeight : rightPaddleHeight,
+    arenaHeight: H,
+    clamp,
+    getGamepadInput: () => latestGamepadInput,
+  })
+
+  const ballSystem = createBallSystem({
+    state,
+    width: W,
+    height: H,
+    paddleWidth: PADDLE_W,
+    getLeftPaddleHeight: () => leftPaddleHeight,
+    getRightPaddleHeight: () => rightPaddleHeight,
+    clamp,
+    getBallRadius,
+    applyBallSizeModifiers,
+    collectActiveGravityWells,
+    setActiveGravityWells: (wells) => {
+      activeGravityWells = wells
+    },
+    config: {
+      baseBallSpeed: () => config.baseBallSpeed,
+      minHorizontalRatio: () => config.minHorizontalRatio,
+      speedIncreaseOnHit: () => config.speedIncreaseOnHit,
+      winScore: () => WIN_SCORE,
+    },
+    handlePaddleReturn,
+    updateBallTrails,
+    clearDivotWells,
+    resetBall,
+    handlePointScored,
+  })
+
+  scheduler.register('preUpdate', arenaSystem)
+  scheduler.register('update', paddleSystem, 0)
+  scheduler.register('update', ballSystem, 10)
+
   function resetBall(toLeft: boolean) {
     state.ballX = W * 0.5
     state.ballY = H * 0.5
@@ -556,8 +601,8 @@ export function createPong(
     state.totalBites = 0
     state.completedBitesSinceLastPoint = 0
     completedBitesSinceLastPoint = 0
-    leftAIEnabled = true
-    rightAIEnabled = true
+    aiState.left = true
+    aiState.right = true
     for (const movingState of Object.values(movingWellStates)) {
       resetMovingWellState(movingState)
     }
@@ -619,183 +664,16 @@ export function createPong(
     checkModifierAnnouncements()
     updatePaddleModifierState()
 
-    const gamepadInput = getGamepadInput()
+    latestGamepadInput = getGamepadInput()
 
     if (state.winner) {
-      if (isRestartInputActive(gamepadInput)) {
+      if (isRestartInputActive(latestGamepadInput)) {
         reset()
       }
       return
     }
 
-    updateMovingWellState('blackMole', dt)
-    updateMovingWellState('gopher', dt)
-    updateDivotsState()
-    updateIrelandState()
-
-    const leftGamepadActive =
-      gamepadInput.leftAxis !== 0 || gamepadInput.leftUp || gamepadInput.leftDown
-    const rightGamepadActive =
-      gamepadInput.rightAxis !== 0 || gamepadInput.rightUp || gamepadInput.rightDown
-
-    if (leftGamepadActive) leftAIEnabled = false
-    if (rightGamepadActive) rightAIEnabled = false
-
-    // Controls
-    const leftPaddleSpeed = config.paddleSpeed * getPaddleSpeedMultiplier('left')
-    const rightPaddleSpeed = config.paddleSpeed * getPaddleSpeedMultiplier('right')
-
-    if (leftAIEnabled) {
-      const target = state.ballY - leftPaddleHeight / 2
-      const diff = target - state.leftY
-      const maxStep = leftPaddleSpeed * dt
-      state.leftY += clamp(diff, -maxStep, maxStep)
-    } else {
-      const keyDirection = (keys['w'] ? -1 : 0) + (keys['s'] ? 1 : 0)
-      let gamePadDirection = 0;
-      if (gamepadInput.leftAxis)
-        gamePadDirection += gamepadInput.leftAxis * config.paddleSpeed * dt
-      if (gamepadInput.leftUp) gamePadDirection -= config.paddleSpeed * dt
-      if (gamepadInput.leftDown) gamePadDirection += config.paddleSpeed * dt
-
-      const totalDirection = clamp(
-        keyDirection + touchControls.left.direction + gamePadDirection,
-        -1,
-        1,
-      )
-      state.leftY += totalDirection * config.paddleSpeed * dt
-      if (touchControls.left.relativeDelta !== 0) {
-        state.leftY += touchControls.left.relativeDelta
-        touchControls.left.relativeDelta = 0
-      }
-    }
-
-    if (rightAIEnabled) {
-      const target = state.ballY - rightPaddleHeight / 2
-      const diff = target - state.rightY
-      const maxStep = rightPaddleSpeed * dt
-      state.rightY += clamp(diff, -maxStep, maxStep)
-    } else {
-      const keyDirection = (keys['ArrowUp'] ? -1 : 0) + (keys['ArrowDown'] ? 1 : 0)
-      let gamePadDirection = 0;
-      if (gamepadInput.rightAxis)
-        gamePadDirection += gamepadInput.rightAxis * config.paddleSpeed * dt
-      if (gamepadInput.rightUp) gamePadDirection -= config.paddleSpeed * dt
-      if (gamepadInput.rightDown) gamePadDirection += config.paddleSpeed * dt
-      const totalDirection = clamp(
-        keyDirection + touchControls.right.direction + gamePadDirection,
-        -1,
-        1,
-      )
-      state.rightY += totalDirection * config.paddleSpeed * dt
-      if (touchControls.right.relativeDelta !== 0) {
-        state.rightY += touchControls.right.relativeDelta
-        touchControls.right.relativeDelta = 0
-      }
-    }
-
-    state.leftY = clamp(state.leftY, 0, H - leftPaddleHeight)
-    state.rightY = clamp(state.rightY, 0, H - rightPaddleHeight)
-
-    // Gravity well influence
-    activeGravityWells = collectActiveGravityWells()
-    const prevVx = state.vx
-    for (const well of activeGravityWells) {
-      const dx = well.x - state.ballX
-      const dy = well.y - state.ballY
-      const distSq = dx * dx + dy * dy
-      const dist = Math.sqrt(distSq) || 1
-      const force = well.gravityStrength / (distSq + well.gravityFalloff)
-      const ax = (dx / dist) * force
-      const ay = (dy / dist) * force
-      state.vx += ax * dt
-      state.vy += ay * dt
-    }
-
-    if (prevVx !== 0) {
-      const direction = Math.sign(prevVx)
-      const minHorizontalSpeed = config.baseBallSpeed * config.minHorizontalRatio
-      const minSpeed = minHorizontalSpeed * direction
-      if (state.vx * direction < minHorizontalSpeed) {
-        state.vx = minSpeed
-      }
-    }
-
-    const speed = Math.hypot(state.vx, state.vy)
-
-    // Move ball
-    state.ballX += state.vx * dt
-    state.ballY += state.vy * dt
-
-    applyBallSizeModifiers(speed * dt)
-
-    let radius = getBallRadius()
-
-    // Top/Bottom bounce
-    if (state.ballY < radius) {
-      state.ballY = radius
-      state.vy *= -1
-    }
-    if (state.ballY > H - radius) {
-      state.ballY = H - radius
-      state.vy *= -1
-    }
-
-    // Left paddle collision
-    if (
-      state.ballX - radius < 40 + PADDLE_W &&
-      state.ballX - radius > 40 &&
-      state.ballY > state.leftY &&
-      state.ballY < state.leftY + leftPaddleHeight
-    ) {
-      state.ballX = 40 + PADDLE_W + radius
-      const rel =
-        (state.ballY - (state.leftY + leftPaddleHeight / 2)) / (leftPaddleHeight / 2)
-      const angle = rel * 0.8
-      const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
-      state.vx = Math.cos(angle) * reboundSpeed
-      state.vy = Math.sin(angle) * reboundSpeed
-      handlePaddleReturn('left')
-      radius = getBallRadius()
-    }
-
-    // Right paddle collision
-    if (
-      state.ballX + radius > W - 40 - PADDLE_W &&
-      state.ballX + radius < W - 40 &&
-      state.ballY > state.rightY &&
-      state.ballY < state.rightY + rightPaddleHeight
-    ) {
-      state.ballX = W - 40 - PADDLE_W - radius
-      const rel =
-        (state.ballY - (state.rightY + rightPaddleHeight / 2)) /
-        (rightPaddleHeight / 2)
-      const angle = Math.PI - rel * 0.8
-      const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
-      state.vx = Math.cos(angle) * reboundSpeed
-      state.vy = Math.sin(angle) * reboundSpeed
-      handlePaddleReturn('right')
-      radius = getBallRadius()
-    }
-
-    updateBallTrails()
-
-    // Score
-    if (state.ballX < -radius) {
-      state.rightScore++
-      if (state.rightScore >= WIN_SCORE) state.winner = 'right'
-      clearDivotWells()
-      resetBall(false)
-      handlePointScored()
-      radius = getBallRadius()
-    }
-    if (state.ballX > W + radius) {
-      state.leftScore++
-      if (state.leftScore >= WIN_SCORE) state.winner = 'left'
-      clearDivotWells()
-      resetBall(true)
-      handlePointScored()
-    }
+    scheduler.tick(dt)
   }
 
   function isRestartInputActive(gamepadInput: GamepadInput): boolean {
