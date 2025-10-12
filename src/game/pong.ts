@@ -516,9 +516,7 @@ export function createPong(
   let irelandNeedsRegeneration = true
   let activeGravityWells: ActiveGravityWell[] = []
   let announcement: Announcement | null = null
-  let lastEnabledArenaModifiers = new Set<GravityWellKey>(
-    getEnabledArenaModifierKeys(config.modifiers.arena),
-  )
+  let lastActiveArenaModifiers = new Set<GravityWellKey>()
   let activeModKey: GravityWellKey | null = null
   const kiteTrail: TrailPoint[] = []
   const bumShuffleTrail: TrailPoint[] = []
@@ -529,6 +527,7 @@ export function createPong(
   let ballTravelDistance = 0
 
   initializeActiveModState()
+  lastActiveArenaModifiers = new Set(getActiveArenaModifierKeys())
   resetBallSize()
   initializePaddleHeights(true)
 
@@ -612,16 +611,16 @@ export function createPong(
     divotWells.length = 0
     irelandWells.length = 0
     irelandNeedsRegeneration = true
-    activeGravityWells = []
+    disableAllMods()
     announcement = null
-    lastEnabledArenaModifiers = new Set<GravityWellKey>(
-      getEnabledArenaModifierKeys(config.modifiers.arena),
-    )
+    lastActiveArenaModifiers = new Set()
     clearKiteTrail()
     clearBumShuffleTrail()
     clearPollokTrail()
     lastReturner = null
     initializePaddleHeights(true)
+    initializeActiveModState()
+    lastActiveArenaModifiers = new Set(getActiveArenaModifierKeys())
     resetBall(Math.random() < 0.5)
   }
 
@@ -666,6 +665,7 @@ export function createPong(
     updateAnnouncement(dt)
     checkModifierAnnouncements()
     updatePaddleModifierState()
+    syncActiveModAvailability()
 
     latestGamepadInput = getGamepadInput()
 
@@ -711,22 +711,22 @@ export function createPong(
   }
 
   function checkModifierAnnouncements() {
-    const enabledEntries = getEnabledArenaModifiers(config.modifiers.arena)
-    const enabledKeys = new Set<GravityWellKey>()
-    const newlyEnabled: string[] = []
+    const activeEntries = getActiveArenaModifiers()
+    const activeKeys = new Set<GravityWellKey>()
+    const newlyActivated: string[] = []
 
-    for (const [key, modifier] of enabledEntries) {
-      enabledKeys.add(key)
-      if (!lastEnabledArenaModifiers.has(key)) {
-        newlyEnabled.push(modifier.name)
+    for (const [key, modifier] of activeEntries) {
+      activeKeys.add(key)
+      if (!lastActiveArenaModifiers.has(key)) {
+        newlyActivated.push(modifier.name)
       }
     }
 
-    if (newlyEnabled.length > 0) {
-      showAnnouncement(newlyEnabled)
+    if (newlyActivated.length > 0) {
+      showAnnouncement(newlyActivated)
     }
 
-    lastEnabledArenaModifiers = enabledKeys
+    lastActiveArenaModifiers = activeKeys
   }
 
   function showAnnouncement(lines: string[]) {
@@ -745,14 +745,28 @@ export function createPong(
     }
   }
 
-  function getEnabledArenaModifiers(
+  function getAvailableArenaModifiers(
     arena: ArenaModifiers,
   ): [GravityWellKey, GravityWellModifier][] {
     return getGravityWellsEntries(arena).filter(([, modifier]) => modifier.enabled)
   }
 
-  function getEnabledArenaModifierKeys(arena: ArenaModifiers): GravityWellKey[] {
-    return getEnabledArenaModifiers(arena).map(([key]) => key)
+  function getAvailableArenaModifierKeys(arena: ArenaModifiers): GravityWellKey[] {
+    return getAvailableArenaModifiers(arena).map(([key]) => key)
+  }
+
+  function getActiveArenaModifiers(): [GravityWellKey, GravityWellModifier][] {
+    if (activeModKey === null) return []
+    const modifier = config.modifiers.arena[activeModKey]
+    return modifier ? [[activeModKey, modifier]] : []
+  }
+
+  function getActiveArenaModifierKeys(): GravityWellKey[] {
+    return activeModKey === null ? [] : [activeModKey]
+  }
+
+  function isArenaModifierActive(key: GravityWellKey): boolean {
+    return activeModKey === key
   }
 
   function handlePaddleReturn(side: 'left' | 'right') {
@@ -786,7 +800,7 @@ export function createPong(
     clearBumShuffleTrail()
 
     const modifier = config.modifiers.arena.ireland as IrelandModifier
-    if (!modifier.enabled) {
+    if (!isArenaModifierActive('ireland')) {
       irelandWells.length = 0
       return
     }
@@ -996,40 +1010,36 @@ export function createPong(
   }
 
   function disableAllMods() {
-    let anyDisabled = false
-    for (const key of GRAVITY_WELL_KEYS) {
-      const modifier = config.modifiers.arena[key]
-      if (!modifier.enabled) continue
+    if (activeModKey === null) return
 
-      modifier.enabled = false
-      anyDisabled = true
-
-      if (key === 'divots') clearDivotWells()
-      if (key === 'ireland') {
-        irelandWells.length = 0
-        irelandNeedsRegeneration = true
-      }
-      if (key === 'blackMole' || key === 'gopher') {
-        resetMovingWellState(movingWellStates[key])
-      }
-    }
-
-    if (anyDisabled) {
-      activeGravityWells = collectActiveGravityWells()
-    }
-
+    deactivateModifier(activeModKey)
     activeModKey = null
+    activeGravityWells = []
+  }
+
+  function deactivateModifier(key: GravityWellKey) {
+    if (key === 'divots') clearDivotWells()
+    if (key === 'ireland') {
+      irelandWells.length = 0
+      irelandNeedsRegeneration = true
+    }
+    if (key === 'blackMole' || key === 'gopher') {
+      resetMovingWellState(movingWellStates[key])
+    }
   }
 
   function collectActiveGravityWells(): ActiveGravityWell[] {
-    const wells: ActiveGravityWell[] = []
-    for (const [key, modifier] of getGravityWellsEntries(config.modifiers.arena)) {
-      if (!modifier.enabled) continue
+    if (activeModKey === null) return []
 
-      if (key === 'blackMole' || key === 'gopher') {
-        const state = movingWellStates[key]
-        wells.push({
-          key,
+    const activeKey: GravityWellKey = activeModKey
+    const modifier = config.modifiers.arena[activeKey]
+    if (!modifier) return []
+
+    if (activeKey === 'blackMole' || activeKey === 'gopher') {
+      const state = movingWellStates[activeKey]
+      return [
+        {
+          key: activeKey,
           x: state.x,
           y: state.y,
           gravityStrength: modifier.gravityStrength,
@@ -1037,57 +1047,52 @@ export function createPong(
           radius: modifier.radius,
           positiveTint: modifier.positiveTint,
           negativeTint: modifier.negativeTint,
-        })
-        continue
-      }
+        },
+      ]
+    }
 
-      if (key === 'divots') {
-        for (const well of divotWells) {
-          wells.push({
-            key,
-            x: well.x,
-            y: well.y,
-            gravityStrength: well.gravityStrength,
-            gravityFalloff: well.gravityFalloff,
-            radius: well.radius,
-            positiveTint: modifier.positiveTint,
-            negativeTint: modifier.negativeTint,
-          })
-        }
-        continue
-      }
+    if (activeKey === 'divots') {
+      return divotWells.map(well => ({
+        key: activeKey,
+        x: well.x,
+        y: well.y,
+        gravityStrength: well.gravityStrength,
+        gravityFalloff: well.gravityFalloff,
+        radius: well.radius,
+        positiveTint: modifier.positiveTint,
+        negativeTint: modifier.negativeTint,
+      }))
+    }
 
-      if (key === 'ireland') {
-        const wellsToRender =
-          irelandWells.length > 0
-            ? irelandWells
-            : [
-                {
-                  x: W * 0.5,
-                  y: H * 0.5,
-                  gravityStrength: modifier.gravityStrength,
-                  gravityFalloff: toGravityFalloffValue(modifier.gravityFalloff),
-                  radius: modifier.radius,
-                },
-              ]
+    if (activeKey === 'ireland') {
+      const wellsToRender =
+        irelandWells.length > 0
+          ? irelandWells
+          : [
+              {
+                x: W * 0.5,
+                y: H * 0.5,
+                gravityStrength: modifier.gravityStrength,
+                gravityFalloff: toGravityFalloffValue(modifier.gravityFalloff),
+                radius: modifier.radius,
+              },
+            ]
 
-        for (const well of wellsToRender) {
-          wells.push({
-            key,
-            x: well.x,
-            y: well.y,
-            gravityStrength: well.gravityStrength,
-            gravityFalloff: well.gravityFalloff,
-            radius: well.radius,
-            positiveTint: modifier.positiveTint,
-            negativeTint: modifier.negativeTint,
-          })
-        }
-        continue
-      }
+      return wellsToRender.map(well => ({
+        key: activeKey,
+        x: well.x,
+        y: well.y,
+        gravityStrength: well.gravityStrength,
+        gravityFalloff: well.gravityFalloff,
+        radius: well.radius,
+        positiveTint: modifier.positiveTint,
+        negativeTint: modifier.negativeTint,
+      }))
+    }
 
-      wells.push({
-        key,
+    return [
+      {
+        key: activeKey,
         x: W * 0.5,
         y: H * 0.5,
         gravityStrength: modifier.gravityStrength,
@@ -1095,10 +1100,8 @@ export function createPong(
         radius: modifier.radius,
         positiveTint: modifier.positiveTint,
         negativeTint: modifier.negativeTint,
-      })
-    }
-
-    return wells
+      },
+    ]
   }
 
   function getBallRadius() {
@@ -1183,7 +1186,7 @@ export function createPong(
   function updateMovingWellState(key: MovingWellKey, dt: number) {
     const state = movingWellStates[key]
     const modifier = config.modifiers.arena[key]
-    if (!modifier.enabled) {
+    if (!isArenaModifierActive(key)) {
       resetMovingWellState(state)
       return
     }
@@ -1245,7 +1248,7 @@ export function createPong(
 
   function updateDivotsState() {
     const modifier = config.modifiers.arena.divots as DivotsModifier
-    if (!modifier.enabled) {
+    if (!isArenaModifierActive('divots')) {
       if (divotWells.length > 0) divotWells.length = 0
       return
     }
@@ -1258,7 +1261,7 @@ export function createPong(
 
   function updateIrelandState() {
     const modifier = config.modifiers.arena.ireland as IrelandModifier
-    if (!modifier.enabled) {
+    if (!isArenaModifierActive('ireland')) {
       if (irelandWells.length > 0) irelandWells.length = 0
       irelandNeedsRegeneration = true
       return
@@ -1316,7 +1319,7 @@ export function createPong(
 
   function spawnDivotWell() {
     const modifier = config.modifiers.arena.divots as DivotsModifier
-    if (!modifier.enabled) return
+    if (!isArenaModifierActive('divots')) return
 
     const maxDivots = Math.max(1, Math.floor(modifier.maxDivots ?? 12))
     const margin = Math.max(20, modifier.spawnMargin ?? modifier.radius ?? 0)
@@ -1351,40 +1354,31 @@ export function createPong(
   }
 
   function initializeActiveModState() {
-    const enabledMods = GRAVITY_WELL_KEYS.filter(key => config.modifiers.arena[key].enabled)
-    if (enabledMods.length === 0) {
+    const availableMods = getAvailableArenaModifierKeys(config.modifiers.arena)
+    if (availableMods.length === 0) {
       setActiveMod(pickRandomMod(null))
       return
     }
 
-    if (enabledMods.length === 1) {
-      activeModKey = enabledMods[0]
+    if (activeModKey && availableMods.includes(activeModKey)) {
+      setActiveMod(activeModKey)
       return
     }
 
-    setActiveMod(enabledMods[0])
+    setActiveMod(availableMods[0])
   }
 
   function setActiveMod(nextKey: GravityWellKey) {
-    if (activeModKey === nextKey && config.modifiers.arena[nextKey].enabled) return
-
-    for (const key of GRAVITY_WELL_KEYS) {
-      const modifier = config.modifiers.arena[key]
-      const shouldEnable = key === nextKey
-      if (modifier.enabled === shouldEnable) continue
-
-      modifier.enabled = shouldEnable
-
-      if (!shouldEnable) {
-        if (key === 'divots') clearDivotWells()
-        if (key === 'ireland') {
-          irelandWells.length = 0
-          irelandNeedsRegeneration = true
-        }
-        if (key === 'blackMole' || key === 'gopher') {
-          resetMovingWellState(movingWellStates[key])
-        }
+    if (activeModKey === nextKey) {
+      if (nextKey === 'ireland') {
+        irelandNeedsRegeneration = true
       }
+      activeGravityWells = collectActiveGravityWells()
+      return
+    }
+
+    if (activeModKey !== null) {
+      deactivateModifier(activeModKey)
     }
 
     activeModKey = nextKey
@@ -1396,10 +1390,35 @@ export function createPong(
     activeGravityWells = collectActiveGravityWells()
   }
 
+  function syncActiveModAvailability() {
+    if (activeModKey !== null && !config.modifiers.arena[activeModKey].enabled) {
+      const available = getAvailableArenaModifierKeys(config.modifiers.arena).filter(
+        key => key !== activeModKey,
+      )
+      if (available.length === 0) {
+        disableAllMods()
+        return
+      }
+      setActiveMod(available[0])
+      return
+    }
+
+    if (activeModKey === null) {
+      const available = getAvailableArenaModifierKeys(config.modifiers.arena)
+      if (available.length > 0) {
+        setActiveMod(available[0])
+      }
+    }
+  }
+
   function pickRandomMod(exclude: GravityWellKey | null) {
-    const available = GRAVITY_WELL_KEYS.filter(key => key !== exclude)
-    const pool = available.length > 0 ? available : GRAVITY_WELL_KEYS
-    return pool[Math.floor(Math.random() * pool.length)]
+    const available = getAvailableArenaModifierKeys(config.modifiers.arena).filter(
+      key => key !== exclude,
+    )
+    const fallback = GRAVITY_WELL_KEYS.filter(key => key !== exclude)
+    const pool = available.length > 0 ? available : fallback
+    const finalPool = pool.length > 0 ? pool : GRAVITY_WELL_KEYS
+    return finalPool[Math.floor(Math.random() * finalPool.length)]
   }
 
   function resolveRange(
