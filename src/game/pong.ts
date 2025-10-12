@@ -17,6 +17,7 @@ export interface PongState {
   ballRadius: number
   vx: number
   vy: number
+  balls: BallState[]
   leftY: number
   rightY: number
   leftInnerY: number
@@ -132,6 +133,42 @@ interface RGBColor {
 interface PaddleHeightOptions {
   center?: boolean
   preserveCenter?: boolean
+}
+
+interface BallState {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  radius: number
+  travelDistance: number
+}
+
+type PaddleLane = 'outer' | 'inner'
+
+interface PhysicalPaddle {
+  side: 'left' | 'right'
+  lane: PaddleLane
+  x: number
+  y: number
+  height: number
+}
+
+interface PaddleSegment {
+  paddle: PhysicalPaddle
+  index: number
+  x: number
+  y: number
+  width: number
+  height: number
+  osteoIndex?: number
+  cracked?: boolean
+  broken?: boolean
+}
+
+interface OsteoSegmentState {
+  hits: number
+  broken: boolean
 }
 
 export function createPong(
@@ -482,8 +519,9 @@ export function createPong(
     ballX: W * 0.5,
     ballY: H * 0.5,
     ballRadius: BALL_R,
-    vx: config.baseBallSpeed * (Math.random() < 0.5 ? -1 : 1),
-    vy: (Math.random() * 2 - 1) * config.baseBallSpeed * 0.6,
+    vx: 0,
+    vy: 0,
+    balls: [],
     leftY: H * 0.5 - initialLeftHeight / 2,
     rightY: H * 0.5 - initialRightHeight / 2,
     leftInnerY: H * 0.5 - initialLeftHeight / 2,
@@ -506,6 +544,15 @@ export function createPong(
   let previousLeftSizeMultiplier = getPaddleSizeMultiplier('left')
   let previousRightSizeMultiplier = getPaddleSizeMultiplier('right')
   let previousDoublesEnabled = config.doubles.enabled
+
+  const balls: BallState[] = state.balls
+  const MAX_ACTIVE_BALLS = 6
+  const hadronStatus: Record<'left' | 'right', boolean> = { left: true, right: true }
+  const osteoStates: Record<'left' | 'right', Record<PaddleLane, OsteoSegmentState[]>> = {
+    left: { outer: [], inner: [] },
+    right: { outer: [], inner: [] },
+  }
+  let previousOsteoSignature: string | null = null
 
   const movingWellStates: Record<MovingWellKey, MovingWellState> = {
     blackMole: {
@@ -540,21 +587,69 @@ export function createPong(
   const pollokTrail: ColoredTrailPoint[] = []
   let lastReturner: 'left' | 'right' | null = null
   let completedBitesSinceLastPoint = 0
-  let currentBallRadius = BALL_R
-  let ballTravelDistance = 0
-
   initializeActiveModState()
   resetBallSize()
   initializePaddleHeights(true)
+  resetBall(Math.random() < 0.5)
 
-  function resetBall(toLeft: boolean) {
+  function createBall(toLeft: boolean): BallState {
+    const direction = toLeft ? -1 : 1
+    const vx = config.baseBallSpeed * direction
+    const vy = (Math.random() * 2 - 1) * config.baseBallSpeed * 0.6
+    return {
+      x: W * 0.5,
+      y: H * 0.5,
+      vx,
+      vy,
+      radius: BALL_R,
+      travelDistance: 0,
+    }
+  }
+
+  function syncPrimaryBallState() {
+    const primary = balls[0]
+    if (primary) {
+      state.ballX = primary.x
+      state.ballY = primary.y
+      state.vx = primary.vx
+      state.vy = primary.vy
+      state.ballRadius = primary.radius
+      return
+    }
+
     state.ballX = W * 0.5
     state.ballY = H * 0.5
-    state.vx = config.baseBallSpeed * (toLeft ? -1 : 1)
-    state.vy = (Math.random() * 2 - 1) * config.baseBallSpeed * 0.6
+    state.vx = 0
+    state.vy = 0
+    state.ballRadius = BALL_R
+  }
+
+  function syncStateIntoPrimaryBall() {
+    const primary = balls[0]
+    if (!primary) return
+
+    if (Math.abs(state.ballX - primary.x) > 1e-3 || Math.abs(state.ballY - primary.y) > 1e-3) {
+      primary.x = state.ballX
+      primary.y = state.ballY
+    }
+
+    if (Math.abs(state.vx - primary.vx) > 1e-3 || Math.abs(state.vy - primary.vy) > 1e-3) {
+      primary.vx = state.vx
+      primary.vy = state.vy
+    }
+
+    if (Math.abs(state.ballRadius - primary.radius) > 1e-3) {
+      primary.radius = Math.max(1, state.ballRadius)
+    }
+  }
+
+  function resetBall(toLeft: boolean) {
+    balls.length = 0
+    balls.push(createBall(toLeft))
     lastReturner = null
     resetBallSize()
     clearKiteTrail()
+    syncPrimaryBallState()
   }
 
   function reset() {
@@ -583,6 +678,8 @@ export function createPong(
     clearBumShuffleTrail()
     clearPollokTrail()
     lastReturner = null
+    rearmHadron()
+    syncOsteoState(true)
     initializePaddleHeights(true)
     resetBall(Math.random() < 0.5)
   }
@@ -641,6 +738,8 @@ export function createPong(
       }
       return
     }
+
+    syncStateIntoPrimaryBall()
 
     updateMovingWellState('blackMole', dt)
     updateMovingWellState('gopher', dt)
@@ -758,175 +857,85 @@ export function createPong(
 
     // Gravity well influence
     activeGravityWells = collectActiveGravityWells()
-    const prevVx = state.vx
-    for (const well of activeGravityWells) {
-      const dx = well.x - state.ballX
-      const dy = well.y - state.ballY
-      const distSq = dx * dx + dy * dy
-      const dist = Math.sqrt(distSq) || 1
-      const force = well.gravityStrength / (distSq + well.gravityFalloff)
-      const ax = (dx / dist) * force
-      const ay = (dy / dist) * force
-      state.vx += ax * dt
-      state.vy += ay * dt
-    }
+    const paddles = getPhysicalPaddles()
+    let pointAwarded: 'left' | 'right' | null = null
 
-    if (prevVx !== 0) {
-      const direction = Math.sign(prevVx)
-      const minHorizontalSpeed = config.baseBallSpeed * config.minHorizontalRatio
-      const minSpeed = minHorizontalSpeed * direction
-      if (state.vx * direction < minHorizontalSpeed) {
-        state.vx = minSpeed
+    for (let i = 0; i < balls.length; i++) {
+      const ball = balls[i]
+      const prevVx = ball.vx
+
+      for (const well of activeGravityWells) {
+        const dx = well.x - ball.x
+        const dy = well.y - ball.y
+        const distSq = dx * dx + dy * dy
+        const dist = Math.sqrt(distSq) || 1
+        const force = well.gravityStrength / (distSq + well.gravityFalloff)
+        const ax = (dx / dist) * force
+        const ay = (dy / dist) * force
+        ball.vx += ax * dt
+        ball.vy += ay * dt
+      }
+
+      if (prevVx !== 0) {
+        const direction = Math.sign(prevVx)
+        const minHorizontalSpeed = config.baseBallSpeed * config.minHorizontalRatio
+        const minSpeed = minHorizontalSpeed * direction
+        if (ball.vx * direction < minHorizontalSpeed) {
+          ball.vx = minSpeed
+        }
+      }
+
+      const speed = Math.hypot(ball.vx, ball.vy)
+
+      ball.x += ball.vx * dt
+      ball.y += ball.vy * dt
+
+      applyBallSizeModifiers(ball, speed * dt)
+
+      let radius = ball.radius
+
+      if (ball.y < radius) {
+        ball.y = radius
+        ball.vy *= -1
+      } else if (ball.y > H - radius) {
+        ball.y = H - radius
+        ball.vy *= -1
+      }
+
+      if (resolvePaddleCollisions(ball, paddles)) {
+        radius = ball.radius
+      }
+
+      if (ball.x < -radius) {
+        pointAwarded = 'right'
+        break
+      }
+      if (ball.x > W + radius) {
+        pointAwarded = 'left'
+        break
       }
     }
 
-    const speed = Math.hypot(state.vx, state.vy)
+    syncPrimaryBallState()
 
-    // Move ball
-    state.ballX += state.vx * dt
-    state.ballY += state.vy * dt
-
-    applyBallSizeModifiers(speed * dt)
-
-    let radius = getBallRadius()
-
-    // Top/Bottom bounce
-    if (state.ballY < radius) {
-      state.ballY = radius
-      state.vy *= -1
-    }
-    if (state.ballY > H - radius) {
-      state.ballY = H - radius
-      state.vy *= -1
-    }
-
-    const leftOuterX = getLeftOuterX()
-    const rightOuterX = getRightOuterX()
-
-    if (doublesEnabled) {
-      const leftInnerX = getLeftInnerX()
-      if (
-        state.ballX - radius < leftInnerX + PADDLE_W &&
-        state.ballX - radius > leftInnerX &&
-        state.ballY > state.leftInnerY &&
-        state.ballY < state.leftInnerY + state.leftInnerPaddleHeight
-      ) {
-        state.ballX = leftInnerX + PADDLE_W + radius
-        const rel =
-          (state.ballY - (state.leftInnerY + state.leftInnerPaddleHeight / 2)) /
-          (state.leftInnerPaddleHeight / 2)
-        const angle = rel * 0.8
-        const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
-        state.vx = Math.cos(angle) * reboundSpeed
-        state.vy = Math.sin(angle) * reboundSpeed
-        handlePaddleReturn('left')
-        radius = getBallRadius()
-      } else if (
-        state.ballX - radius < leftOuterX + PADDLE_W &&
-        state.ballX - radius > leftOuterX &&
-        state.ballY > state.leftY &&
-        state.ballY < state.leftY + leftPaddleHeight
-      ) {
-        state.ballX = leftOuterX + PADDLE_W + radius
-        const rel =
-          (state.ballY - (state.leftY + leftPaddleHeight / 2)) / (leftPaddleHeight / 2)
-        const angle = rel * 0.8
-        const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
-        state.vx = Math.cos(angle) * reboundSpeed
-        state.vy = Math.sin(angle) * reboundSpeed
-        handlePaddleReturn('left')
-        radius = getBallRadius()
+    if (pointAwarded) {
+      if (pointAwarded === 'right') {
+        state.rightScore++
+        if (state.rightScore >= WIN_SCORE) state.winner = 'right'
+        clearDivotWells()
+        resetBall(false)
+      } else {
+        state.leftScore++
+        if (state.leftScore >= WIN_SCORE) state.winner = 'left'
+        clearDivotWells()
+        resetBall(true)
       }
-
-      const rightInnerX = getRightInnerX()
-      if (
-        state.ballX + radius > rightInnerX &&
-        state.ballX + radius < rightInnerX + PADDLE_W &&
-        state.ballY > state.rightInnerY &&
-        state.ballY < state.rightInnerY + state.rightInnerPaddleHeight
-      ) {
-        state.ballX = rightInnerX - radius
-        const rel =
-          (state.ballY - (state.rightInnerY + state.rightInnerPaddleHeight / 2)) /
-          (state.rightInnerPaddleHeight / 2)
-        const angle = Math.PI - rel * 0.8
-        const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
-        state.vx = Math.cos(angle) * reboundSpeed
-        state.vy = Math.sin(angle) * reboundSpeed
-        handlePaddleReturn('right')
-        radius = getBallRadius()
-      } else if (
-        state.ballX + radius > rightOuterX &&
-        state.ballX + radius < rightOuterX + PADDLE_W &&
-        state.ballY > state.rightY &&
-        state.ballY < state.rightY + rightPaddleHeight
-      ) {
-        state.ballX = rightOuterX - radius
-        const rel =
-          (state.ballY - (state.rightY + rightPaddleHeight / 2)) /
-          (rightPaddleHeight / 2)
-        const angle = Math.PI - rel * 0.8
-        const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
-        state.vx = Math.cos(angle) * reboundSpeed
-        state.vy = Math.sin(angle) * reboundSpeed
-        handlePaddleReturn('right')
-        radius = getBallRadius()
-      }
-    } else {
-      if (
-        state.ballX - radius < leftOuterX + PADDLE_W &&
-        state.ballX - radius > leftOuterX &&
-        state.ballY > state.leftY &&
-        state.ballY < state.leftY + leftPaddleHeight
-      ) {
-        state.ballX = leftOuterX + PADDLE_W + radius
-        const rel =
-          (state.ballY - (state.leftY + leftPaddleHeight / 2)) / (leftPaddleHeight / 2)
-        const angle = rel * 0.8
-        const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
-        state.vx = Math.cos(angle) * reboundSpeed
-        state.vy = Math.sin(angle) * reboundSpeed
-        handlePaddleReturn('left')
-        radius = getBallRadius()
-      }
-
-      if (
-        state.ballX + radius > rightOuterX &&
-        state.ballX + radius < rightOuterX + PADDLE_W &&
-        state.ballY > state.rightY &&
-        state.ballY < state.rightY + rightPaddleHeight
-      ) {
-        state.ballX = rightOuterX - radius
-        const rel =
-          (state.ballY - (state.rightY + rightPaddleHeight / 2)) /
-          (rightPaddleHeight / 2)
-        const angle = Math.PI - rel * 0.8
-        const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
-        state.vx = Math.cos(angle) * reboundSpeed
-        state.vy = Math.sin(angle) * reboundSpeed
-        handlePaddleReturn('right')
-        radius = getBallRadius()
-      }
+      handlePointScored()
+      syncPrimaryBallState()
+      return
     }
 
     updateBallTrails()
-
-    // Score
-    if (state.ballX < -radius) {
-      state.rightScore++
-      if (state.rightScore >= WIN_SCORE) state.winner = 'right'
-      clearDivotWells()
-      resetBall(false)
-      handlePointScored()
-      radius = getBallRadius()
-    }
-    if (state.ballX > W + radius) {
-      state.leftScore++
-      if (state.leftScore >= WIN_SCORE) state.winner = 'left'
-      clearDivotWells()
-      resetBall(true)
-      handlePointScored()
-    }
   }
 
   function isRestartInputActive(gamepadInput: GamepadInput): boolean {
@@ -1005,12 +1014,75 @@ export function createPong(
     return getEnabledArenaModifiers(arena).map(([key]) => key)
   }
 
-  function handlePaddleReturn(side: 'left' | 'right') {
+  function handlePaddleReturn(side: 'left' | 'right', ball: BallState) {
     lastReturner = side
     registerPipReturn()
-    resetBallSize()
+    resetBallSize(ball)
     spawnDivotWell()
     applyChillyShrink(side)
+    handleHadronSplit(side, ball)
+  }
+
+  function applyOsteoDamage(segment: PaddleSegment) {
+    const modifier = config.modifiers.paddle.osteoWhat
+    if (!modifier.enabled) return
+    if (segment.osteoIndex === undefined) return
+
+    const states = osteoStates[segment.paddle.side][segment.paddle.lane]
+    const state = states[segment.osteoIndex]
+    if (!state || state.broken) return
+
+    const rawThreshold = Number.isFinite(modifier.hitsBeforeBreak)
+      ? Math.floor(modifier.hitsBeforeBreak)
+      : 2
+    const threshold = Math.max(1, rawThreshold)
+
+    state.hits += 1
+    if (state.hits >= threshold) {
+      state.broken = true
+    }
+  }
+
+  function handleHadronSplit(side: 'left' | 'right', ball: BallState) {
+    const modifier = config.modifiers.paddle.hadron
+    if (!modifier.enabled) return
+    if (!hadronStatus[side]) return
+
+    const speed = Math.hypot(ball.vx, ball.vy)
+    if (speed <= 0 || balls.length >= MAX_ACTIVE_BALLS) {
+      hadronStatus[side] = false
+      return
+    }
+
+    const rawOffset = Number.isFinite(modifier.splitAngle) ? modifier.splitAngle : 0.35
+    const angleOffset = clamp(Math.abs(rawOffset), 0, Math.PI / 2)
+    if (angleOffset === 0) {
+      hadronStatus[side] = false
+      return
+    }
+
+    hadronStatus[side] = false
+
+    const baseAngle = Math.atan2(ball.vy, ball.vx)
+    const halfOffset = angleOffset * 0.5
+    const firstAngle = baseAngle - halfOffset
+    const secondAngle = baseAngle + halfOffset
+
+    ball.vx = Math.cos(firstAngle) * speed
+    ball.vy = Math.sin(firstAngle) * speed
+
+    if (balls.length >= MAX_ACTIVE_BALLS) return
+
+    const newBall: BallState = {
+      x: ball.x + Math.cos(secondAngle) * ball.radius,
+      y: ball.y + Math.sin(secondAngle) * ball.radius,
+      vx: Math.cos(secondAngle) * speed,
+      vy: Math.sin(secondAngle) * speed,
+      radius: ball.radius,
+      travelDistance: ball.travelDistance,
+    }
+
+    balls.push(newBall)
   }
 
   function clearDivotWells() {
@@ -1018,6 +1090,8 @@ export function createPong(
   }
 
   function handlePointScored() {
+    rearmHadron()
+    syncOsteoState(true)
     initializePaddleHeights(true)
     if (completedBitesSinceLastPoint > 0) {
       const previousActive = activeModKey
@@ -1142,6 +1216,12 @@ export function createPong(
       state.leftInnerY = state.leftY
       state.rightInnerY = state.rightY
     }
+
+    syncOsteoState()
+
+    if (!config.modifiers.paddle.hadron.enabled) {
+      rearmHadron()
+    }
   }
 
   function applyChillyShrink(side: 'left' | 'right') {
@@ -1158,6 +1238,59 @@ export function createPong(
     clampPaddlePosition(side)
     state.leftPaddleHeight = leftPaddleHeight
     state.rightPaddleHeight = rightPaddleHeight
+  }
+
+  function rearmHadron() {
+    hadronStatus.left = true
+    hadronStatus.right = true
+  }
+
+  function ensureOsteoArrayLength(target: OsteoSegmentState[], length: number) {
+    if (target.length > length) {
+      target.length = length
+      return
+    }
+    while (target.length < length) {
+      target.push({ hits: 0, broken: false })
+    }
+  }
+
+  function syncOsteoState(forceReset = false) {
+    const modifier = config.modifiers.paddle.osteoWhat
+    if (!modifier.enabled) {
+      osteoStates.left.outer = []
+      osteoStates.left.inner = []
+      osteoStates.right.outer = []
+      osteoStates.right.inner = []
+      previousOsteoSignature = null
+      return
+    }
+
+    const rawCount = Number.isFinite(modifier.segmentCount)
+      ? Math.floor(modifier.segmentCount)
+      : 6
+    const segmentCount = Math.max(1, rawCount)
+    const rawHits = Number.isFinite(modifier.hitsBeforeBreak)
+      ? Math.floor(modifier.hitsBeforeBreak)
+      : 2
+    const hitsBeforeBreak = Math.max(1, rawHits)
+    const signature = `${segmentCount}:${hitsBeforeBreak}`
+
+    if (forceReset || signature !== previousOsteoSignature) {
+      previousOsteoSignature = signature
+      const createSegments = () =>
+        Array.from({ length: segmentCount }, () => ({ hits: 0, broken: false }))
+      osteoStates.left.outer = createSegments()
+      osteoStates.left.inner = createSegments()
+      osteoStates.right.outer = createSegments()
+      osteoStates.right.inner = createSegments()
+      return
+    }
+
+    ensureOsteoArrayLength(osteoStates.left.outer, segmentCount)
+    ensureOsteoArrayLength(osteoStates.left.inner, segmentCount)
+    ensureOsteoArrayLength(osteoStates.right.outer, segmentCount)
+    ensureOsteoArrayLength(osteoStates.right.inner, segmentCount)
   }
 
   function setPaddleHeight(
@@ -1399,18 +1532,32 @@ export function createPong(
     return wells
   }
 
-  function getBallRadius() {
-    return currentBallRadius
+  function getBallRadius(ball?: BallState) {
+    if (ball) return ball.radius
+    const primary = balls[0]
+    return primary ? primary.radius : BALL_R
   }
 
-  function resetBallSize() {
-    ballTravelDistance = 0
-    applyBallSizeModifiers(0)
+  function resetBallSize(target?: BallState) {
+    if (target) {
+      target.travelDistance = 0
+      applyBallSizeModifiers(target, 0)
+      if (balls[0] === target) {
+        state.ballRadius = target.radius
+      }
+      return
+    }
+
+    for (const ball of balls) {
+      ball.travelDistance = 0
+      applyBallSizeModifiers(ball, 0)
+    }
+    syncPrimaryBallState()
   }
 
-  function applyBallSizeModifiers(distanceDelta: number) {
+  function applyBallSizeModifiers(ball: BallState, distanceDelta: number) {
     if (Number.isFinite(distanceDelta) && distanceDelta > 0) {
-      ballTravelDistance += distanceDelta
+      ball.travelDistance += distanceDelta
     }
 
     const { snowball, meteor } = config.modifiers.ball
@@ -1424,7 +1571,7 @@ export function createPong(
       const growthRate = Number.isFinite(snowball.growthRate)
         ? Math.max(0, snowball.growthRate)
         : 0
-      radius = clamp(minRadius + ballTravelDistance * growthRate, minRadius, maxRadius)
+      radius = clamp(minRadius + ball.travelDistance * growthRate, minRadius, maxRadius)
     }
 
     if (meteor.enabled) {
@@ -1435,11 +1582,13 @@ export function createPong(
       const shrinkRate = Number.isFinite(meteor.shrinkRate)
         ? Math.max(0, meteor.shrinkRate)
         : 0
-      radius = clamp(startRadius - ballTravelDistance * shrinkRate, minRadius, startRadius)
+      radius = clamp(startRadius - ball.travelDistance * shrinkRate, minRadius, startRadius)
     }
 
-    currentBallRadius = radius
-    state.ballRadius = currentBallRadius
+    ball.radius = radius
+    if (balls[0] === ball) {
+      state.ballRadius = radius
+    }
   }
 
   function updateBallTrails() {
@@ -1778,6 +1927,278 @@ export function createPong(
     return W / 2 + getInnerOffset()
   }
 
+  function getPhysicalPaddles(): PhysicalPaddle[] {
+    const paddles: PhysicalPaddle[] = []
+    const doublesEnabled = Boolean(config.doubles.enabled)
+
+    if (doublesEnabled) {
+      paddles.push({
+        side: 'left',
+        lane: 'inner',
+        x: getLeftInnerX(),
+        y: state.leftInnerY,
+        height: state.leftInnerPaddleHeight,
+      })
+      paddles.push({
+        side: 'left',
+        lane: 'outer',
+        x: getLeftOuterX(),
+        y: state.leftY,
+        height: state.leftPaddleHeight,
+      })
+      paddles.push({
+        side: 'right',
+        lane: 'inner',
+        x: getRightInnerX(),
+        y: state.rightInnerY,
+        height: state.rightInnerPaddleHeight,
+      })
+      paddles.push({
+        side: 'right',
+        lane: 'outer',
+        x: getRightOuterX(),
+        y: state.rightY,
+        height: state.rightPaddleHeight,
+      })
+      return paddles
+    }
+
+    paddles.push({
+      side: 'left',
+      lane: 'outer',
+      x: getLeftOuterX(),
+      y: state.leftY,
+      height: state.leftPaddleHeight,
+    })
+    paddles.push({
+      side: 'right',
+      lane: 'outer',
+      x: getRightOuterX(),
+      y: state.rightY,
+      height: state.rightPaddleHeight,
+    })
+    return paddles
+  }
+
+  function buildPaddleSegments(paddle: PhysicalPaddle): PaddleSegment[] {
+    const baseSegment: PaddleSegment = {
+      paddle,
+      index: 0,
+      x: paddle.x,
+      y: paddle.y,
+      width: PADDLE_W,
+      height: paddle.height,
+    }
+
+    const osteoModifier = config.modifiers.paddle.osteoWhat
+    if (osteoModifier.enabled) {
+      return buildOsteoSegments(paddle, osteoModifier)
+    }
+
+    let segments: PaddleSegment[] = [baseSegment]
+
+    const foosballModifier = config.modifiers.paddle.foosball
+    if (foosballModifier.enabled) {
+      const gap = Number.isFinite(foosballModifier.gapSize)
+        ? Math.max(0, foosballModifier.gapSize)
+        : 0
+      segments = segments.flatMap(segment => splitSegmentFoosball(segment, gap))
+    }
+
+    const buckToothModifier = config.modifiers.paddle.buckTooth
+    if (buckToothModifier.enabled) {
+      const gap = Number.isFinite(buckToothModifier.gapSize)
+        ? Math.max(0, buckToothModifier.gapSize)
+        : 0
+      segments = segments.flatMap(segment => splitSegmentWithGap(segment, gap))
+    }
+
+    return segments
+  }
+
+  function splitSegmentWithGap(segment: PaddleSegment, gap: number): PaddleSegment[] {
+    const clampedGap = Math.max(0, Math.min(gap, segment.height))
+    const remainingHeight = segment.height - clampedGap
+    if (remainingHeight <= 4) {
+      return [segment]
+    }
+
+    const topHeight = remainingHeight / 2
+    const bottomHeight = remainingHeight - topHeight
+
+    return [
+      {
+        ...segment,
+        index: segment.index * 2,
+        y: segment.y,
+        height: topHeight,
+      },
+      {
+        ...segment,
+        index: segment.index * 2 + 1,
+        y: segment.y + topHeight + clampedGap,
+        height: bottomHeight,
+      },
+    ]
+  }
+
+  function splitSegmentFoosball(segment: PaddleSegment, gap: number): PaddleSegment[] {
+    const clampedGap = Math.max(0, gap)
+    const count = 3
+    const totalGap = clampedGap * (count - 1)
+    const availableHeight = Math.max(segment.height - totalGap, 0)
+    if (availableHeight <= 0) {
+      return [segment]
+    }
+
+    const baseHeight = availableHeight / count
+    const segments: PaddleSegment[] = []
+    let y = segment.y
+
+    for (let i = 0; i < count; i++) {
+      let height = baseHeight
+      if (i === count - 1) {
+        height = Math.max(0, segment.y + segment.height - y)
+      }
+
+      if (height <= 0) break
+
+      segments.push({
+        ...segment,
+        index: segment.index * count + i,
+        y,
+        height,
+      })
+
+      y += height + (i < count - 1 ? clampedGap : 0)
+    }
+
+    return segments
+  }
+
+  function buildOsteoSegments(
+    paddle: PhysicalPaddle,
+    modifier: { segmentCount: number; gapSize: number },
+  ): PaddleSegment[] {
+    const rawCount = Number.isFinite(modifier.segmentCount)
+      ? Math.floor(modifier.segmentCount)
+      : 6
+    const segmentCount = Math.max(1, rawCount)
+    const gap = Number.isFinite(modifier.gapSize) ? Math.max(0, modifier.gapSize) : 0
+    const states = osteoStates[paddle.side][paddle.lane]
+    ensureOsteoArrayLength(states, segmentCount)
+
+    const segments: PaddleSegment[] = []
+    let y = paddle.y
+
+    for (let i = 0; i < segmentCount; i++) {
+      const remainingSegments = segmentCount - i
+      const remainingHeight = Math.max(paddle.y + paddle.height - y, 0)
+      const gapSpace = i < segmentCount - 1 ? gap : 0
+      const height = remainingSegments > 0
+        ? Math.max(0, (remainingHeight - gapSpace * (remainingSegments - 1)) / remainingSegments)
+        : 0
+
+      if (height <= 0) {
+        y += gap
+        continue
+      }
+
+      const state = states[i]
+      segments.push({
+        paddle,
+        index: i,
+        x: paddle.x,
+        y,
+        width: PADDLE_W,
+        height,
+        osteoIndex: i,
+        cracked: !state?.broken && (state?.hits ?? 0) > 0,
+        broken: Boolean(state?.broken),
+      })
+
+      y += height + gap
+    }
+
+    return segments
+  }
+
+  function resolvePaddleCollisions(ball: BallState, paddles: PhysicalPaddle[]) {
+    for (const paddle of paddles) {
+      const segments = buildPaddleSegments(paddle)
+      for (const segment of segments) {
+        if (tryResolveBallSegmentCollision(ball, segment)) {
+          return true
+        }
+      }
+    }
+    return false
+  }
+
+  function tryResolveBallSegmentCollision(ball: BallState, segment: PaddleSegment): boolean {
+    if (segment.height <= 0 || segment.broken) return false
+
+    const top = segment.y
+    const bottom = segment.y + segment.height
+    if (ball.y <= top || ball.y >= bottom) return false
+
+    const radius = ball.radius
+    if (segment.paddle.side === 'left') {
+      const contact = ball.x - radius
+      if (contact <= segment.x || contact >= segment.x + segment.width) return false
+      ball.x = segment.x + segment.width + radius
+    } else {
+      const contact = ball.x + radius
+      if (contact <= segment.x || contact >= segment.x + segment.width) return false
+      ball.x = segment.x - radius
+    }
+
+    const centerY = top + segment.height / 2
+    const halfHeight = segment.height / 2 || 1
+    const rel = clamp((ball.y - centerY) / halfHeight, -1, 1)
+    const speed = Math.hypot(ball.vx, ball.vy) * config.speedIncreaseOnHit
+    const deflection = computeDeflectionAngle(segment.paddle.side, rel, ball.vy)
+
+    if (segment.paddle.side === 'left') {
+      ball.vx = Math.cos(deflection) * speed
+      ball.vy = Math.sin(deflection) * speed
+    } else {
+      const angle = Math.PI - deflection
+      ball.vx = Math.cos(angle) * speed
+      ball.vy = Math.sin(angle) * speed
+    }
+
+    if (segment.osteoIndex !== undefined) {
+      applyOsteoDamage(segment)
+    }
+
+    handlePaddleReturn(segment.paddle.side, ball)
+    return true
+  }
+
+  function computeDeflectionAngle(
+    side: 'left' | 'right',
+    rel: number,
+    incomingVy: number,
+  ) {
+    const modifier = config.modifiers.paddle.brokePhysics
+    if (!modifier.enabled) {
+      return clamp(rel, -1, 1) * 0.8
+    }
+
+    const rawCenter = Number.isFinite(modifier.centerAngle) ? modifier.centerAngle : 1.2
+    const rawEdge = Number.isFinite(modifier.edgeAngle) ? modifier.edgeAngle : 0
+    const centerAngle = clamp(Math.abs(rawCenter), 0, Math.PI / 2)
+    const edgeAngle = clamp(Math.abs(rawEdge), 0, Math.PI / 2)
+    const amount = clamp(Math.abs(rel), 0, 1)
+    const angleMagnitude = centerAngle + (edgeAngle - centerAngle) * amount
+    let direction = Math.sign(rel)
+    if (direction === 0) {
+      direction = incomingVy >= 0 ? 1 : -1
+    }
+    return angleMagnitude * direction
+  }
+
   function draw() {
     ctx.fillStyle = ARENA_BACKGROUND
     ctx.fillRect(0, 0, W, H)
@@ -1802,44 +2223,45 @@ export function createPong(
 
     drawBallTrails()
 
-    const drawPaddleWithEdge = (
-      side: 'left' | 'right',
-      x: number,
-      y: number,
-      height: number,
-    ) => {
-      ctx.fillStyle = BALL_COLOR
-      ctx.fillRect(x, y, PADDLE_W, height)
-      ctx.fillStyle = side === 'left' ? LEFT_PADDLE_EDGE_COLOR : RIGHT_PADDLE_EDGE_COLOR
-      if (side === 'left') {
-        ctx.fillRect(x, y, PADDLE_EDGE_WIDTH, height)
-      } else {
-        ctx.fillRect(x + PADDLE_W - PADDLE_EDGE_WIDTH, y, PADDLE_EDGE_WIDTH, height)
+    const hadronModifier = config.modifiers.paddle.hadron
+    const paddlesToDraw = getPhysicalPaddles()
+    for (const paddle of paddlesToDraw) {
+      const segments = buildPaddleSegments(paddle)
+      const baseHex = hadronModifier.enabled
+        ? hadronStatus[paddle.side]
+          ? hadronModifier.armedColor
+          : hadronModifier.disarmedColor
+        : BALL_COLOR
+      const baseRgb = hexToRgb(baseHex)
+      const crackedRgb = mixRgb(baseRgb, WHITE_RGB, 0.35)
+      const crackedColor = rgbaString(crackedRgb, 1)
+
+      for (const segment of segments) {
+        if (segment.height <= 0 || segment.broken) continue
+        const fillColor = segment.cracked ? crackedColor : baseHex
+        ctx.fillStyle = fillColor
+        ctx.fillRect(segment.x, segment.y, segment.width, segment.height)
+        ctx.fillStyle =
+          paddle.side === 'left' ? LEFT_PADDLE_EDGE_COLOR : RIGHT_PADDLE_EDGE_COLOR
+        if (paddle.side === 'left') {
+          ctx.fillRect(segment.x, segment.y, PADDLE_EDGE_WIDTH, segment.height)
+        } else {
+          ctx.fillRect(
+            segment.x + segment.width - PADDLE_EDGE_WIDTH,
+            segment.y,
+            PADDLE_EDGE_WIDTH,
+            segment.height,
+          )
+        }
       }
     }
 
-    const doublesEnabled = Boolean(config.doubles.enabled)
-    const leftOuterX = getLeftOuterX()
-    const rightOuterX = getRightOuterX()
-
-    if (doublesEnabled) {
-      const leftInnerX = getLeftInnerX()
-      const rightInnerX = getRightInnerX()
-      drawPaddleWithEdge('left', leftOuterX, state.leftY, state.leftPaddleHeight)
-      drawPaddleWithEdge('left', leftInnerX, state.leftInnerY, state.leftInnerPaddleHeight)
-      drawPaddleWithEdge('right', rightInnerX, state.rightInnerY, state.rightInnerPaddleHeight)
-      drawPaddleWithEdge('right', rightOuterX, state.rightY, state.rightPaddleHeight)
-    } else {
-      drawPaddleWithEdge('left', leftOuterX, state.leftY, state.leftPaddleHeight)
-      drawPaddleWithEdge('right', rightOuterX, state.rightY, state.rightPaddleHeight)
-    }
-
     ctx.fillStyle = BALL_COLOR
-
-    const ballRadius = getBallRadius()
-    ctx.beginPath()
-    ctx.arc(state.ballX, state.ballY, ballRadius, 0, Math.PI * 2)
-    ctx.fill()
+    for (const ball of balls) {
+      ctx.beginPath()
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2)
+      ctx.fill()
+    }
 
     const pipRadius = 6
     const pipSpacing = 22

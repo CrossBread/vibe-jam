@@ -2,7 +2,6 @@
   GRAVITY_WELL_KEYS,
   deepClone,
   getGravityWellsEntries,
-  getPaddleModifiersEntries,
   type DevConfig,
   type GravityWellModifier,
   type ModifierBase,
@@ -12,6 +11,11 @@
   type SnowballModifier,
   type MeteorModifier,
   type ChillyModifier,
+  type BuckToothModifier,
+  type OsteoWhatModifier,
+  type BrokePhysicsModifier,
+  type HadronModifier,
+  type FoosballModifier,
   type ModifiersConfig,
   type DoublesConfig,
 } from './devtools'
@@ -20,6 +24,14 @@ let devOverlayStylesInjected = false
 
 interface DevOverlayOptions {
   onDockChange?: (docked: boolean) => void
+}
+
+function radiansToDegrees(value: number) {
+  return (value * 180) / Math.PI
+}
+
+function degreesToRadians(value: number) {
+  return (value * Math.PI) / 180
 }
 
 function ensureDevOverlayStyles() {
@@ -676,41 +688,158 @@ export function createDevOverlay(
     paddleList.className = 'dev-overlay__modifiers'
     paddleSection.appendChild(paddleList)
 
-    for (const [, modifier] of getPaddleModifiersEntries(config.modifiers.paddle)) {
-      paddleList.appendChild(
-        createModifierDetails(modifier, body => {
-          body.appendChild(
-            createSliderControl('Starting Height', modifier.startingHeight, {
-              min: 60,
-              max: 200,
-              step: 1,
-              format: v => `${Math.round(v)} px`,
-              onInput: v => (modifier.startingHeight = v),
-            }),
-          )
+    const { chilly, buckTooth, osteoWhat, brokePhysics, hadron, foosball } =
+      config.modifiers.paddle
 
-          body.appendChild(
-            createSliderControl('Shrink Per Return', modifier.shrinkAmount, {
+    paddleList.appendChild(
+      createModifierDetails(chilly, body => {
+        body.appendChild(
+          createSliderControl('Starting Height', chilly.startingHeight, {
+            min: 60,
+            max: 200,
+            step: 1,
+            format: v => `${Math.round(v)} px`,
+            onInput: v => (chilly.startingHeight = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Shrink Per Return', chilly.shrinkAmount, {
+            min: 0,
+            max: 20,
+            step: 1,
+            format: v => `${Math.round(v)} px`,
+            onInput: v => (chilly.shrinkAmount = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Minimum Height', chilly.minimumHeight, {
+            min: 40,
+            max: 140,
+            step: 1,
+            format: v => `${Math.round(v)} px`,
+            onInput: v => (chilly.minimumHeight = v),
+          }),
+        )
+      }),
+    )
+
+    paddleList.appendChild(
+      createModifierDetails(buckTooth, body => {
+        body.appendChild(
+          createSliderControl('Gap Size', buckTooth.gapSize, {
+            min: 0,
+            max: 160,
+            step: 1,
+            format: v => `${Math.round(v)} px`,
+            onInput: v => (buckTooth.gapSize = v),
+          }),
+        )
+      }),
+    )
+
+    paddleList.appendChild(
+      createModifierDetails(osteoWhat, body => {
+        body.appendChild(
+          createSliderControl('Segment Count', osteoWhat.segmentCount, {
+            min: 2,
+            max: 18,
+            step: 1,
+            format: v => `${Math.round(v)}`,
+            onInput: v => (osteoWhat.segmentCount = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Gap Size', osteoWhat.gapSize, {
+            min: 0,
+            max: 60,
+            step: 1,
+            format: v => `${Math.round(v)} px`,
+            onInput: v => (osteoWhat.gapSize = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Hits Before Break', osteoWhat.hitsBeforeBreak, {
+            min: 1,
+            max: 4,
+            step: 1,
+            format: v => `${Math.round(v)} hits`,
+            onInput: v => (osteoWhat.hitsBeforeBreak = v),
+          }),
+        )
+      }),
+    )
+
+    paddleList.appendChild(
+      createModifierDetails(brokePhysics, body => {
+        body.appendChild(
+          createSliderControl(
+            'Center Angle',
+            radiansToDegrees(brokePhysics.centerAngle),
+            {
               min: 0,
-              max: 20,
+              max: 90,
               step: 1,
-              format: v => `${Math.round(v)} px`,
-              onInput: v => (modifier.shrinkAmount = v),
-            }),
-          )
+              format: v => `${Math.round(v)}°`,
+              onInput: v => (brokePhysics.centerAngle = degreesToRadians(v)),
+            },
+          ),
+        )
 
-          body.appendChild(
-            createSliderControl('Minimum Height', modifier.minimumHeight, {
-              min: 40,
-              max: 140,
-              step: 1,
-              format: v => `${Math.round(v)} px`,
-              onInput: v => (modifier.minimumHeight = v),
-            }),
-          )
-        }),
-      )
-    }
+        body.appendChild(
+          createSliderControl('Edge Angle', radiansToDegrees(brokePhysics.edgeAngle), {
+            min: 0,
+            max: 45,
+            step: 1,
+            format: v => `${Math.round(v)}°`,
+            onInput: v => (brokePhysics.edgeAngle = degreesToRadians(v)),
+          }),
+        )
+      }),
+    )
+
+    paddleList.appendChild(
+      createModifierDetails(hadron, body => {
+        body.appendChild(
+          createSliderControl('Split Angle Offset', radiansToDegrees(hadron.splitAngle), {
+            min: 0,
+            max: 60,
+            step: 1,
+            format: v => `${Math.round(v)}°`,
+            onInput: v => (hadron.splitAngle = degreesToRadians(v)),
+          }),
+        )
+
+        body.appendChild(
+          createColorControl('Armed Color', hadron.armedColor, value => {
+            hadron.armedColor = value
+          }),
+        )
+
+        body.appendChild(
+          createColorControl('Disarmed Color', hadron.disarmedColor, value => {
+            hadron.disarmedColor = value
+          }),
+        )
+      }),
+    )
+
+    paddleList.appendChild(
+      createModifierDetails(foosball, body => {
+        body.appendChild(
+          createSliderControl('Gap Size', foosball.gapSize, {
+            min: 0,
+            max: 80,
+            step: 1,
+            format: v => `${Math.round(v)} px`,
+            onInput: v => (foosball.gapSize = v),
+          }),
+        )
+      }),
+    )
 
     const ballTitle = document.createElement('div')
     ballTitle.className = 'dev-overlay__section-title'
@@ -1094,6 +1223,11 @@ function isDevConfig(value: unknown): value is DevConfig {
   if (!paddle || typeof paddle !== 'object') return false
 
   if (!isChillyModifier(paddle.chilly)) return false
+  if (!isBuckToothModifier(paddle.buckTooth)) return false
+  if (!isOsteoWhatModifier(paddle.osteoWhat)) return false
+  if (!isBrokePhysicsModifier(paddle.brokePhysics)) return false
+  if (!isHadronModifier(paddle.hadron)) return false
+  if (!isFoosballModifier(paddle.foosball)) return false
 
   return true
 }
@@ -1244,6 +1378,47 @@ function isChillyModifier(value: unknown): value is ChillyModifier {
     typeof candidate.shrinkAmount === 'number' &&
     typeof candidate.minimumHeight === 'number'
   )
+}
+
+function isBuckToothModifier(value: unknown): value is BuckToothModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<BuckToothModifier>
+  return typeof candidate.gapSize === 'number'
+}
+
+function isOsteoWhatModifier(value: unknown): value is OsteoWhatModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<OsteoWhatModifier>
+  return (
+    typeof candidate.segmentCount === 'number' &&
+    typeof candidate.gapSize === 'number' &&
+    typeof candidate.hitsBeforeBreak === 'number'
+  )
+}
+
+function isBrokePhysicsModifier(value: unknown): value is BrokePhysicsModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<BrokePhysicsModifier>
+  return (
+    typeof candidate.centerAngle === 'number' &&
+    typeof candidate.edgeAngle === 'number'
+  )
+}
+
+function isHadronModifier(value: unknown): value is HadronModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<HadronModifier>
+  return (
+    typeof candidate.splitAngle === 'number' &&
+    typeof candidate.armedColor === 'string' &&
+    typeof candidate.disarmedColor === 'string'
+  )
+}
+
+function isFoosballModifier(value: unknown): value is FoosballModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<FoosballModifier>
+  return typeof candidate.gapSize === 'number'
 }
 
 function isDoublesConfig(value: unknown): value is DoublesConfig {
