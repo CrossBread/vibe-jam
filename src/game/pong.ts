@@ -19,8 +19,12 @@ export interface PongState {
   vy: number
   leftY: number
   rightY: number
+  leftInnerY: number
+  rightInnerY: number
   leftPaddleHeight: number
   rightPaddleHeight: number
+  leftInnerPaddleHeight: number
+  rightInnerPaddleHeight: number
   paused: boolean
   winner: 'left' | 'right' | null
   currentPips: number
@@ -162,6 +166,9 @@ export function createPong(
   const ARENA_BACKGROUND_RGB = hexToRgb(ARENA_BACKGROUND)
   const BLACK_RGB: RGBColor = { r: 0, g: 0, b: 0 }
   const WHITE_RGB: RGBColor = { r: 255, g: 255, b: 255 }
+  const LEFT_PADDLE_EDGE_COLOR = '#38bdf8'
+  const RIGHT_PADDLE_EDGE_COLOR = '#ef4444'
+  const PADDLE_EDGE_WIDTH = 2
 
   const defaults = createDevConfig()
   const config = deepClone(defaults)
@@ -278,7 +285,10 @@ export function createPong(
       }
       keys[e.key] = true
       const key = e.key.toLowerCase()
-      if (key === 'w' || key === 's') leftAIEnabled = false
+      if (key === 'w' || key === 's') {
+        if (config.doubles.enabled) rightAIEnabled = false
+        else leftAIEnabled = false
+      }
       if (key === 'arrowup' || key === 'arrowdown') rightAIEnabled = false
     })
     window.addEventListener('keyup', (e) => (keys[e.key] = false))
@@ -476,8 +486,12 @@ export function createPong(
     vy: (Math.random() * 2 - 1) * config.baseBallSpeed * 0.6,
     leftY: H * 0.5 - initialLeftHeight / 2,
     rightY: H * 0.5 - initialRightHeight / 2,
+    leftInnerY: H * 0.5 - initialLeftHeight / 2,
+    rightInnerY: H * 0.5 - initialRightHeight / 2,
     leftPaddleHeight: initialLeftHeight,
     rightPaddleHeight: initialRightHeight,
+    leftInnerPaddleHeight: initialLeftHeight,
+    rightInnerPaddleHeight: initialRightHeight,
     paused: false,
     winner: null,
     currentPips: 0,
@@ -491,6 +505,7 @@ export function createPong(
   let previousChillyEnabled = config.modifiers.paddle.chilly.enabled
   let previousLeftSizeMultiplier = getPaddleSizeMultiplier('left')
   let previousRightSizeMultiplier = getPaddleSizeMultiplier('right')
+  let previousDoublesEnabled = config.doubles.enabled
 
   const movingWellStates: Record<MovingWellKey, MovingWellState> = {
     blackMole: {
@@ -613,6 +628,12 @@ export function createPong(
     updatePaddleModifierState()
 
     const gamepadInput = getGamepadInput()
+    const doublesEnabled = Boolean(config.doubles.enabled)
+
+    if (doublesEnabled !== previousDoublesEnabled) {
+      syncDoublesState(doublesEnabled)
+      previousDoublesEnabled = doublesEnabled
+    }
 
     if (state.winner) {
       if (isRestartInputActive(gamepadInput)) {
@@ -631,8 +652,12 @@ export function createPong(
     const rightGamepadActive =
       gamepadInput.rightAxis !== 0 || gamepadInput.rightUp || gamepadInput.rightDown
 
-    if (leftGamepadActive) leftAIEnabled = false
-    if (rightGamepadActive) rightAIEnabled = false
+    if (doublesEnabled) {
+      if (leftGamepadActive || rightGamepadActive) leftAIEnabled = false
+    } else {
+      if (leftGamepadActive) leftAIEnabled = false
+      if (rightGamepadActive) rightAIEnabled = false
+    }
 
     // Controls
     const leftPaddleSpeed = config.paddleSpeed * getPaddleSpeedMultiplier('left')
@@ -640,12 +665,18 @@ export function createPong(
 
     if (leftAIEnabled) {
       const target = state.ballY - leftPaddleHeight / 2
-      const diff = target - state.leftY
       const maxStep = leftPaddleSpeed * dt
-      state.leftY += clamp(diff, -maxStep, maxStep)
+      const delta = clamp(target - state.leftY, -maxStep, maxStep)
+      state.leftY += delta
+      if (doublesEnabled) {
+        const innerDelta = clamp(target - state.leftInnerY, -maxStep, maxStep)
+        state.leftInnerY += innerDelta
+      } else {
+        state.leftInnerY = state.leftY
+      }
     } else {
-      const keyDirection = (keys['w'] ? -1 : 0) + (keys['s'] ? 1 : 0)
-      let gamePadDirection = 0;
+      const keyDirection = doublesEnabled ? 0 : (keys['w'] ? -1 : 0) + (keys['s'] ? 1 : 0)
+      let gamePadDirection = 0
       if (gamepadInput.leftAxis)
         gamePadDirection += gamepadInput.leftAxis * config.paddleSpeed * dt
       if (gamepadInput.leftUp) gamePadDirection -= config.paddleSpeed * dt
@@ -661,20 +692,40 @@ export function createPong(
         state.leftY += touchControls.left.relativeDelta
         touchControls.left.relativeDelta = 0
       }
+
+      if (doublesEnabled) {
+        let innerGamepad = 0
+        if (gamepadInput.rightAxis)
+          innerGamepad += gamepadInput.rightAxis * config.paddleSpeed * dt
+        if (gamepadInput.rightUp) innerGamepad -= config.paddleSpeed * dt
+        if (gamepadInput.rightDown) innerGamepad += config.paddleSpeed * dt
+        const innerDirection = clamp(innerGamepad, -1, 1)
+        state.leftInnerY += innerDirection * config.paddleSpeed * dt
+      } else {
+        state.leftInnerY = state.leftY
+      }
     }
 
     if (rightAIEnabled) {
       const target = state.ballY - rightPaddleHeight / 2
-      const diff = target - state.rightY
       const maxStep = rightPaddleSpeed * dt
-      state.rightY += clamp(diff, -maxStep, maxStep)
+      const delta = clamp(target - state.rightY, -maxStep, maxStep)
+      state.rightY += delta
+      if (doublesEnabled) {
+        const innerDelta = clamp(target - state.rightInnerY, -maxStep, maxStep)
+        state.rightInnerY += innerDelta
+      } else {
+        state.rightInnerY = state.rightY
+      }
     } else {
       const keyDirection = (keys['ArrowUp'] ? -1 : 0) + (keys['ArrowDown'] ? 1 : 0)
-      let gamePadDirection = 0;
-      if (gamepadInput.rightAxis)
-        gamePadDirection += gamepadInput.rightAxis * config.paddleSpeed * dt
-      if (gamepadInput.rightUp) gamePadDirection -= config.paddleSpeed * dt
-      if (gamepadInput.rightDown) gamePadDirection += config.paddleSpeed * dt
+      let gamePadDirection = 0
+      if (!doublesEnabled) {
+        if (gamepadInput.rightAxis)
+          gamePadDirection += gamepadInput.rightAxis * config.paddleSpeed * dt
+        if (gamepadInput.rightUp) gamePadDirection -= config.paddleSpeed * dt
+        if (gamepadInput.rightDown) gamePadDirection += config.paddleSpeed * dt
+      }
       const totalDirection = clamp(
         keyDirection + touchControls.right.direction + gamePadDirection,
         -1,
@@ -685,10 +736,25 @@ export function createPong(
         state.rightY += touchControls.right.relativeDelta
         touchControls.right.relativeDelta = 0
       }
+
+      if (doublesEnabled) {
+        const innerKeyDirection = (keys['w'] ? -1 : 0) + (keys['s'] ? 1 : 0)
+        const innerDirection = clamp(innerKeyDirection, -1, 1)
+        state.rightInnerY += innerDirection * config.paddleSpeed * dt
+      } else {
+        state.rightInnerY = state.rightY
+      }
     }
 
     state.leftY = clamp(state.leftY, 0, H - leftPaddleHeight)
     state.rightY = clamp(state.rightY, 0, H - rightPaddleHeight)
+    if (doublesEnabled) {
+      state.leftInnerY = clamp(state.leftInnerY, 0, H - state.leftInnerPaddleHeight)
+      state.rightInnerY = clamp(state.rightInnerY, 0, H - state.rightInnerPaddleHeight)
+    } else {
+      state.leftInnerY = state.leftY
+      state.rightInnerY = state.rightY
+    }
 
     // Gravity well influence
     activeGravityWells = collectActiveGravityWells()
@@ -734,41 +800,113 @@ export function createPong(
       state.vy *= -1
     }
 
-    // Left paddle collision
-    if (
-      state.ballX - radius < 40 + PADDLE_W &&
-      state.ballX - radius > 40 &&
-      state.ballY > state.leftY &&
-      state.ballY < state.leftY + leftPaddleHeight
-    ) {
-      state.ballX = 40 + PADDLE_W + radius
-      const rel =
-        (state.ballY - (state.leftY + leftPaddleHeight / 2)) / (leftPaddleHeight / 2)
-      const angle = rel * 0.8
-      const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
-      state.vx = Math.cos(angle) * reboundSpeed
-      state.vy = Math.sin(angle) * reboundSpeed
-      handlePaddleReturn('left')
-      radius = getBallRadius()
-    }
+    const leftOuterX = getLeftOuterX()
+    const rightOuterX = getRightOuterX()
 
-    // Right paddle collision
-    if (
-      state.ballX + radius > W - 40 - PADDLE_W &&
-      state.ballX + radius < W - 40 &&
-      state.ballY > state.rightY &&
-      state.ballY < state.rightY + rightPaddleHeight
-    ) {
-      state.ballX = W - 40 - PADDLE_W - radius
-      const rel =
-        (state.ballY - (state.rightY + rightPaddleHeight / 2)) /
-        (rightPaddleHeight / 2)
-      const angle = Math.PI - rel * 0.8
-      const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
-      state.vx = Math.cos(angle) * reboundSpeed
-      state.vy = Math.sin(angle) * reboundSpeed
-      handlePaddleReturn('right')
-      radius = getBallRadius()
+    if (doublesEnabled) {
+      const leftInnerX = getLeftInnerX()
+      if (
+        state.ballX - radius < leftInnerX + PADDLE_W &&
+        state.ballX - radius > leftInnerX &&
+        state.ballY > state.leftInnerY &&
+        state.ballY < state.leftInnerY + state.leftInnerPaddleHeight
+      ) {
+        state.ballX = leftInnerX + PADDLE_W + radius
+        const rel =
+          (state.ballY - (state.leftInnerY + state.leftInnerPaddleHeight / 2)) /
+          (state.leftInnerPaddleHeight / 2)
+        const angle = rel * 0.8
+        const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
+        state.vx = Math.cos(angle) * reboundSpeed
+        state.vy = Math.sin(angle) * reboundSpeed
+        handlePaddleReturn('left')
+        radius = getBallRadius()
+      } else if (
+        state.ballX - radius < leftOuterX + PADDLE_W &&
+        state.ballX - radius > leftOuterX &&
+        state.ballY > state.leftY &&
+        state.ballY < state.leftY + leftPaddleHeight
+      ) {
+        state.ballX = leftOuterX + PADDLE_W + radius
+        const rel =
+          (state.ballY - (state.leftY + leftPaddleHeight / 2)) / (leftPaddleHeight / 2)
+        const angle = rel * 0.8
+        const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
+        state.vx = Math.cos(angle) * reboundSpeed
+        state.vy = Math.sin(angle) * reboundSpeed
+        handlePaddleReturn('left')
+        radius = getBallRadius()
+      }
+
+      const rightInnerX = getRightInnerX()
+      if (
+        state.ballX + radius > rightInnerX &&
+        state.ballX + radius < rightInnerX + PADDLE_W &&
+        state.ballY > state.rightInnerY &&
+        state.ballY < state.rightInnerY + state.rightInnerPaddleHeight
+      ) {
+        state.ballX = rightInnerX - radius
+        const rel =
+          (state.ballY - (state.rightInnerY + state.rightInnerPaddleHeight / 2)) /
+          (state.rightInnerPaddleHeight / 2)
+        const angle = Math.PI - rel * 0.8
+        const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
+        state.vx = Math.cos(angle) * reboundSpeed
+        state.vy = Math.sin(angle) * reboundSpeed
+        handlePaddleReturn('right')
+        radius = getBallRadius()
+      } else if (
+        state.ballX + radius > rightOuterX &&
+        state.ballX + radius < rightOuterX + PADDLE_W &&
+        state.ballY > state.rightY &&
+        state.ballY < state.rightY + rightPaddleHeight
+      ) {
+        state.ballX = rightOuterX - radius
+        const rel =
+          (state.ballY - (state.rightY + rightPaddleHeight / 2)) /
+          (rightPaddleHeight / 2)
+        const angle = Math.PI - rel * 0.8
+        const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
+        state.vx = Math.cos(angle) * reboundSpeed
+        state.vy = Math.sin(angle) * reboundSpeed
+        handlePaddleReturn('right')
+        radius = getBallRadius()
+      }
+    } else {
+      if (
+        state.ballX - radius < leftOuterX + PADDLE_W &&
+        state.ballX - radius > leftOuterX &&
+        state.ballY > state.leftY &&
+        state.ballY < state.leftY + leftPaddleHeight
+      ) {
+        state.ballX = leftOuterX + PADDLE_W + radius
+        const rel =
+          (state.ballY - (state.leftY + leftPaddleHeight / 2)) / (leftPaddleHeight / 2)
+        const angle = rel * 0.8
+        const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
+        state.vx = Math.cos(angle) * reboundSpeed
+        state.vy = Math.sin(angle) * reboundSpeed
+        handlePaddleReturn('left')
+        radius = getBallRadius()
+      }
+
+      if (
+        state.ballX + radius > rightOuterX &&
+        state.ballX + radius < rightOuterX + PADDLE_W &&
+        state.ballY > state.rightY &&
+        state.ballY < state.rightY + rightPaddleHeight
+      ) {
+        state.ballX = rightOuterX - radius
+        const rel =
+          (state.ballY - (state.rightY + rightPaddleHeight / 2)) /
+          (rightPaddleHeight / 2)
+        const angle = Math.PI - rel * 0.8
+        const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
+        state.vx = Math.cos(angle) * reboundSpeed
+        state.vy = Math.sin(angle) * reboundSpeed
+        handlePaddleReturn('right')
+        radius = getBallRadius()
+      }
     }
 
     updateBallTrails()
@@ -926,6 +1064,22 @@ export function createPong(
     previousRightSizeMultiplier = getPaddleSizeMultiplier('right')
     clampPaddlePosition('left')
     clampPaddlePosition('right')
+    state.leftInnerPaddleHeight = state.leftPaddleHeight
+    state.rightInnerPaddleHeight = state.rightPaddleHeight
+    state.leftInnerY = state.leftY
+    state.rightInnerY = state.rightY
+  }
+
+  function syncDoublesState(enabled: boolean) {
+    state.leftInnerPaddleHeight = state.leftPaddleHeight
+    state.rightInnerPaddleHeight = state.rightPaddleHeight
+    if (enabled) {
+      state.leftInnerY = clamp(state.leftInnerY, 0, H - state.leftInnerPaddleHeight)
+      state.rightInnerY = clamp(state.rightInnerY, 0, H - state.rightInnerPaddleHeight)
+    } else {
+      state.leftInnerY = state.leftY
+      state.rightInnerY = state.rightY
+    }
   }
 
   function updatePaddleModifierState() {
@@ -979,6 +1133,15 @@ export function createPong(
     clampPaddlePosition('right')
     state.leftPaddleHeight = leftPaddleHeight
     state.rightPaddleHeight = rightPaddleHeight
+    state.leftInnerPaddleHeight = leftPaddleHeight
+    state.rightInnerPaddleHeight = rightPaddleHeight
+    if (config.doubles.enabled) {
+      state.leftInnerY = clamp(state.leftInnerY, 0, H - state.leftInnerPaddleHeight)
+      state.rightInnerY = clamp(state.rightInnerY, 0, H - state.rightInnerPaddleHeight)
+    } else {
+      state.leftInnerY = state.leftY
+      state.rightInnerY = state.rightY
+    }
   }
 
   function applyChillyShrink(side: 'left' | 'right') {
@@ -1004,19 +1167,28 @@ export function createPong(
   ) {
     const { center = false, preserveCenter = true } = options
     const prevHeight = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+    const prevInnerHeight =
+      side === 'left' ? state.leftInnerPaddleHeight : state.rightInnerPaddleHeight
 
     if (side === 'left') {
       leftPaddleHeight = height
       state.leftPaddleHeight = height
+      state.leftInnerPaddleHeight = height
     } else {
       rightPaddleHeight = height
       state.rightPaddleHeight = height
+      state.rightInnerPaddleHeight = height
     }
 
     if (center) {
       const y = clamp(H * 0.5 - height / 2, 0, H - height)
-      if (side === 'left') state.leftY = y
-      else state.rightY = y
+      if (side === 'left') {
+        state.leftY = y
+        state.leftInnerY = y
+      } else {
+        state.rightY = y
+        state.rightInnerY = y
+      }
       return
     }
 
@@ -1024,8 +1196,16 @@ export function createPong(
       const currentY = side === 'left' ? state.leftY : state.rightY
       const centerY = currentY + prevHeight / 2
       const newY = clamp(centerY - height / 2, 0, H - height)
-      if (side === 'left') state.leftY = newY
-      else state.rightY = newY
+      const innerCurrentY = side === 'left' ? state.leftInnerY : state.rightInnerY
+      const innerCenterY = innerCurrentY + prevInnerHeight / 2
+      const newInnerY = clamp(innerCenterY - height / 2, 0, H - height)
+      if (side === 'left') {
+        state.leftY = newY
+        state.leftInnerY = newInnerY
+      } else {
+        state.rightY = newY
+        state.rightInnerY = newInnerY
+      }
       return
     }
 
@@ -1036,8 +1216,14 @@ export function createPong(
     const height = side === 'left' ? leftPaddleHeight : rightPaddleHeight
     if (side === 'left') {
       state.leftY = clamp(state.leftY, 0, H - height)
+      state.leftInnerY = clamp(state.leftInnerY, 0, H - state.leftInnerPaddleHeight)
     } else {
       state.rightY = clamp(state.rightY, 0, H - height)
+      state.rightInnerY = clamp(
+        state.rightInnerY,
+        0,
+        H - state.rightInnerPaddleHeight,
+      )
     }
   }
 
@@ -1565,6 +1751,33 @@ export function createPong(
     return gradient
   }
 
+  function getMaxInnerOffset() {
+    return Math.max(0, W / 2 - 40 - 2 * PADDLE_W)
+  }
+
+  function getInnerOffset() {
+    const offset = Number.isFinite(config.doubles.insideOffset)
+      ? config.doubles.insideOffset
+      : 0
+    return clamp(offset, 0, getMaxInnerOffset())
+  }
+
+  function getLeftOuterX() {
+    return 40
+  }
+
+  function getRightOuterX() {
+    return W - 40 - PADDLE_W
+  }
+
+  function getLeftInnerX() {
+    return W / 2 - getInnerOffset() - PADDLE_W
+  }
+
+  function getRightInnerX() {
+    return W / 2 + getInnerOffset()
+  }
+
   function draw() {
     ctx.fillStyle = ARENA_BACKGROUND
     ctx.fillRect(0, 0, W, H)
@@ -1589,9 +1802,39 @@ export function createPong(
 
     drawBallTrails()
 
+    const drawPaddleWithEdge = (
+      side: 'left' | 'right',
+      x: number,
+      y: number,
+      height: number,
+    ) => {
+      ctx.fillStyle = BALL_COLOR
+      ctx.fillRect(x, y, PADDLE_W, height)
+      ctx.fillStyle = side === 'left' ? LEFT_PADDLE_EDGE_COLOR : RIGHT_PADDLE_EDGE_COLOR
+      if (side === 'left') {
+        ctx.fillRect(x, y, PADDLE_EDGE_WIDTH, height)
+      } else {
+        ctx.fillRect(x + PADDLE_W - PADDLE_EDGE_WIDTH, y, PADDLE_EDGE_WIDTH, height)
+      }
+    }
+
+    const doublesEnabled = Boolean(config.doubles.enabled)
+    const leftOuterX = getLeftOuterX()
+    const rightOuterX = getRightOuterX()
+
+    if (doublesEnabled) {
+      const leftInnerX = getLeftInnerX()
+      const rightInnerX = getRightInnerX()
+      drawPaddleWithEdge('left', leftOuterX, state.leftY, state.leftPaddleHeight)
+      drawPaddleWithEdge('left', leftInnerX, state.leftInnerY, state.leftInnerPaddleHeight)
+      drawPaddleWithEdge('right', rightInnerX, state.rightInnerY, state.rightInnerPaddleHeight)
+      drawPaddleWithEdge('right', rightOuterX, state.rightY, state.rightPaddleHeight)
+    } else {
+      drawPaddleWithEdge('left', leftOuterX, state.leftY, state.leftPaddleHeight)
+      drawPaddleWithEdge('right', rightOuterX, state.rightY, state.rightPaddleHeight)
+    }
+
     ctx.fillStyle = BALL_COLOR
-    ctx.fillRect(40, state.leftY, PADDLE_W, state.leftPaddleHeight)
-    ctx.fillRect(W - 40 - PADDLE_W, state.rightY, PADDLE_W, state.rightPaddleHeight)
 
     const ballRadius = getBallRadius()
     ctx.beginPath()

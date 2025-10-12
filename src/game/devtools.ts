@@ -88,6 +88,11 @@ export interface ModifiersConfig {
   paddle: PaddleModifiers
 }
 
+export interface DoublesConfig {
+  enabled: boolean
+  insideOffset: number
+}
+
 export interface DevConfig {
   paddleSpeed: number
   leftPaddleSpeedMultiplier: number
@@ -97,6 +102,7 @@ export interface DevConfig {
   baseBallSpeed: number
   minHorizontalRatio: number
   speedIncreaseOnHit: number
+  doubles: DoublesConfig
   modifiers: ModifiersConfig
 }
 

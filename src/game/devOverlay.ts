@@ -13,6 +13,7 @@
   type MeteorModifier,
   type ChillyModifier,
   type ModifiersConfig,
+  type DoublesConfig,
 } from './devtools'
 
 let devOverlayStylesInjected = false
@@ -540,6 +541,33 @@ export function createDevOverlay(
     baseBody.className = 'dev-overlay__collapsible-body'
     baseSection.appendChild(baseBody)
 
+    let insideOffsetInput: HTMLInputElement | null = null
+
+    baseBody.appendChild(
+      createToggleControl('Doubles Mode', config.doubles.enabled, {
+        onChange: value => {
+          config.doubles.enabled = value
+          if (insideOffsetInput) insideOffsetInput.disabled = !value
+        },
+      }),
+    )
+
+    const insideOffsetControl = createSliderControl(
+      'Inside Paddle Offset',
+      config.doubles.insideOffset,
+      {
+        min: 0,
+        max: 220,
+        step: 1,
+        format: v => `${Math.round(v)} px`,
+        onInput: v => (config.doubles.insideOffset = v),
+      },
+    )
+
+    insideOffsetInput = insideOffsetControl.querySelector('input') as HTMLInputElement | null
+    if (insideOffsetInput) insideOffsetInput.disabled = !config.doubles.enabled
+    baseBody.appendChild(insideOffsetControl)
+
     baseBody.appendChild(
       createSliderControl('Paddle Speed', config.paddleSpeed, {
         min: 120,
@@ -1021,6 +1049,7 @@ function applyConfig(target: DevConfig, source: DevConfig) {
   target.baseBallSpeed = source.baseBallSpeed
   target.minHorizontalRatio = source.minHorizontalRatio
   target.speedIncreaseOnHit = source.speedIncreaseOnHit
+  target.doubles = deepClone(source.doubles)
   target.modifiers = deepClone(source.modifiers)
 }
 
@@ -1039,6 +1068,8 @@ function isDevConfig(value: unknown): value is DevConfig {
   ) {
     return false
   }
+
+  if (!isDoublesConfig(candidate.doubles)) return false
 
   const modifiers = candidate.modifiers as Partial<ModifiersConfig> | undefined
   if (!modifiers || typeof modifiers !== 'object') return false
@@ -1215,6 +1246,12 @@ function isChillyModifier(value: unknown): value is ChillyModifier {
   )
 }
 
+function isDoublesConfig(value: unknown): value is DoublesConfig {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<DoublesConfig>
+  return typeof candidate.enabled === 'boolean' && typeof candidate.insideOffset === 'number'
+}
+
 function createOverlayButton(label: string) {
   const button = document.createElement('button')
   button.type = 'button'
@@ -1255,6 +1292,37 @@ function createSliderControl(label: string, value: number, options: SliderOption
     const next = Number(input.value)
     options.onInput(next)
     valueEl.textContent = options.format(next)
+  })
+
+  wrapper.appendChild(title)
+  wrapper.appendChild(input)
+
+  return wrapper
+}
+
+interface ToggleOptions {
+  onChange: (value: boolean) => void
+}
+
+function createToggleControl(label: string, value: boolean, options: ToggleOptions) {
+  const wrapper = document.createElement('label')
+  wrapper.className = 'dev-overlay__control'
+
+  const title = document.createElement('div')
+  title.className = 'dev-overlay__label'
+  title.textContent = label
+
+  const valueEl = document.createElement('span')
+  valueEl.className = 'dev-overlay__value'
+  valueEl.textContent = value ? 'On' : 'Off'
+  title.appendChild(valueEl)
+
+  const input = document.createElement('input')
+  input.type = 'checkbox'
+  input.checked = value
+  input.addEventListener('change', () => {
+    options.onChange(input.checked)
+    valueEl.textContent = input.checked ? 'On' : 'Off'
   })
 
   wrapper.appendChild(title)
