@@ -18,7 +18,7 @@ const emitTick = createTickEmitter(runtime)
 
 const game = createPong(canvas, undefined, {
   onTick: (dt) => emitTick({ type: 'tick', dt }),
-})
+}, runtime.mods)
 
 type FullscreenCapableElement = HTMLElement & {
   webkitRequestFullscreen?: () => Promise<void>

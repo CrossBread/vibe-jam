@@ -8,6 +8,7 @@ import {
   type GravityWellModifier,
 } from './devtools'
 import { createDevOverlay, showOverlay, toggleOverlay } from './devOverlay'
+import type { ModManager } from './mods/manager'
 import { createScheduler } from '../engine/scheduler'
 import { createArenaSystem } from './systems/arenaSystem'
 import {
@@ -138,6 +139,7 @@ export function createPong(
   canvas: HTMLCanvasElement,
   options: PongOptions = {},
   hooks: PongRuntimeHooks = {},
+  modManager?: ModManager,
 ): PongAPI {
   const context = canvas.getContext('2d')
   if (!context) throw new Error('Canvas 2D context is required')
@@ -175,6 +177,7 @@ export function createPong(
 
   const overlay = createDevOverlay(config, defaults, {
     onDockChange: () => syncOverlayLayout(),
+    modManager,
   })
   container?.appendChild(overlay)
   syncOverlayLayout()

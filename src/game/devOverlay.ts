@@ -14,11 +14,14 @@
   type ChillyModifier,
   type ModifiersConfig,
 } from './devtools'
+import type { GameMod } from './mods/mod.types'
+import type { ModManager } from './mods/manager'
 
 let devOverlayStylesInjected = false
 
 interface DevOverlayOptions {
   onDockChange?: (docked: boolean) => void
+  modManager?: ModManager
 }
 
 function ensureDevOverlayStyles() {
@@ -192,6 +195,70 @@ function ensureDevOverlayStyles() {
       padding-top: 12px;
       margin-top: 12px;
       border-top: 1px solid rgba(148, 163, 184, 0.35);
+    }
+    .dev-overlay__tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .dev-overlay__tab-list {
+      display: flex;
+      gap: 8px;
+    }
+    .dev-overlay__tab {
+      flex: 0 0 auto;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(30, 41, 59, 0.6);
+      color: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+      font-family: inherit;
+      line-height: 1;
+    }
+    .dev-overlay__tab:hover {
+      border-color: rgba(148, 163, 184, 0.6);
+    }
+    .dev-overlay__tab:focus-visible {
+      outline: 2px solid rgba(148, 163, 184, 0.6);
+      outline-offset: 2px;
+    }
+    .dev-overlay__tab--active {
+      background: rgba(59, 130, 246, 0.25);
+      border-color: rgba(59, 130, 246, 0.6);
+      color: rgba(226, 232, 240, 0.95);
+    }
+    .dev-overlay__tab-panels {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .dev-overlay__tab-panel {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .dev-overlay__tab-panel--active {
+      display: flex;
+    }
+    .dev-overlay__empty {
+      margin: 0;
+      color: rgba(226, 232, 240, 0.6);
+      font-size: 12px;
+      font-style: italic;
+    }
+    .dev-overlay__meta {
+      margin: 0;
+      color: rgba(226, 232, 240, 0.65);
+      font-size: 11px;
+    }
+    .dev-overlay__meta + .dev-overlay__meta {
+      margin-top: 4px;
     }
     .dev-overlay__section-title {
       font-size: 12px;
@@ -378,6 +445,16 @@ function ensureDevOverlayStyles() {
   devOverlayStylesInjected = true
 }
 
+function formatModName(id: string): string {
+  const segments = id.split('.')
+  const lastSegment = segments[segments.length - 1] ?? id
+  return lastSegment
+    .split(/[-_]/g)
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
 export function createDevOverlay(
   config: DevConfig,
   defaults: DevConfig,
@@ -389,7 +466,7 @@ export function createDevOverlay(
   overlay.className = 'dev-overlay'
   overlay.setAttribute('aria-hidden', 'true')
 
-  const { onDockChange } = options
+  const { onDockChange, modManager } = options
 
   const title = document.createElement('div')
   title.className = 'dev-overlay__title'
@@ -452,6 +529,83 @@ export function createDevOverlay(
   const arenaSection = document.createElement('div')
   arenaSection.className = 'dev-overlay__section'
 
+  const modifiersSection = document.createElement('div')
+  modifiersSection.className = 'dev-overlay__section'
+
+  const modifiersTitle = document.createElement('div')
+  modifiersTitle.className = 'dev-overlay__section-title'
+  modifiersTitle.textContent = 'Modifiers'
+  modifiersSection.appendChild(modifiersTitle)
+
+  const modifiersTabs = document.createElement('div')
+  modifiersTabs.className = 'dev-overlay__tabs'
+
+  const tabList = document.createElement('div')
+  tabList.className = 'dev-overlay__tab-list'
+
+  const v1TabButton = document.createElement('button')
+  v1TabButton.type = 'button'
+  v1TabButton.className = 'dev-overlay__tab dev-overlay__tab--active'
+  v1TabButton.textContent = 'V1'
+
+  const v2TabButton = document.createElement('button')
+  v2TabButton.type = 'button'
+  v2TabButton.className = 'dev-overlay__tab'
+  v2TabButton.textContent = 'V2'
+
+  tabList.appendChild(v1TabButton)
+  tabList.appendChild(v2TabButton)
+
+  const tabPanels = document.createElement('div')
+  tabPanels.className = 'dev-overlay__tab-panels'
+
+  const v1Panel = document.createElement('div')
+  v1Panel.className = 'dev-overlay__tab-panel dev-overlay__tab-panel--active'
+
+  const v2Panel = document.createElement('div')
+  v2Panel.className = 'dev-overlay__tab-panel'
+
+  v1Panel.appendChild(paddleSection)
+  v1Panel.appendChild(ballSection)
+  v1Panel.appendChild(arenaSection)
+
+  const v2PaddleSection = document.createElement('div')
+  v2PaddleSection.className = 'dev-overlay__section'
+
+  const v2BallSection = document.createElement('div')
+  v2BallSection.className = 'dev-overlay__section'
+
+  const v2ArenaSection = document.createElement('div')
+  v2ArenaSection.className = 'dev-overlay__section'
+
+  v2Panel.appendChild(v2PaddleSection)
+  v2Panel.appendChild(v2BallSection)
+  v2Panel.appendChild(v2ArenaSection)
+
+  tabPanels.appendChild(v1Panel)
+  tabPanels.appendChild(v2Panel)
+
+  modifiersTabs.appendChild(tabList)
+  modifiersTabs.appendChild(tabPanels)
+
+  modifiersSection.appendChild(modifiersTabs)
+
+  const tabs = [
+    { button: v1TabButton, panel: v1Panel },
+    { button: v2TabButton, panel: v2Panel },
+  ]
+
+  function activateTab(index: number) {
+    tabs.forEach((tab, i) => {
+      tab.button.classList.toggle('dev-overlay__tab--active', i === index)
+      tab.panel.classList.toggle('dev-overlay__tab-panel--active', i === index)
+    })
+  }
+
+  v1TabButton.addEventListener('click', () => activateTab(0))
+  v2TabButton.addEventListener('click', () => activateTab(1))
+  activateTab(0)
+
   const buttons = document.createElement('div')
   buttons.className = 'dev-overlay__buttons'
 
@@ -479,6 +633,9 @@ export function createDevOverlay(
     paddleSection.innerHTML = ''
     ballSection.innerHTML = ''
     arenaSection.innerHTML = ''
+    v2PaddleSection.innerHTML = ''
+    v2BallSection.innerHTML = ''
+    v2ArenaSection.innerHTML = ''
     collapsibleSections.length = 0
 
     function createModifierDetails<T extends ModifierBase>(
@@ -947,6 +1104,131 @@ export function createDevOverlay(
       details.appendChild(body)
       modifiersList.appendChild(details)
     }
+
+    function createModManagerDetails(mod: GameMod): HTMLDetailsElement {
+      const details = document.createElement('details')
+      details.className = 'dev-overlay__modifier'
+      details.open = true
+      collapsibleSections.push(details)
+
+      const summary = document.createElement('summary')
+
+      const summaryHeader = document.createElement('div')
+      summaryHeader.className = 'dev-overlay__modifier-header'
+
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.className = 'dev-overlay__modifier-toggle'
+      toggle.checked = modManager?.isActive(mod.id) ?? false
+      toggle.addEventListener('click', event => event.stopPropagation())
+      toggle.addEventListener('change', () => {
+        if (!modManager) return
+        const shouldEnable = toggle.checked
+        try {
+          if (shouldEnable) {
+            modManager.activate(mod.id)
+            setStatus(`${formatModName(mod.id)} activated.`)
+          } else {
+            modManager.deactivate(mod.id)
+            setStatus(`${formatModName(mod.id)} deactivated.`)
+          }
+        } catch (error) {
+          console.error(error)
+          toggle.checked = modManager.isActive(mod.id)
+          const message = error instanceof Error ? error.message : 'Failed to toggle mod.'
+          setStatus(message, 'error')
+        }
+      })
+
+      const summaryLabel = document.createElement('span')
+      summaryLabel.className = 'dev-overlay__modifier-name'
+      summaryLabel.textContent = formatModName(mod.id)
+
+      summaryHeader.appendChild(toggle)
+      summaryHeader.appendChild(summaryLabel)
+
+      summary.appendChild(summaryHeader)
+      details.appendChild(summary)
+
+      const body = document.createElement('div')
+      body.className = 'dev-overlay__modifier-body'
+
+      const metaEntries: Array<[string, string]> = [['ID', mod.id]]
+      if (mod.tags?.length) {
+        metaEntries.push(['Tags', mod.tags.join(', ')])
+      }
+      if (mod.requires?.length) {
+        metaEntries.push(['Requires', mod.requires.join(', ')])
+      }
+      if (mod.conflictsWith?.length) {
+        metaEntries.push(['Conflicts', mod.conflictsWith.join(', ')])
+      }
+
+      metaEntries.forEach(([label, value]) => {
+        const meta = document.createElement('p')
+        meta.className = 'dev-overlay__meta'
+        meta.textContent = `${label}: ${value}`
+        body.appendChild(meta)
+      })
+
+      details.appendChild(body)
+      return details
+    }
+
+    const groupedMods: Record<'paddle' | 'ball' | 'arena', GameMod[]> = {
+      paddle: [],
+      ball: [],
+      arena: [],
+    }
+
+    if (modManager) {
+      for (const mod of modManager.all()) {
+        if (mod.kind === 'paddle') {
+          groupedMods.paddle.push(mod)
+        } else if (mod.kind === 'ball') {
+          groupedMods.ball.push(mod)
+        } else if (mod.kind === 'arena') {
+          groupedMods.arena.push(mod)
+        }
+      }
+    }
+
+    const v2Sections: Array<[HTMLDivElement, string, GameMod[]]> = [
+      [v2PaddleSection, 'Paddle Modifiers', groupedMods.paddle],
+      [v2BallSection, 'Ball Modifiers', groupedMods.ball],
+      [v2ArenaSection, 'Arena Modifiers', groupedMods.arena],
+    ]
+
+    for (const [section, title, mods] of v2Sections) {
+      const sectionTitle = document.createElement('div')
+      sectionTitle.className = 'dev-overlay__section-title'
+      sectionTitle.textContent = title
+      section.appendChild(sectionTitle)
+
+      if (!modManager) {
+        const message = document.createElement('p')
+        message.className = 'dev-overlay__empty'
+        message.textContent = 'Mod controls unavailable in this build.'
+        section.appendChild(message)
+        continue
+      }
+
+      if (mods.length === 0) {
+        const message = document.createElement('p')
+        message.className = 'dev-overlay__empty'
+        message.textContent = 'No mods available.'
+        section.appendChild(message)
+        continue
+      }
+
+      const list = document.createElement('div')
+      list.className = 'dev-overlay__modifiers'
+      section.appendChild(list)
+
+      for (const mod of mods) {
+        list.appendChild(createModManagerDetails(mod))
+      }
+    }
   }
 
   const copyButton = createOverlayButton('Copy to Clipboard')
@@ -997,9 +1279,7 @@ export function createDevOverlay(
   buttons.appendChild(buttonsRow)
 
   content.appendChild(controls)
-  content.appendChild(paddleSection)
-  content.appendChild(ballSection)
-  content.appendChild(arenaSection)
+  content.appendChild(modifiersSection)
 
   overlay.appendChild(title)
   overlay.appendChild(content)
