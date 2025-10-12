@@ -12,6 +12,7 @@
   type SnowballModifier,
   type MeteorModifier,
   type ChillyModifier,
+  type BuckToothModifier,
   type ModifiersConfig,
 } from './devtools'
 import type { GameMod } from './mods/mod.types'
@@ -805,40 +806,61 @@ export function createDevOverlay(
     paddleList.className = 'dev-overlay__modifiers'
     paddleSection.appendChild(paddleList)
 
-    for (const [, modifier] of getPaddleModifiersEntries(config.modifiers.paddle)) {
-      paddleList.appendChild(
-        createModifierDetails(modifier, body => {
-          body.appendChild(
-            createSliderControl('Starting Height', modifier.startingHeight, {
-              min: 60,
-              max: 200,
-              step: 1,
-              format: v => `${Math.round(v)} px`,
-              onInput: v => (modifier.startingHeight = v),
-            }),
-          )
+    for (const [key, modifier] of getPaddleModifiersEntries(config.modifiers.paddle)) {
+      if (key === 'chilly') {
+        const chilly = modifier as ChillyModifier
+        paddleList.appendChild(
+          createModifierDetails(chilly, body => {
+            body.appendChild(
+              createSliderControl('Starting Height', chilly.startingHeight, {
+                min: 60,
+                max: 200,
+                step: 1,
+                format: v => `${Math.round(v)} px`,
+                onInput: v => (chilly.startingHeight = v),
+              }),
+            )
 
-          body.appendChild(
-            createSliderControl('Shrink Per Return', modifier.shrinkAmount, {
-              min: 0,
-              max: 20,
-              step: 1,
-              format: v => `${Math.round(v)} px`,
-              onInput: v => (modifier.shrinkAmount = v),
-            }),
-          )
+            body.appendChild(
+              createSliderControl('Shrink Per Return', chilly.shrinkAmount, {
+                min: 0,
+                max: 20,
+                step: 1,
+                format: v => `${Math.round(v)} px`,
+                onInput: v => (chilly.shrinkAmount = v),
+              }),
+            )
 
-          body.appendChild(
-            createSliderControl('Minimum Height', modifier.minimumHeight, {
-              min: 40,
-              max: 140,
-              step: 1,
-              format: v => `${Math.round(v)} px`,
-              onInput: v => (modifier.minimumHeight = v),
-            }),
-          )
-        }),
-      )
+            body.appendChild(
+              createSliderControl('Minimum Height', chilly.minimumHeight, {
+                min: 40,
+                max: 140,
+                step: 1,
+                format: v => `${Math.round(v)} px`,
+                onInput: v => (chilly.minimumHeight = v),
+              }),
+            )
+          }),
+        )
+        continue
+      }
+
+      if (key === 'buckTooth') {
+        const buckTooth = modifier as BuckToothModifier
+        paddleList.appendChild(
+          createModifierDetails(buckTooth, body => {
+            body.appendChild(
+              createSliderControl('Gap Size', buckTooth.gapSize, {
+                min: 0,
+                max: 160,
+                step: 1,
+                format: v => `${Math.round(v)} px`,
+                onInput: v => (buckTooth.gapSize = v),
+              }),
+            )
+          }),
+        )
+      }
     }
 
     const ballTitle = document.createElement('div')

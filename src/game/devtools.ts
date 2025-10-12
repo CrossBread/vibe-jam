@@ -13,7 +13,7 @@ export const GRAVITY_WELL_KEYS = [
 export type GravityWellKey = (typeof GRAVITY_WELL_KEYS)[number]
 
 export const BALL_MODIFIER_KEYS = ['kite', 'bumShuffle', 'pollok', 'snowball', 'meteor'] as const
-export const PADDLE_MODIFIER_KEYS = ['chilly'] as const
+export const PADDLE_MODIFIER_KEYS = ['chilly', 'buckTooth'] as const
 
 export type BallModifierKey = (typeof BALL_MODIFIER_KEYS)[number]
 export type PaddleModifierKey = (typeof PADDLE_MODIFIER_KEYS)[number]
@@ -78,8 +78,13 @@ export interface ChillyModifier extends ModifierBase {
   minimumHeight: number
 }
 
+export interface BuckToothModifier extends ModifierBase {
+  gapSize: number
+}
+
 export type PaddleModifiers = {
   chilly: ChillyModifier
+  buckTooth: BuckToothModifier
 }
 
 export interface ModifiersConfig {

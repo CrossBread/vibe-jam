@@ -142,6 +142,12 @@
         "startingHeight": 132,
         "shrinkAmount": 6,
         "minimumHeight": 78
+      },
+      "buckTooth": {
+        "name": "Buck Tooth",
+        "description": "Split paddles with a gap in the middle",
+        "enabled": false,
+        "gapSize": 42
       }
     }
   }

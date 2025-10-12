@@ -8,17 +8,6 @@ import {
   type GravityWellModifier,
 } from './devtools'
 import { createDevOverlay, showOverlay, toggleOverlay } from './devOverlay'
-import type { ModManager } from './mods/manager'
-import { createScheduler } from '../engine/scheduler'
-import { createArenaSystem } from './systems/arenaSystem'
-import {
-  createPaddleSystem,
-  type GamepadInput,
-} from './systems/paddleSystem'
-import {
-  createBallSystem,
-  type ActiveGravityWell,
-} from './systems/ballSystem'
 
 export interface PongState {
   leftScore: number
@@ -66,10 +55,6 @@ export interface PongOptions {
   announcementFadeDuration?: number
 }
 
-export interface PongRuntimeHooks {
-  onTick?(dt: number): void
-}
-
 type KeySet = Record<string, boolean>
 
 interface MovingWellState {
@@ -81,6 +66,16 @@ interface MovingWellState {
   hasTarget: boolean
 }
 
+interface ActiveGravityWell {
+  key: GravityWellKey
+  x: number
+  y: number
+  gravityStrength: number
+  gravityFalloff: number // squared falloff radius used for force calculations
+  radius: number
+  positiveTint: string
+  negativeTint: string
+}
 
 interface StoredWell {
   x: number
@@ -135,11 +130,14 @@ interface PaddleHeightOptions {
   preserveCenter?: boolean
 }
 
+interface PaddleSegment {
+  top: number
+  height: number
+}
+
 export function createPong(
   canvas: HTMLCanvasElement,
   options: PongOptions = {},
-  hooks: PongRuntimeHooks = {},
-  modManager?: ModManager,
 ): PongAPI {
   const context = canvas.getContext('2d')
   if (!context) throw new Error('Canvas 2D context is required')
@@ -177,7 +175,6 @@ export function createPong(
 
   const overlay = createDevOverlay(config, defaults, {
     onDockChange: () => syncOverlayLayout(),
-    modManager,
   })
   container?.appendChild(overlay)
   syncOverlayLayout()
@@ -210,7 +207,17 @@ export function createPong(
   canvas.addEventListener('touchcancel', handleTouchEnd)
 
   const keys: KeySet = {}
-  const aiState = { left: true, right: true }
+  let leftAIEnabled = true
+  let rightAIEnabled = true
+
+  interface GamepadInput {
+    leftAxis: number
+    leftUp: boolean
+    leftDown: boolean
+    rightAxis: number
+    rightUp: boolean
+    rightDown: boolean
+  }
 
   const GAMEPAD_DEADZONE = 0.2
 
@@ -222,8 +229,6 @@ export function createPong(
     rightUp: false,
     rightDown: false,
   }
-
-  let latestGamepadInput: GamepadInput = defaultGamepadInput
 
   function withDeadzone(value: number, deadzone = GAMEPAD_DEADZONE): number {
     return Math.abs(value) < deadzone ? 0 : value
@@ -278,8 +283,8 @@ export function createPong(
       }
       keys[e.key] = true
       const key = e.key.toLowerCase()
-      if (key === 'w' || key === 's') aiState.left = false
-      if (key === 'arrowup' || key === 'arrowdown') aiState.right = false
+      if (key === 'w' || key === 's') leftAIEnabled = false
+      if (key === 'arrowup' || key === 'arrowdown') rightAIEnabled = false
     })
     window.addEventListener('keyup', (e) => (keys[e.key] = false))
   }
@@ -301,8 +306,8 @@ export function createPong(
       const control = createTouchControl(touch.identifier, x, y)
       if (!control) continue
       activeTouches.set(touch.identifier, control)
-      if (control.side === 'left') aiState.left = false
-      else aiState.right = false
+      if (control.side === 'left') leftAIEnabled = false
+      else rightAIEnabled = false
     }
 
     recalculateDirectDirections()
@@ -516,7 +521,9 @@ export function createPong(
   let irelandNeedsRegeneration = true
   let activeGravityWells: ActiveGravityWell[] = []
   let announcement: Announcement | null = null
-  let lastActiveArenaModifiers = new Set<GravityWellKey>()
+  let lastEnabledArenaModifiers = new Set<GravityWellKey>(
+    getEnabledArenaModifierKeys(config.modifiers.arena),
+  )
   let activeModKey: GravityWellKey | null = null
   const kiteTrail: TrailPoint[] = []
   const bumShuffleTrail: TrailPoint[] = []
@@ -527,62 +534,8 @@ export function createPong(
   let ballTravelDistance = 0
 
   initializeActiveModState()
-  lastActiveArenaModifiers = new Set(getActiveArenaModifierKeys())
   resetBallSize()
   initializePaddleHeights(true)
-
-  const scheduler = createScheduler()
-
-  const arenaSystem = createArenaSystem({
-    updateMovingWellState,
-    updateDivotsState,
-    updateIrelandState,
-  })
-
-  const paddleSystem = createPaddleSystem({
-    state,
-    config,
-    aiState,
-    keys,
-    touchControls,
-    getPaddleSpeedMultiplier,
-    getPaddleHeight: (side) =>
-      side === 'left' ? leftPaddleHeight : rightPaddleHeight,
-    arenaHeight: H,
-    clamp,
-    getGamepadInput: () => latestGamepadInput,
-  })
-
-  const ballSystem = createBallSystem({
-    state,
-    width: W,
-    height: H,
-    paddleWidth: PADDLE_W,
-    getLeftPaddleHeight: () => leftPaddleHeight,
-    getRightPaddleHeight: () => rightPaddleHeight,
-    clamp,
-    getBallRadius,
-    applyBallSizeModifiers,
-    collectActiveGravityWells,
-    setActiveGravityWells: (wells) => {
-      activeGravityWells = wells
-    },
-    config: {
-      baseBallSpeed: () => config.baseBallSpeed,
-      minHorizontalRatio: () => config.minHorizontalRatio,
-      speedIncreaseOnHit: () => config.speedIncreaseOnHit,
-      winScore: () => WIN_SCORE,
-    },
-    handlePaddleReturn,
-    updateBallTrails,
-    clearDivotWells,
-    resetBall,
-    handlePointScored,
-  })
-
-  scheduler.register('preUpdate', arenaSystem)
-  scheduler.register('update', paddleSystem, 0)
-  scheduler.register('update', ballSystem, 10)
 
   function resetBall(toLeft: boolean) {
     state.ballX = W * 0.5
@@ -603,24 +556,24 @@ export function createPong(
     state.totalBites = 0
     state.completedBitesSinceLastPoint = 0
     completedBitesSinceLastPoint = 0
-    aiState.left = true
-    aiState.right = true
+    leftAIEnabled = true
+    rightAIEnabled = true
     for (const movingState of Object.values(movingWellStates)) {
       resetMovingWellState(movingState)
     }
     divotWells.length = 0
     irelandWells.length = 0
     irelandNeedsRegeneration = true
-    disableAllMods()
+    activeGravityWells = []
     announcement = null
-    lastActiveArenaModifiers = new Set()
+    lastEnabledArenaModifiers = new Set<GravityWellKey>(
+      getEnabledArenaModifierKeys(config.modifiers.arena),
+    )
     clearKiteTrail()
     clearBumShuffleTrail()
     clearPollokTrail()
     lastReturner = null
     initializePaddleHeights(true)
-    initializeActiveModState()
-    lastActiveArenaModifiers = new Set(getActiveArenaModifierKeys())
     resetBall(Math.random() < 0.5)
   }
 
@@ -660,23 +613,196 @@ export function createPong(
   }
 
   function tick(dt: number) {
-    hooks.onTick?.(dt)
-
     updateAnnouncement(dt)
     checkModifierAnnouncements()
     updatePaddleModifierState()
-    syncActiveModAvailability()
 
-    latestGamepadInput = getGamepadInput()
+    const gamepadInput = getGamepadInput()
 
     if (state.winner) {
-      if (isRestartInputActive(latestGamepadInput)) {
+      if (isRestartInputActive(gamepadInput)) {
         reset()
       }
       return
     }
 
-    scheduler.tick(dt)
+    updateMovingWellState('blackMole', dt)
+    updateMovingWellState('gopher', dt)
+    updateDivotsState()
+    updateIrelandState()
+
+    const leftGamepadActive =
+      gamepadInput.leftAxis !== 0 || gamepadInput.leftUp || gamepadInput.leftDown
+    const rightGamepadActive =
+      gamepadInput.rightAxis !== 0 || gamepadInput.rightUp || gamepadInput.rightDown
+
+    if (leftGamepadActive) leftAIEnabled = false
+    if (rightGamepadActive) rightAIEnabled = false
+
+    // Controls
+    const leftPaddleSpeed = config.paddleSpeed * getPaddleSpeedMultiplier('left')
+    const rightPaddleSpeed = config.paddleSpeed * getPaddleSpeedMultiplier('right')
+
+    if (leftAIEnabled) {
+      const target = state.ballY - leftPaddleHeight / 2
+      const diff = target - state.leftY
+      const maxStep = leftPaddleSpeed * dt
+      state.leftY += clamp(diff, -maxStep, maxStep)
+    } else {
+      const keyDirection = (keys['w'] ? -1 : 0) + (keys['s'] ? 1 : 0)
+      let gamePadDirection = 0;
+      if (gamepadInput.leftAxis)
+        gamePadDirection += gamepadInput.leftAxis * config.paddleSpeed * dt
+      if (gamepadInput.leftUp) gamePadDirection -= config.paddleSpeed * dt
+      if (gamepadInput.leftDown) gamePadDirection += config.paddleSpeed * dt
+
+      const totalDirection = clamp(
+        keyDirection + touchControls.left.direction + gamePadDirection,
+        -1,
+        1,
+      )
+      state.leftY += totalDirection * config.paddleSpeed * dt
+      if (touchControls.left.relativeDelta !== 0) {
+        state.leftY += touchControls.left.relativeDelta
+        touchControls.left.relativeDelta = 0
+      }
+    }
+
+    if (rightAIEnabled) {
+      const target = state.ballY - rightPaddleHeight / 2
+      const diff = target - state.rightY
+      const maxStep = rightPaddleSpeed * dt
+      state.rightY += clamp(diff, -maxStep, maxStep)
+    } else {
+      const keyDirection = (keys['ArrowUp'] ? -1 : 0) + (keys['ArrowDown'] ? 1 : 0)
+      let gamePadDirection = 0;
+      if (gamepadInput.rightAxis)
+        gamePadDirection += gamepadInput.rightAxis * config.paddleSpeed * dt
+      if (gamepadInput.rightUp) gamePadDirection -= config.paddleSpeed * dt
+      if (gamepadInput.rightDown) gamePadDirection += config.paddleSpeed * dt
+      const totalDirection = clamp(
+        keyDirection + touchControls.right.direction + gamePadDirection,
+        -1,
+        1,
+      )
+      state.rightY += totalDirection * config.paddleSpeed * dt
+      if (touchControls.right.relativeDelta !== 0) {
+        state.rightY += touchControls.right.relativeDelta
+        touchControls.right.relativeDelta = 0
+      }
+    }
+
+    state.leftY = clamp(state.leftY, 0, H - leftPaddleHeight)
+    state.rightY = clamp(state.rightY, 0, H - rightPaddleHeight)
+
+    // Gravity well influence
+    activeGravityWells = collectActiveGravityWells()
+    const prevVx = state.vx
+    for (const well of activeGravityWells) {
+      const dx = well.x - state.ballX
+      const dy = well.y - state.ballY
+      const distSq = dx * dx + dy * dy
+      const dist = Math.sqrt(distSq) || 1
+      const force = well.gravityStrength / (distSq + well.gravityFalloff)
+      const ax = (dx / dist) * force
+      const ay = (dy / dist) * force
+      state.vx += ax * dt
+      state.vy += ay * dt
+    }
+
+    if (prevVx !== 0) {
+      const direction = Math.sign(prevVx)
+      const minHorizontalSpeed = config.baseBallSpeed * config.minHorizontalRatio
+      const minSpeed = minHorizontalSpeed * direction
+      if (state.vx * direction < minHorizontalSpeed) {
+        state.vx = minSpeed
+      }
+    }
+
+    const speed = Math.hypot(state.vx, state.vy)
+
+    // Move ball
+    state.ballX += state.vx * dt
+    state.ballY += state.vy * dt
+
+    applyBallSizeModifiers(speed * dt)
+
+    let radius = getBallRadius()
+
+    // Top/Bottom bounce
+    if (state.ballY < radius) {
+      state.ballY = radius
+      state.vy *= -1
+    }
+    if (state.ballY > H - radius) {
+      state.ballY = H - radius
+      state.vy *= -1
+    }
+
+    const leftSegments = getPaddleSegments('left')
+    if (
+      leftSegments.length > 0 &&
+      state.ballX - radius < 40 + PADDLE_W &&
+      state.ballX - radius > 40
+    ) {
+      const segment = findSegmentCollision(leftSegments, state.ballY)
+      if (segment) {
+        state.ballX = 40 + PADDLE_W + radius
+        const halfHeight = segment.height / 2
+        const rel =
+          halfHeight > 0
+            ? clamp((state.ballY - (segment.top + halfHeight)) / halfHeight, -1, 1)
+            : 0
+        const angle = rel * 0.8
+        const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
+        state.vx = Math.cos(angle) * reboundSpeed
+        state.vy = Math.sin(angle) * reboundSpeed
+        handlePaddleReturn('left')
+        radius = getBallRadius()
+      }
+    }
+
+    const rightSegments = getPaddleSegments('right')
+    if (
+      rightSegments.length > 0 &&
+      state.ballX + radius > W - 40 - PADDLE_W &&
+      state.ballX + radius < W - 40
+    ) {
+      const segment = findSegmentCollision(rightSegments, state.ballY)
+      if (segment) {
+        state.ballX = W - 40 - PADDLE_W - radius
+        const halfHeight = segment.height / 2
+        const rel =
+          halfHeight > 0
+            ? clamp((state.ballY - (segment.top + halfHeight)) / halfHeight, -1, 1)
+            : 0
+        const angle = Math.PI - rel * 0.8
+        const reboundSpeed = Math.hypot(state.vx, state.vy) * config.speedIncreaseOnHit
+        state.vx = Math.cos(angle) * reboundSpeed
+        state.vy = Math.sin(angle) * reboundSpeed
+        handlePaddleReturn('right')
+        radius = getBallRadius()
+      }
+    }
+
+    updateBallTrails()
+
+    // Score
+    if (state.ballX < -radius) {
+      state.rightScore++
+      if (state.rightScore >= WIN_SCORE) state.winner = 'right'
+      clearDivotWells()
+      resetBall(false)
+      handlePointScored()
+      radius = getBallRadius()
+    }
+    if (state.ballX > W + radius) {
+      state.leftScore++
+      if (state.leftScore >= WIN_SCORE) state.winner = 'left'
+      clearDivotWells()
+      resetBall(true)
+      handlePointScored()
+    }
   }
 
   function isRestartInputActive(gamepadInput: GamepadInput): boolean {
@@ -711,22 +837,22 @@ export function createPong(
   }
 
   function checkModifierAnnouncements() {
-    const activeEntries = getActiveArenaModifiers()
-    const activeKeys = new Set<GravityWellKey>()
-    const newlyActivated: string[] = []
+    const enabledEntries = getEnabledArenaModifiers(config.modifiers.arena)
+    const enabledKeys = new Set<GravityWellKey>()
+    const newlyEnabled: string[] = []
 
-    for (const [key, modifier] of activeEntries) {
-      activeKeys.add(key)
-      if (!lastActiveArenaModifiers.has(key)) {
-        newlyActivated.push(modifier.name)
+    for (const [key, modifier] of enabledEntries) {
+      enabledKeys.add(key)
+      if (!lastEnabledArenaModifiers.has(key)) {
+        newlyEnabled.push(modifier.name)
       }
     }
 
-    if (newlyActivated.length > 0) {
-      showAnnouncement(newlyActivated)
+    if (newlyEnabled.length > 0) {
+      showAnnouncement(newlyEnabled)
     }
 
-    lastActiveArenaModifiers = activeKeys
+    lastEnabledArenaModifiers = enabledKeys
   }
 
   function showAnnouncement(lines: string[]) {
@@ -745,28 +871,14 @@ export function createPong(
     }
   }
 
-  function getAvailableArenaModifiers(
+  function getEnabledArenaModifiers(
     arena: ArenaModifiers,
   ): [GravityWellKey, GravityWellModifier][] {
     return getGravityWellsEntries(arena).filter(([, modifier]) => modifier.enabled)
   }
 
-  function getAvailableArenaModifierKeys(arena: ArenaModifiers): GravityWellKey[] {
-    return getAvailableArenaModifiers(arena).map(([key]) => key)
-  }
-
-  function getActiveArenaModifiers(): [GravityWellKey, GravityWellModifier][] {
-    if (activeModKey === null) return []
-    const modifier = config.modifiers.arena[activeModKey]
-    return modifier ? [[activeModKey, modifier]] : []
-  }
-
-  function getActiveArenaModifierKeys(): GravityWellKey[] {
-    return activeModKey === null ? [] : [activeModKey]
-  }
-
-  function isArenaModifierActive(key: GravityWellKey): boolean {
-    return activeModKey === key
+  function getEnabledArenaModifierKeys(arena: ArenaModifiers): GravityWellKey[] {
+    return getEnabledArenaModifiers(arena).map(([key]) => key)
   }
 
   function handlePaddleReturn(side: 'left' | 'right') {
@@ -800,7 +912,7 @@ export function createPong(
     clearBumShuffleTrail()
 
     const modifier = config.modifiers.arena.ireland as IrelandModifier
-    if (!isArenaModifierActive('ireland')) {
+    if (!modifier.enabled) {
       irelandWells.length = 0
       return
     }
@@ -994,6 +1106,48 @@ export function createPong(
     }
   }
 
+  function getBuckToothGap(
+    side: 'left' | 'right',
+    modifier = config.modifiers.paddle.buckTooth,
+  ) {
+    if (!modifier.enabled) return 0
+    const baseGap = Number.isFinite(modifier.gapSize) ? modifier.gapSize : 0
+    if (baseGap <= 0) return 0
+    const multiplier = getPaddleSizeMultiplier(side)
+    const scaledGap = Math.max(0, baseGap * multiplier)
+    const totalHeight = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+    return clamp(scaledGap, 0, totalHeight)
+  }
+
+  function getPaddleSegments(side: 'left' | 'right'): PaddleSegment[] {
+    const totalHeight = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+    const top = side === 'left' ? state.leftY : state.rightY
+    if (totalHeight <= 0) return []
+
+    const modifier = config.modifiers.paddle.buckTooth
+    if (!modifier.enabled) {
+      return [{ top, height: totalHeight }]
+    }
+
+    const gap = getBuckToothGap(side, modifier)
+    const segmentHeight = (totalHeight - gap) / 2
+    if (segmentHeight <= 0) return []
+
+    return [
+      { top, height: segmentHeight },
+      { top: top + segmentHeight + gap, height: segmentHeight },
+    ]
+  }
+
+  function findSegmentCollision(segments: PaddleSegment[], y: number): PaddleSegment | null {
+    for (const segment of segments) {
+      if (y > segment.top && y < segment.top + segment.height) {
+        return segment
+      }
+    }
+    return null
+  }
+
   function registerPipReturn() {
     state.totalPips += 1
     state.currentPips = ((state.totalPips - 1) % PIPS_PER_BITE) + 1
@@ -1010,36 +1164,40 @@ export function createPong(
   }
 
   function disableAllMods() {
-    if (activeModKey === null) return
+    let anyDisabled = false
+    for (const key of GRAVITY_WELL_KEYS) {
+      const modifier = config.modifiers.arena[key]
+      if (!modifier.enabled) continue
 
-    deactivateModifier(activeModKey)
+      modifier.enabled = false
+      anyDisabled = true
+
+      if (key === 'divots') clearDivotWells()
+      if (key === 'ireland') {
+        irelandWells.length = 0
+        irelandNeedsRegeneration = true
+      }
+      if (key === 'blackMole' || key === 'gopher') {
+        resetMovingWellState(movingWellStates[key])
+      }
+    }
+
+    if (anyDisabled) {
+      activeGravityWells = collectActiveGravityWells()
+    }
+
     activeModKey = null
-    activeGravityWells = []
-  }
-
-  function deactivateModifier(key: GravityWellKey) {
-    if (key === 'divots') clearDivotWells()
-    if (key === 'ireland') {
-      irelandWells.length = 0
-      irelandNeedsRegeneration = true
-    }
-    if (key === 'blackMole' || key === 'gopher') {
-      resetMovingWellState(movingWellStates[key])
-    }
   }
 
   function collectActiveGravityWells(): ActiveGravityWell[] {
-    if (activeModKey === null) return []
+    const wells: ActiveGravityWell[] = []
+    for (const [key, modifier] of getGravityWellsEntries(config.modifiers.arena)) {
+      if (!modifier.enabled) continue
 
-    const activeKey: GravityWellKey = activeModKey
-    const modifier = config.modifiers.arena[activeKey]
-    if (!modifier) return []
-
-    if (activeKey === 'blackMole' || activeKey === 'gopher') {
-      const state = movingWellStates[activeKey]
-      return [
-        {
-          key: activeKey,
+      if (key === 'blackMole' || key === 'gopher') {
+        const state = movingWellStates[key]
+        wells.push({
+          key,
           x: state.x,
           y: state.y,
           gravityStrength: modifier.gravityStrength,
@@ -1047,52 +1205,57 @@ export function createPong(
           radius: modifier.radius,
           positiveTint: modifier.positiveTint,
           negativeTint: modifier.negativeTint,
-        },
-      ]
-    }
+        })
+        continue
+      }
 
-    if (activeKey === 'divots') {
-      return divotWells.map(well => ({
-        key: activeKey,
-        x: well.x,
-        y: well.y,
-        gravityStrength: well.gravityStrength,
-        gravityFalloff: well.gravityFalloff,
-        radius: well.radius,
-        positiveTint: modifier.positiveTint,
-        negativeTint: modifier.negativeTint,
-      }))
-    }
+      if (key === 'divots') {
+        for (const well of divotWells) {
+          wells.push({
+            key,
+            x: well.x,
+            y: well.y,
+            gravityStrength: well.gravityStrength,
+            gravityFalloff: well.gravityFalloff,
+            radius: well.radius,
+            positiveTint: modifier.positiveTint,
+            negativeTint: modifier.negativeTint,
+          })
+        }
+        continue
+      }
 
-    if (activeKey === 'ireland') {
-      const wellsToRender =
-        irelandWells.length > 0
-          ? irelandWells
-          : [
-              {
-                x: W * 0.5,
-                y: H * 0.5,
-                gravityStrength: modifier.gravityStrength,
-                gravityFalloff: toGravityFalloffValue(modifier.gravityFalloff),
-                radius: modifier.radius,
-              },
-            ]
+      if (key === 'ireland') {
+        const wellsToRender =
+          irelandWells.length > 0
+            ? irelandWells
+            : [
+                {
+                  x: W * 0.5,
+                  y: H * 0.5,
+                  gravityStrength: modifier.gravityStrength,
+                  gravityFalloff: toGravityFalloffValue(modifier.gravityFalloff),
+                  radius: modifier.radius,
+                },
+              ]
 
-      return wellsToRender.map(well => ({
-        key: activeKey,
-        x: well.x,
-        y: well.y,
-        gravityStrength: well.gravityStrength,
-        gravityFalloff: well.gravityFalloff,
-        radius: well.radius,
-        positiveTint: modifier.positiveTint,
-        negativeTint: modifier.negativeTint,
-      }))
-    }
+        for (const well of wellsToRender) {
+          wells.push({
+            key,
+            x: well.x,
+            y: well.y,
+            gravityStrength: well.gravityStrength,
+            gravityFalloff: well.gravityFalloff,
+            radius: well.radius,
+            positiveTint: modifier.positiveTint,
+            negativeTint: modifier.negativeTint,
+          })
+        }
+        continue
+      }
 
-    return [
-      {
-        key: activeKey,
+      wells.push({
+        key,
         x: W * 0.5,
         y: H * 0.5,
         gravityStrength: modifier.gravityStrength,
@@ -1100,8 +1263,10 @@ export function createPong(
         radius: modifier.radius,
         positiveTint: modifier.positiveTint,
         negativeTint: modifier.negativeTint,
-      },
-    ]
+      })
+    }
+
+    return wells
   }
 
   function getBallRadius() {
@@ -1186,7 +1351,7 @@ export function createPong(
   function updateMovingWellState(key: MovingWellKey, dt: number) {
     const state = movingWellStates[key]
     const modifier = config.modifiers.arena[key]
-    if (!isArenaModifierActive(key)) {
+    if (!modifier.enabled) {
       resetMovingWellState(state)
       return
     }
@@ -1248,7 +1413,7 @@ export function createPong(
 
   function updateDivotsState() {
     const modifier = config.modifiers.arena.divots as DivotsModifier
-    if (!isArenaModifierActive('divots')) {
+    if (!modifier.enabled) {
       if (divotWells.length > 0) divotWells.length = 0
       return
     }
@@ -1261,7 +1426,7 @@ export function createPong(
 
   function updateIrelandState() {
     const modifier = config.modifiers.arena.ireland as IrelandModifier
-    if (!isArenaModifierActive('ireland')) {
+    if (!modifier.enabled) {
       if (irelandWells.length > 0) irelandWells.length = 0
       irelandNeedsRegeneration = true
       return
@@ -1319,7 +1484,7 @@ export function createPong(
 
   function spawnDivotWell() {
     const modifier = config.modifiers.arena.divots as DivotsModifier
-    if (!isArenaModifierActive('divots')) return
+    if (!modifier.enabled) return
 
     const maxDivots = Math.max(1, Math.floor(modifier.maxDivots ?? 12))
     const margin = Math.max(20, modifier.spawnMargin ?? modifier.radius ?? 0)
@@ -1354,31 +1519,40 @@ export function createPong(
   }
 
   function initializeActiveModState() {
-    const availableMods = getAvailableArenaModifierKeys(config.modifiers.arena)
-    if (availableMods.length === 0) {
+    const enabledMods = GRAVITY_WELL_KEYS.filter(key => config.modifiers.arena[key].enabled)
+    if (enabledMods.length === 0) {
       setActiveMod(pickRandomMod(null))
       return
     }
 
-    if (activeModKey && availableMods.includes(activeModKey)) {
-      setActiveMod(activeModKey)
+    if (enabledMods.length === 1) {
+      activeModKey = enabledMods[0]
       return
     }
 
-    setActiveMod(availableMods[0])
+    setActiveMod(enabledMods[0])
   }
 
   function setActiveMod(nextKey: GravityWellKey) {
-    if (activeModKey === nextKey) {
-      if (nextKey === 'ireland') {
-        irelandNeedsRegeneration = true
-      }
-      activeGravityWells = collectActiveGravityWells()
-      return
-    }
+    if (activeModKey === nextKey && config.modifiers.arena[nextKey].enabled) return
 
-    if (activeModKey !== null) {
-      deactivateModifier(activeModKey)
+    for (const key of GRAVITY_WELL_KEYS) {
+      const modifier = config.modifiers.arena[key]
+      const shouldEnable = key === nextKey
+      if (modifier.enabled === shouldEnable) continue
+
+      modifier.enabled = shouldEnable
+
+      if (!shouldEnable) {
+        if (key === 'divots') clearDivotWells()
+        if (key === 'ireland') {
+          irelandWells.length = 0
+          irelandNeedsRegeneration = true
+        }
+        if (key === 'blackMole' || key === 'gopher') {
+          resetMovingWellState(movingWellStates[key])
+        }
+      }
     }
 
     activeModKey = nextKey
@@ -1390,35 +1564,10 @@ export function createPong(
     activeGravityWells = collectActiveGravityWells()
   }
 
-  function syncActiveModAvailability() {
-    if (activeModKey !== null && !config.modifiers.arena[activeModKey].enabled) {
-      const available = getAvailableArenaModifierKeys(config.modifiers.arena).filter(
-        key => key !== activeModKey,
-      )
-      if (available.length === 0) {
-        disableAllMods()
-        return
-      }
-      setActiveMod(available[0])
-      return
-    }
-
-    if (activeModKey === null) {
-      const available = getAvailableArenaModifierKeys(config.modifiers.arena)
-      if (available.length > 0) {
-        setActiveMod(available[0])
-      }
-    }
-  }
-
   function pickRandomMod(exclude: GravityWellKey | null) {
-    const available = getAvailableArenaModifierKeys(config.modifiers.arena).filter(
-      key => key !== exclude,
-    )
-    const fallback = GRAVITY_WELL_KEYS.filter(key => key !== exclude)
-    const pool = available.length > 0 ? available : fallback
-    const finalPool = pool.length > 0 ? pool : GRAVITY_WELL_KEYS
-    return finalPool[Math.floor(Math.random() * finalPool.length)]
+    const available = GRAVITY_WELL_KEYS.filter(key => key !== exclude)
+    const pool = available.length > 0 ? available : GRAVITY_WELL_KEYS
+    return pool[Math.floor(Math.random() * pool.length)]
   }
 
   function resolveRange(
@@ -1497,8 +1646,12 @@ export function createPong(
     drawBallTrails()
 
     ctx.fillStyle = BALL_COLOR
-    ctx.fillRect(40, state.leftY, PADDLE_W, state.leftPaddleHeight)
-    ctx.fillRect(W - 40 - PADDLE_W, state.rightY, PADDLE_W, state.rightPaddleHeight)
+    for (const segment of getPaddleSegments('left')) {
+      ctx.fillRect(40, segment.top, PADDLE_W, segment.height)
+    }
+    for (const segment of getPaddleSegments('right')) {
+      ctx.fillRect(W - 40 - PADDLE_W, segment.top, PADDLE_W, segment.height)
+    }
 
     const ballRadius = getBallRadius()
     ctx.beginPath()
