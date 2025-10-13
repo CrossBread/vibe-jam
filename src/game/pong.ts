@@ -71,6 +71,13 @@ import { getGopherWells } from './mods/arena/gopher/gopherView'
 import { getBlackHoleWells } from './mods/arena/blackHole/blackHoleView'
 import { getSuperMassiveWells } from './mods/arena/superMassive/superMassiveView'
 import { getWhiteDwarfWells } from './mods/arena/whiteDwarf/whiteDwarfView'
+import {
+  createApparitionState,
+  resetApparitionStates as resetApparitionStateMap,
+  updateApparitionStates as updateApparitionStateMap,
+  type ApparitionState,
+} from './mods/paddle/apparition/apparitionModifier'
+import { getApparitionOpacity } from './mods/paddle/apparition/apparitionView'
 
 export interface PongState {
   leftScore: number
@@ -166,14 +173,6 @@ interface PaddleSegment {
   osteoIndex?: number
   cracked?: boolean
   broken?: boolean
-}
-
-type ApparitionPhase = 'visibleHold' | 'fadingOut' | 'hiddenHold' | 'fadingIn'
-
-interface ApparitionState {
-  phase: ApparitionPhase
-  timer: number
-  opacity: number
 }
 
 interface OutOfBodyTrailPoint {
@@ -616,8 +615,8 @@ export function createPong(
 
   type OutOfBodyLaneKey = 'outer' | 'inner'
   const paddleApparitionStates: Record<'left' | 'right', ApparitionState> = {
-    left: createInitialApparitionState(),
-    right: createInitialApparitionState(),
+    left: createApparitionState(),
+    right: createApparitionState(),
   }
   const outOfBodyTrails: Record<'left' | 'right', Record<OutOfBodyLaneKey, OutOfBodyTrailState>> = {
     left: {
@@ -712,7 +711,9 @@ export function createPong(
   initializeActiveModState()
   resetBallSize()
   initializePaddleHeights(true)
-  resetApparitionStates(true)
+  resetApparitionStateMap(paddleApparitionStates, config.modifiers.paddle.apparition, {
+    randomize: true,
+  })
   resetOutOfBodyTrails(true)
   resetBendyState(config.modifiers.paddle.bendy.enabled)
   syncPaddleMotionState()
@@ -804,7 +805,9 @@ export function createPong(
     rearmHadron()
     syncOsteoState(true)
     initializePaddleHeights(true)
-    resetApparitionStates(true)
+    resetApparitionStateMap(paddleApparitionStates, config.modifiers.paddle.apparition, {
+      randomize: true,
+    })
     resetOutOfBodyTrails(true)
     resetBendyState(config.modifiers.paddle.bendy.enabled)
     syncPaddleMotionState()
@@ -983,7 +986,11 @@ export function createPong(
 
     updatePaddleMotion(dt)
     updateOutOfBodyTrails(dt)
-    updateApparitionStates(dt)
+    updateApparitionStateMap(
+      paddleApparitionStates,
+      dt,
+      config.modifiers.paddle.apparition,
+    )
     updateBendyState(dt)
 
     // Gravity well influence
@@ -1371,7 +1378,9 @@ export function createPong(
 
     const apparitionEnabled = config.modifiers.paddle.apparition.enabled
     if (apparitionEnabled !== previousApparitionEnabled) {
-      resetApparitionStates(apparitionEnabled)
+      resetApparitionStateMap(paddleApparitionStates, config.modifiers.paddle.apparition, {
+        randomize: apparitionEnabled,
+      })
       previousApparitionEnabled = apparitionEnabled
     }
 
@@ -1495,163 +1504,6 @@ export function createPong(
     syncPaddleMotionForSide(side)
   }
 
-  function createInitialApparitionState(): ApparitionState {
-    return { phase: 'visibleHold', timer: 0, opacity: 1 }
-  }
-
-  function resetApparitionStates(randomize = false) {
-    const modifier = config.modifiers.paddle.apparition
-    const shouldRandomize = randomize && modifier.enabled
-    const visibleHold = Math.max(
-      0,
-      Number.isFinite(modifier.visibleHoldDuration) ? modifier.visibleHoldDuration : 3.2,
-    )
-    for (const side of ['left', 'right'] as const) {
-      const state = paddleApparitionStates[side]
-      state.phase = 'visibleHold'
-      state.timer = shouldRandomize && visibleHold > 0 ? Math.random() * visibleHold : 0
-      state.opacity = 1
-    }
-  }
-
-  interface ApparitionDurations {
-    fadeDuration: number
-    visibleHold: number
-    hiddenHold: number
-    minOpacity: number
-  }
-
-  function updateApparitionStates(dt: number) {
-    const modifier = config.modifiers.paddle.apparition
-    if (!modifier.enabled) {
-      for (const side of ['left', 'right'] as const) {
-        const state = paddleApparitionStates[side]
-        state.phase = 'visibleHold'
-        state.timer = 0
-        state.opacity = 1
-      }
-      return
-    }
-
-    const durations: ApparitionDurations = {
-      fadeDuration: Math.max(
-        0,
-        Number.isFinite(modifier.fadeDuration) ? modifier.fadeDuration : 0.8,
-      ),
-      visibleHold: Math.max(
-        0,
-        Number.isFinite(modifier.visibleHoldDuration) ? modifier.visibleHoldDuration : 3.2,
-      ),
-      hiddenHold: Math.max(
-        0,
-        Number.isFinite(modifier.hiddenHoldDuration) ? modifier.hiddenHoldDuration : 1.4,
-      ),
-      minOpacity: clamp01(
-        Number.isFinite(modifier.minOpacity) ? modifier.minOpacity : 0.05,
-      ),
-    }
-
-    for (const side of ['left', 'right'] as const) {
-      advanceApparitionState(paddleApparitionStates[side], dt, durations)
-    }
-  }
-
-  function advanceApparitionState(
-    state: ApparitionState,
-    dt: number,
-    durations: ApparitionDurations,
-  ) {
-    state.timer += dt
-    let iterations = 0
-    while (iterations < 8) {
-      iterations += 1
-      switch (state.phase) {
-        case 'visibleHold': {
-          const duration = durations.visibleHold
-          if (duration <= 0) {
-            state.phase = durations.fadeDuration > 0 ? 'fadingOut' : durations.hiddenHold > 0 ? 'hiddenHold' : 'fadingIn'
-            state.timer = Math.max(state.timer, 0)
-            continue
-          }
-          if (state.timer < duration) {
-            state.opacity = 1
-            return
-          }
-          state.timer -= duration
-          state.opacity = 1
-          state.phase = durations.fadeDuration > 0 ? 'fadingOut' : durations.hiddenHold > 0 ? 'hiddenHold' : 'fadingIn'
-          continue
-        }
-        case 'fadingOut': {
-          const duration = durations.fadeDuration
-          if (duration <= 0) {
-            state.phase = durations.hiddenHold > 0 ? 'hiddenHold' : 'fadingIn'
-            state.opacity = durations.minOpacity
-            state.timer = Math.max(state.timer, 0)
-            continue
-          }
-          if (state.timer < duration) {
-            const progress = clamp01(state.timer / duration)
-            state.opacity = 1 - (1 - durations.minOpacity) * progress
-            return
-          }
-          state.timer -= duration
-          state.opacity = durations.minOpacity
-          state.phase = durations.hiddenHold > 0 ? 'hiddenHold' : 'fadingIn'
-          continue
-        }
-        case 'hiddenHold': {
-          const duration = durations.hiddenHold
-          if (duration <= 0) {
-            state.phase = durations.fadeDuration > 0 ? 'fadingIn' : 'visibleHold'
-            state.timer = Math.max(state.timer, 0)
-            continue
-          }
-          if (state.timer < duration) {
-            state.opacity = durations.minOpacity
-            return
-          }
-          state.timer -= duration
-          state.opacity = durations.minOpacity
-          state.phase = durations.fadeDuration > 0 ? 'fadingIn' : 'visibleHold'
-          continue
-        }
-        case 'fadingIn': {
-          const duration = durations.fadeDuration
-          if (duration <= 0) {
-            state.phase = 'visibleHold'
-            state.opacity = 1
-            state.timer = Math.max(state.timer, 0)
-            continue
-          }
-          if (state.timer < duration) {
-            const progress = clamp01(state.timer / duration)
-            state.opacity = durations.minOpacity + (1 - durations.minOpacity) * progress
-            return
-          }
-          state.timer -= duration
-          state.opacity = 1
-          state.phase = 'visibleHold'
-          continue
-        }
-        default: {
-          state.phase = 'visibleHold'
-          state.timer = 0
-          state.opacity = 1
-          return
-        }
-      }
-    }
-
-    state.timer = 0
-    state.opacity = state.phase === 'hiddenHold' ? durations.minOpacity : 1
-  }
-
-  function getApparitionOpacity(side: 'left' | 'right') {
-    if (!config.modifiers.paddle.apparition.enabled) return 1
-    return clamp01(paddleApparitionStates[side].opacity)
-  }
-
   function createOutOfBodyTrailState(): OutOfBodyTrailState {
     return { points: [], sampleTimer: 0 }
   }
@@ -1752,7 +1604,11 @@ export function createPong(
   }
 
   function getPaddleOpacity(paddle: PhysicalPaddle) {
-    let opacity = getApparitionOpacity(paddle.side)
+    let opacity = getApparitionOpacity(
+      paddleApparitionStates,
+      paddle.side,
+      config.modifiers.paddle.apparition,
+    )
     if (config.modifiers.paddle.outOfBody.enabled && paddle.lane !== 'missile') {
       const modifier = config.modifiers.paddle.outOfBody
       const base = Number.isFinite(modifier.paddleOpacity) ? modifier.paddleOpacity : 0.2
