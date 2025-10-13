@@ -11,6 +11,7 @@ export const GRAVITY_WELL_KEYS = [
   'wonderland',
   'secondChances',
   'spaceInvaders',
+  'minesweeper',
   'ireland',
   'russianRoulette',
   'drinkMe',
@@ -95,6 +96,13 @@ export interface SpaceInvadersModifier extends GravityWellModifier {
   barricadeCount?: number
   barricadeSpacing?: number
   barricadeDistance?: number
+}
+
+export interface MinesweeperModifier extends GravityWellModifier {
+  gridSpacing?: number
+  squareSize?: number
+  rows?: number
+  columns?: number
 }
 
 export interface KiteModifier extends ModifierBase {

@@ -8,6 +8,7 @@ import {
   type GravityWellModifier,
   type SecondChancesModifier,
   type SpaceInvadersModifier,
+  type MinesweeperModifier,
 } from './devtools'
 import { createDevOverlay, showOverlay, toggleOverlay } from './devOverlay'
 import type { RGBColor } from './mods/ball/shared'
@@ -121,6 +122,15 @@ import {
   type SpaceInvadersState,
 } from './mods/arena/spaceInvaders/spaceInvadersModifier'
 import { drawSpaceInvadersBarricades } from './mods/arena/spaceInvaders/spaceInvadersView'
+import {
+  clearMinesweeperState,
+  createMinesweeperState,
+  maintainMinesweeperState,
+  resetMinesweeperState,
+  resolveMinesweeperCollision,
+  type MinesweeperState,
+} from './mods/arena/minesweeper/minesweeperModifier'
+import { drawMinesweeperSquares } from './mods/arena/minesweeper/minesweeperView'
 import {
   createApparitionState,
   resetApparitionStates as resetApparitionStateMap,
@@ -780,6 +790,7 @@ export function createPong(
   const teaPartyState: TeaPartyState = createTeaPartyState()
   const secondChancesState: SecondChancesState = createSecondChancesState()
   const spaceInvadersState: SpaceInvadersState = createSpaceInvadersState()
+  const minesweeperState: MinesweeperState = createMinesweeperState()
   let activeGravityWells: ActiveGravityWell[] = []
   let announcement: Announcement | null = null
   let lastEnabledArenaModifiers = new Set<GravityWellKey>(
@@ -794,6 +805,11 @@ export function createPong(
   maintainSpaceInvadersState(
     spaceInvadersState,
     getSpaceInvadersModifier(),
+    arenaDimensions,
+  )
+  maintainMinesweeperState(
+    minesweeperState,
+    getMinesweeperModifier(),
     arenaDimensions,
   )
   initializeActiveModState()
@@ -907,6 +923,7 @@ export function createPong(
     balls.length = 0
     resetSecondChancesShields(secondChancesState, getSecondChancesModifier())
     resetSpaceInvadersState(spaceInvadersState, getSpaceInvadersModifier(), arenaDimensions)
+    resetMinesweeperState(minesweeperState, getMinesweeperModifier(), arenaDimensions)
     if (config.modifiers.arena.russianRoulette.enabled) {
       spawnRussianRouletteBalls(toLeft)
     } else {
@@ -939,6 +956,7 @@ export function createPong(
     clearTeaPartyState(teaPartyState)
     clearSecondChancesState(secondChancesState)
     clearSpaceInvadersState(spaceInvadersState)
+    clearMinesweeperState(minesweeperState)
     activeGravityWells = []
     announcement = null
     lastEnabledArenaModifiers = new Set<GravityWellKey>(
@@ -961,6 +979,11 @@ export function createPong(
     maintainSpaceInvadersState(
       spaceInvadersState,
       getSpaceInvadersModifier(),
+      arenaDimensions,
+    )
+    maintainMinesweeperState(
+      minesweeperState,
+      getMinesweeperModifier(),
       arenaDimensions,
     )
     resetBall(Math.random() < 0.5)
@@ -1050,6 +1073,11 @@ export function createPong(
     maintainSpaceInvadersState(
       spaceInvadersState,
       getSpaceInvadersModifier(),
+      arenaDimensions,
+    )
+    maintainMinesweeperState(
+      minesweeperState,
+      getMinesweeperModifier(),
       arenaDimensions,
     )
 
@@ -1236,6 +1264,15 @@ export function createPong(
 
       handlePotionCollisions(ball)
 
+      const minesweeperResult = resolveMinesweeperCollision(
+        minesweeperState,
+        getMinesweeperModifier(),
+        ball,
+      )
+      if (minesweeperResult) {
+        radius = ball.radius
+      }
+
       const hitBarricade = resolveSpaceInvadersCollision(
         spaceInvadersState,
         getSpaceInvadersModifier(),
@@ -1347,6 +1384,10 @@ export function createPong(
 
   function getSpaceInvadersModifier(): SpaceInvadersModifier {
     return config.modifiers.arena.spaceInvaders as SpaceInvadersModifier
+  }
+
+  function getMinesweeperModifier(): MinesweeperModifier {
+    return config.modifiers.arena.minesweeper as MinesweeperModifier
   }
 
   function showAnnouncement(lines: string[]) {
@@ -2931,6 +2972,7 @@ export function createPong(
       if (key === 'teaParty') clearTeaPartyState(teaPartyState)
       if (key === 'secondChances') clearSecondChancesState(secondChancesState)
       if (key === 'spaceInvaders') clearSpaceInvadersState(spaceInvadersState)
+      if (key === 'minesweeper') clearMinesweeperState(minesweeperState)
     }
 
     if (anyDisabled) {
@@ -2970,6 +3012,8 @@ export function createPong(
         case 'secondChances':
           break
         case 'spaceInvaders':
+          break
+        case 'minesweeper':
           break
         case 'ireland':
           wells.push(...getIrelandWells(irelandState, arena.ireland, arenaDimensions))
@@ -3178,6 +3222,7 @@ export function createPong(
         if (key === 'teaParty') clearTeaPartyState(teaPartyState)
         if (key === 'secondChances') clearSecondChancesState(secondChancesState)
         if (key === 'spaceInvaders') clearSpaceInvadersState(spaceInvadersState)
+        if (key === 'minesweeper') clearMinesweeperState(minesweeperState)
       } else {
         if (key === 'secondChances') {
           const shieldModifier = getSecondChancesModifier()
@@ -3188,6 +3233,11 @@ export function createPong(
           const barricadeModifier = getSpaceInvadersModifier()
           maintainSpaceInvadersState(spaceInvadersState, barricadeModifier, arenaDimensions)
           resetSpaceInvadersState(spaceInvadersState, barricadeModifier, arenaDimensions)
+        }
+        if (key === 'minesweeper') {
+          const minesweeperModifier = getMinesweeperModifier()
+          maintainMinesweeperState(minesweeperState, minesweeperModifier, arenaDimensions)
+          resetMinesweeperState(minesweeperState, minesweeperModifier, arenaDimensions)
         }
       }
     }
@@ -3810,6 +3860,8 @@ export function createPong(
       getTeaPartyObjects(teaPartyState, config.modifiers.arena.teaParty),
       config.modifiers.arena.teaParty,
     )
+
+    drawMinesweeperSquares(ctx, minesweeperState, getMinesweeperModifier())
 
     drawSecondChanceShields(ctx, secondChancesState, getSecondChancesModifier(), {
       arenaWidth: W,

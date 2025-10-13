@@ -12,6 +12,7 @@ import { createIrelandModifier } from './ireland/irelandEditor'
 import { createRussianRouletteModifier } from './russianRoulette/russianRouletteEditor'
 import { createSecondChancesModifier } from './secondChances/secondChancesEditor'
 import { createSpaceInvadersModifier } from './spaceInvaders/spaceInvadersEditor'
+import { createMinesweeperModifier } from './minesweeper/minesweeperEditor'
 import { createSuperMassiveModifier } from './superMassive/superMassiveEditor'
 import { createWhiteDwarfModifier } from './whiteDwarf/whiteDwarfEditor'
 
@@ -30,6 +31,7 @@ export const arenaModifierBuilders: ArenaBuilderMap = {
   wonderland: createWonderlandModifier,
   secondChances: createSecondChancesModifier,
   spaceInvaders: createSpaceInvadersModifier,
+  minesweeper: createMinesweeperModifier,
   ireland: createIrelandModifier,
   russianRoulette: createRussianRouletteModifier,
   drinkMe: createDrinkMeModifier,

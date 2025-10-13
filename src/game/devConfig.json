@@ -143,6 +143,21 @@
         "negativeTint": "#34d399",
         "includeInRandom": true
       },
+      "minesweeper": {
+        "name": "Minesweeper",
+        "description": "Hidden mines deflect the ball while decoys vanish on contact",
+        "enabled": false,
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "gridSpacing": 68,
+        "squareSize": 34,
+        "rows": 5,
+        "columns": 6,
+        "positiveTint": "#e2e8f0",
+        "negativeTint": "#ef4444",
+        "includeInRandom": true
+      },
       "russianRoulette": {
         "name": "Russian Roulette",
         "description": "Six launch decoys but only one ball counts",
