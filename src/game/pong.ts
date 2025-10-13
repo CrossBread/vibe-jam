@@ -257,7 +257,7 @@ export function createPong(
   const WHITE_RGB: RGBColor = { r: 255, g: 255, b: 255 }
   const LEFT_PADDLE_EDGE_COLOR = '#38bdf8'
   const RIGHT_PADDLE_EDGE_COLOR = '#ef4444'
-  const PADDLE_EDGE_WIDTH = 2
+  const PADDLE_EDGE_WIDTH = 4
 
   const defaults = createDevConfig()
   const config = deepClone(defaults)
