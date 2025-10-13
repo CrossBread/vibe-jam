@@ -1096,6 +1096,12 @@ export function createPong(
       dt,
       arenaDimensions,
     )
+    updateJupiterState(
+      jupiterState,
+      config.modifiers.arena.jupiter,
+      dt,
+      arenaDimensions,
+    )
     maintainDivotsState(divotsState, config.modifiers.arena.divots)
     maintainDrinkMeState(drinkMeState, config.modifiers.arena.drinkMe, arenaDimensions)
     maintainTeaPartyState(teaPartyState, config.modifiers.arena.teaParty, arenaDimensions)
@@ -1230,16 +1236,11 @@ export function createPong(
     updateBendyState(dt)
 
     const paddles = getPhysicalPaddles()
-    const ceresTargets = paddles
-      .filter(paddle => paddle.height > 0)
-      .map(paddle => ({ x: paddle.x, y: paddle.y, height: paddle.height }))
     updateCeresState(
       ceresState,
       config.modifiers.arena.ceres,
       dt,
       arenaDimensions,
-      ceresTargets,
-      PADDLE_W,
     )
 
     // Gravity well influence
@@ -3051,6 +3052,9 @@ export function createPong(
           break
         case 'gopher':
           wells.push(...getGopherWells(gopherState, arena.gopher))
+          break
+        case 'ceres':
+          wells.push(...getCeresWells(ceresState, arena.ceres))
           break
         case 'ceres':
           wells.push(...getCeresWells(ceresState, arena.ceres))

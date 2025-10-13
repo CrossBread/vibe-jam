@@ -10,12 +10,6 @@ export interface CeresState {
   initialized: boolean
 }
 
-export interface CeresCollisionTarget {
-  x: number
-  y: number
-  height: number
-}
-
 export function createCeresState(dimensions: ArenaDimensions): CeresState {
   return {
     x: dimensions.width * 0.5,
@@ -59,8 +53,6 @@ export function updateCeresState(
   modifier: GravityWellModifier,
   dt: number,
   dimensions: ArenaDimensions,
-  paddles: ReadonlyArray<CeresCollisionTarget>,
-  paddleWidth: number,
 ): void {
   if (!modifier.enabled) {
     resetCeresState(state, dimensions)
@@ -99,51 +91,6 @@ export function updateCeresState(
   } else if (nextY > maxY) {
     nextY = maxY - (nextY - maxY)
     state.vy = -Math.abs(state.vy)
-  }
-
-  const expandedWidth = paddleWidth + radius * 2
-
-  for (const paddle of paddles) {
-    const expandedX = paddle.x - radius
-    const expandedY = paddle.y - radius
-    const expandedHeight = paddle.height + radius * 2
-
-    if (
-      nextX < expandedX ||
-      nextX > expandedX + expandedWidth ||
-      nextY < expandedY ||
-      nextY > expandedY + expandedHeight
-    ) {
-      continue
-    }
-
-    const penetrationLeft = nextX - expandedX
-    const penetrationRight = expandedX + expandedWidth - nextX
-    const penetrationTop = nextY - expandedY
-    const penetrationBottom = expandedY + expandedHeight - nextY
-
-    const smallestPenetration = Math.min(
-      penetrationLeft,
-      penetrationRight,
-      penetrationTop,
-      penetrationBottom,
-    )
-
-    if (smallestPenetration === penetrationLeft) {
-      nextX = expandedX
-      state.vx = Math.abs(state.vx)
-    } else if (smallestPenetration === penetrationRight) {
-      nextX = expandedX + expandedWidth
-      state.vx = -Math.abs(state.vx)
-    } else if (smallestPenetration === penetrationTop) {
-      nextY = expandedY
-      state.vy = Math.abs(state.vy)
-    } else {
-      nextY = expandedY + expandedHeight
-      state.vy = -Math.abs(state.vy)
-    }
-
-    break
   }
 
   state.x = clamp(nextX, minX, maxX)
