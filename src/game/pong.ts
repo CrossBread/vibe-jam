@@ -166,6 +166,41 @@ interface PaddleSegment {
   broken?: boolean
 }
 
+type ApparitionPhase = 'visibleHold' | 'fadingOut' | 'hiddenHold' | 'fadingIn'
+
+interface ApparitionState {
+  phase: ApparitionPhase
+  timer: number
+  opacity: number
+}
+
+interface OutOfBodyTrailPoint {
+  y: number
+  height: number
+}
+
+interface OutOfBodyTrailState {
+  points: OutOfBodyTrailPoint[]
+  sampleTimer: number
+}
+
+interface PaddleMotionSample {
+  previousY: number
+  velocity: number
+}
+
+interface PaddleMotionMap {
+  outer: PaddleMotionSample
+  inner: PaddleMotionSample
+}
+
+interface BendyState {
+  phase: number
+  intensity: number
+  amplitude: number
+  wave: number
+}
+
 interface OsteoSegmentState {
   hits: number
   broken: boolean
@@ -558,6 +593,9 @@ export function createPong(
   let leftPaddleHeight = state.leftPaddleHeight
   let rightPaddleHeight = state.rightPaddleHeight
   let previousChillyEnabled = config.modifiers.paddle.chilly.enabled
+  let previousApparitionEnabled = config.modifiers.paddle.apparition.enabled
+  let previousOutOfBodyEnabled = config.modifiers.paddle.outOfBody.enabled
+  let previousBendyEnabled = config.modifiers.paddle.bendy.enabled
   let previousLeftSizeMultiplier = getPaddleSizeMultiplier('left')
   let previousRightSizeMultiplier = getPaddleSizeMultiplier('right')
   let previousDoublesEnabled = config.doubles.enabled
@@ -572,18 +610,87 @@ export function createPong(
   let previousOsteoSignature: string | null = null
   const missilePaddles: ActiveMissilePaddle[] = []
   const missileCooldowns: Record<'left' | 'right', number> = { left: 0, right: 0 }
+  type InchwormPhase = 'idle' | 'contracting' | 'contracted' | 'extending'
+
+  type OutOfBodyLaneKey = 'outer' | 'inner'
+  const paddleApparitionStates: Record<'left' | 'right', ApparitionState> = {
+    left: createInitialApparitionState(),
+    right: createInitialApparitionState(),
+  }
+  const outOfBodyTrails: Record<'left' | 'right', Record<OutOfBodyLaneKey, OutOfBodyTrailState>> = {
+    left: {
+      outer: createOutOfBodyTrailState(),
+      inner: createOutOfBodyTrailState(),
+    },
+    right: {
+      outer: createOutOfBodyTrailState(),
+      inner: createOutOfBodyTrailState(),
+    },
+  }
+  const paddleMotion: Record<'left' | 'right', PaddleMotionMap> = {
+    left: {
+      outer: { previousY: state.leftY, velocity: 0 },
+      inner: { previousY: state.leftInnerY, velocity: 0 },
+    },
+    right: {
+      outer: { previousY: state.rightY, velocity: 0 },
+      inner: { previousY: state.rightInnerY, velocity: 0 },
+    },
+  }
+  const bendyStates: Record<'left' | 'right', BendyState> = {
+    left: createInitialBendyState(),
+    right: createInitialBendyState(),
+  }
   interface PaddleDynamicsState {
     velocity: number
     frisbeeFlying: boolean
     frisbeeDirection: -1 | 0 | 1
+    angryStretch: number
+    inchwormPhase: InchwormPhase
+    inchwormDirection: -1 | 0 | 1
+    inchwormBaseHeight: number
+    inchwormTargetHeight: number
+    inchwormPendingDirection: -1 | 0 | 1
+    inchwormWasInput: boolean
+    slinkyTimer: number
+    slinkyDirection: -1 | 0 | 1
   }
   const paddleDynamics: Record<'left' | 'right', PaddleDynamicsState> = {
-    left: { velocity: 0, frisbeeFlying: false, frisbeeDirection: 0 },
-    right: { velocity: 0, frisbeeFlying: false, frisbeeDirection: 0 },
+    left: {
+      velocity: 0,
+      frisbeeFlying: false,
+      frisbeeDirection: 0,
+      angryStretch: 0,
+      inchwormPhase: 'idle',
+      inchwormDirection: 0,
+      inchwormBaseHeight: leftPaddleHeight,
+      inchwormTargetHeight: leftPaddleHeight,
+      inchwormPendingDirection: 0,
+      inchwormWasInput: false,
+      slinkyTimer: 0,
+      slinkyDirection: 0,
+    },
+    right: {
+      velocity: 0,
+      frisbeeFlying: false,
+      frisbeeDirection: 0,
+      angryStretch: 0,
+      inchwormPhase: 'idle',
+      inchwormDirection: 0,
+      inchwormBaseHeight: rightPaddleHeight,
+      inchwormTargetHeight: rightPaddleHeight,
+      inchwormPendingDirection: 0,
+      inchwormWasInput: false,
+      slinkyTimer: 0,
+      slinkyDirection: 0,
+    },
   }
   let previousMissileEnabled = config.modifiers.paddle.missileCommander.enabled
   let previousFrisbeeEnabled = config.modifiers.paddle.frisbee.enabled
   let previousDundeeEnabled = config.modifiers.paddle.dundee.enabled
+  let previousAngryEnabled = config.modifiers.paddle.angry.enabled
+  let previousInchwormEnabled = config.modifiers.paddle.inchworm.enabled
+  let previousSlinkyEnabled = config.modifiers.paddle.slinky.enabled
 
   const movingWellStates: Record<MovingWellKey, MovingWellState> = {
     blackMole: {
@@ -621,6 +728,10 @@ export function createPong(
   initializeActiveModState()
   resetBallSize()
   initializePaddleHeights(true)
+  resetApparitionStates(true)
+  resetOutOfBodyTrails(true)
+  resetBendyState(config.modifiers.paddle.bendy.enabled)
+  syncPaddleMotionState()
   resetBall(Math.random() < 0.5)
 
   function createBall(toLeft: boolean): BallState {
@@ -712,6 +823,10 @@ export function createPong(
     rearmHadron()
     syncOsteoState(true)
     initializePaddleHeights(true)
+    resetApparitionStates(true)
+    resetOutOfBodyTrails(true)
+    resetBendyState(config.modifiers.paddle.bendy.enabled)
+    syncPaddleMotionState()
     resetBall(Math.random() < 0.5)
   }
 
@@ -874,6 +989,11 @@ export function createPong(
       state.leftInnerY = state.leftY
       state.rightInnerY = state.rightY
     }
+
+    updatePaddleMotion(dt)
+    updateOutOfBodyTrails(dt)
+    updateApparitionStates(dt)
+    updateBendyState(dt)
 
     // Gravity well influence
     activeGravityWells = collectActiveGravityWells()
@@ -1258,6 +1378,45 @@ export function createPong(
       previousDundeeEnabled = dundeeEnabled
     }
 
+    const apparitionEnabled = config.modifiers.paddle.apparition.enabled
+    if (apparitionEnabled !== previousApparitionEnabled) {
+      resetApparitionStates(apparitionEnabled)
+      previousApparitionEnabled = apparitionEnabled
+    }
+
+    const outOfBodyEnabled = config.modifiers.paddle.outOfBody.enabled
+    if (outOfBodyEnabled !== previousOutOfBodyEnabled) {
+      resetOutOfBodyTrails(true)
+      previousOutOfBodyEnabled = outOfBodyEnabled
+    }
+
+    const bendyEnabled = config.modifiers.paddle.bendy.enabled
+    if (bendyEnabled !== previousBendyEnabled) {
+      resetBendyState(bendyEnabled)
+      previousBendyEnabled = bendyEnabled
+    }
+
+    const angryEnabled = config.modifiers.paddle.angry.enabled
+    if (angryEnabled !== previousAngryEnabled) {
+      resetAngryState()
+      previousAngryEnabled = angryEnabled
+    }
+
+    const inchwormEnabled = config.modifiers.paddle.inchworm.enabled
+    if (inchwormEnabled !== previousInchwormEnabled) {
+      resetInchwormState({
+        restoreHeight:
+          !inchwormEnabled && !config.modifiers.paddle.chilly.enabled,
+      })
+      previousInchwormEnabled = inchwormEnabled
+    }
+
+    const slinkyEnabled = config.modifiers.paddle.slinky.enabled
+    if (slinkyEnabled !== previousSlinkyEnabled) {
+      resetSlinkyState()
+      previousSlinkyEnabled = slinkyEnabled
+    }
+
     clampPaddlePosition('left')
     clampPaddlePosition('right')
     state.leftPaddleHeight = leftPaddleHeight
@@ -1292,6 +1451,40 @@ export function createPong(
     paddleDynamics.right.velocity = 0
     paddleDynamics.right.frisbeeFlying = false
     paddleDynamics.right.frisbeeDirection = 0
+    resetAngryState()
+    resetInchwormState()
+    resetSlinkyState()
+  }
+
+  function resetAngryState() {
+    paddleDynamics.left.angryStretch = 0
+    paddleDynamics.right.angryStretch = 0
+  }
+
+  function resetInchwormState(options: { restoreHeight?: boolean } = {}) {
+    const { restoreHeight = false } = options
+    for (const side of ['left', 'right'] as const) {
+      const dynamics = paddleDynamics[side]
+      dynamics.inchwormPhase = 'idle'
+      dynamics.inchwormDirection = 0
+      const currentHeight = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+      dynamics.inchwormBaseHeight = currentHeight
+      dynamics.inchwormTargetHeight = currentHeight
+      dynamics.inchwormPendingDirection = 0
+      dynamics.inchwormWasInput = false
+    }
+
+    if (restoreHeight) {
+      setPaddleHeight('left', getBasePaddleHeight('left'), { preserveCenter: true })
+      setPaddleHeight('right', getBasePaddleHeight('right'), { preserveCenter: true })
+    }
+  }
+
+  function resetSlinkyState() {
+    paddleDynamics.left.slinkyTimer = 0
+    paddleDynamics.left.slinkyDirection = 0
+    paddleDynamics.right.slinkyTimer = 0
+    paddleDynamics.right.slinkyDirection = 0
   }
 
   function centerPaddle(side: 'left' | 'right') {
@@ -1308,6 +1501,444 @@ export function createPong(
         state.rightInnerY = y
       }
     }
+    syncPaddleMotionForSide(side)
+  }
+
+  function createInitialApparitionState(): ApparitionState {
+    return { phase: 'visibleHold', timer: 0, opacity: 1 }
+  }
+
+  function resetApparitionStates(randomize = false) {
+    const modifier = config.modifiers.paddle.apparition
+    const shouldRandomize = randomize && modifier.enabled
+    const visibleHold = Math.max(
+      0,
+      Number.isFinite(modifier.visibleHoldDuration) ? modifier.visibleHoldDuration : 3.2,
+    )
+    for (const side of ['left', 'right'] as const) {
+      const state = paddleApparitionStates[side]
+      state.phase = 'visibleHold'
+      state.timer = shouldRandomize && visibleHold > 0 ? Math.random() * visibleHold : 0
+      state.opacity = 1
+    }
+  }
+
+  interface ApparitionDurations {
+    fadeDuration: number
+    visibleHold: number
+    hiddenHold: number
+    minOpacity: number
+  }
+
+  function updateApparitionStates(dt: number) {
+    const modifier = config.modifiers.paddle.apparition
+    if (!modifier.enabled) {
+      for (const side of ['left', 'right'] as const) {
+        const state = paddleApparitionStates[side]
+        state.phase = 'visibleHold'
+        state.timer = 0
+        state.opacity = 1
+      }
+      return
+    }
+
+    const durations: ApparitionDurations = {
+      fadeDuration: Math.max(
+        0,
+        Number.isFinite(modifier.fadeDuration) ? modifier.fadeDuration : 0.8,
+      ),
+      visibleHold: Math.max(
+        0,
+        Number.isFinite(modifier.visibleHoldDuration) ? modifier.visibleHoldDuration : 3.2,
+      ),
+      hiddenHold: Math.max(
+        0,
+        Number.isFinite(modifier.hiddenHoldDuration) ? modifier.hiddenHoldDuration : 1.4,
+      ),
+      minOpacity: clamp01(
+        Number.isFinite(modifier.minOpacity) ? modifier.minOpacity : 0.05,
+      ),
+    }
+
+    for (const side of ['left', 'right'] as const) {
+      advanceApparitionState(paddleApparitionStates[side], dt, durations)
+    }
+  }
+
+  function advanceApparitionState(
+    state: ApparitionState,
+    dt: number,
+    durations: ApparitionDurations,
+  ) {
+    state.timer += dt
+    let iterations = 0
+    while (iterations < 8) {
+      iterations += 1
+      switch (state.phase) {
+        case 'visibleHold': {
+          const duration = durations.visibleHold
+          if (duration <= 0) {
+            state.phase = durations.fadeDuration > 0 ? 'fadingOut' : durations.hiddenHold > 0 ? 'hiddenHold' : 'fadingIn'
+            state.timer = Math.max(state.timer, 0)
+            continue
+          }
+          if (state.timer < duration) {
+            state.opacity = 1
+            return
+          }
+          state.timer -= duration
+          state.opacity = 1
+          state.phase = durations.fadeDuration > 0 ? 'fadingOut' : durations.hiddenHold > 0 ? 'hiddenHold' : 'fadingIn'
+          continue
+        }
+        case 'fadingOut': {
+          const duration = durations.fadeDuration
+          if (duration <= 0) {
+            state.phase = durations.hiddenHold > 0 ? 'hiddenHold' : 'fadingIn'
+            state.opacity = durations.minOpacity
+            state.timer = Math.max(state.timer, 0)
+            continue
+          }
+          if (state.timer < duration) {
+            const progress = clamp01(state.timer / duration)
+            state.opacity = 1 - (1 - durations.minOpacity) * progress
+            return
+          }
+          state.timer -= duration
+          state.opacity = durations.minOpacity
+          state.phase = durations.hiddenHold > 0 ? 'hiddenHold' : 'fadingIn'
+          continue
+        }
+        case 'hiddenHold': {
+          const duration = durations.hiddenHold
+          if (duration <= 0) {
+            state.phase = durations.fadeDuration > 0 ? 'fadingIn' : 'visibleHold'
+            state.timer = Math.max(state.timer, 0)
+            continue
+          }
+          if (state.timer < duration) {
+            state.opacity = durations.minOpacity
+            return
+          }
+          state.timer -= duration
+          state.opacity = durations.minOpacity
+          state.phase = durations.fadeDuration > 0 ? 'fadingIn' : 'visibleHold'
+          continue
+        }
+        case 'fadingIn': {
+          const duration = durations.fadeDuration
+          if (duration <= 0) {
+            state.phase = 'visibleHold'
+            state.opacity = 1
+            state.timer = Math.max(state.timer, 0)
+            continue
+          }
+          if (state.timer < duration) {
+            const progress = clamp01(state.timer / duration)
+            state.opacity = durations.minOpacity + (1 - durations.minOpacity) * progress
+            return
+          }
+          state.timer -= duration
+          state.opacity = 1
+          state.phase = 'visibleHold'
+          continue
+        }
+        default: {
+          state.phase = 'visibleHold'
+          state.timer = 0
+          state.opacity = 1
+          return
+        }
+      }
+    }
+
+    state.timer = 0
+    state.opacity = state.phase === 'hiddenHold' ? durations.minOpacity : 1
+  }
+
+  function getApparitionOpacity(side: 'left' | 'right') {
+    if (!config.modifiers.paddle.apparition.enabled) return 1
+    return clamp01(paddleApparitionStates[side].opacity)
+  }
+
+  function createOutOfBodyTrailState(): OutOfBodyTrailState {
+    return { points: [], sampleTimer: 0 }
+  }
+
+  function getLaneSnapshot(side: 'left' | 'right', lane: OutOfBodyLaneKey) {
+    if (side === 'left') {
+      if (lane === 'outer') {
+        return { y: state.leftY, height: leftPaddleHeight }
+      }
+      return { y: state.leftInnerY, height: state.leftInnerPaddleHeight }
+    }
+    if (lane === 'outer') {
+      return { y: state.rightY, height: rightPaddleHeight }
+    }
+    return { y: state.rightInnerY, height: state.rightInnerPaddleHeight }
+  }
+
+  function resetOutOfBodyTrails(populate = false) {
+    for (const side of ['left', 'right'] as const) {
+      for (const lane of ['outer', 'inner'] as const) {
+        const trail = outOfBodyTrails[side][lane]
+        trail.points = []
+        trail.sampleTimer = 0
+        if (populate) {
+          const snapshot = getLaneSnapshot(side, lane)
+          const height = Math.max(0, Math.min(snapshot.height, H))
+          const y = clamp(snapshot.y, 0, H - height)
+          trail.points.push({ y, height })
+        }
+      }
+    }
+  }
+
+  function updateOutOfBodyTrails(dt: number) {
+    const modifier = config.modifiers.paddle.outOfBody
+    const rawLength = Number.isFinite(modifier.trailLength)
+      ? Math.floor(modifier.trailLength)
+      : 6
+    const maxPoints = Math.max(2, rawLength)
+    const intervalRaw = Number.isFinite(modifier.sampleInterval)
+      ? modifier.sampleInterval
+      : 0.05
+    const interval = Math.max(intervalRaw, 1 / 240)
+
+    for (const side of ['left', 'right'] as const) {
+      for (const lane of ['outer', 'inner'] as const) {
+        const trail = outOfBodyTrails[side][lane]
+        const snapshot = getLaneSnapshot(side, lane)
+        const height = Math.max(0, Math.min(snapshot.height, H))
+        const y = clamp(snapshot.y, 0, H - height)
+        const currentPoint = { y, height }
+
+        if (trail.points.length === 0) {
+          trail.points.push({ ...currentPoint })
+        } else {
+          trail.points[0] = { ...currentPoint }
+        }
+
+        if (!modifier.enabled) {
+          trail.sampleTimer = 0
+          if (trail.points.length > 1) {
+            trail.points.length = 1
+          }
+          continue
+        }
+
+        trail.sampleTimer += dt
+        while (trail.sampleTimer >= interval) {
+          trail.sampleTimer -= interval
+          trail.points.splice(1, 0, { ...currentPoint })
+        }
+
+        if (trail.points.length > maxPoints) {
+          trail.points.length = maxPoints
+        }
+      }
+    }
+  }
+
+  function getOutOfBodyTrailForPaddle(paddle: PhysicalPaddle) {
+    if (paddle.lane === 'missile') return null
+    const lane: OutOfBodyLaneKey = paddle.lane === 'inner' ? 'inner' : 'outer'
+    return outOfBodyTrails[paddle.side][lane]
+  }
+
+  function getOutOfBodyCollisionRect(
+    side: 'left' | 'right',
+    lane: OutOfBodyLaneKey,
+  ): OutOfBodyTrailPoint | null {
+    const trail = outOfBodyTrails[side][lane]
+    if (!trail || trail.points.length === 0) return null
+    const useTail = config.modifiers.paddle.outOfBody.enabled && trail.points.length > 1
+    const index = useTail ? trail.points.length - 1 : 0
+    const point = trail.points[index]
+    const height = Math.max(0, Math.min(point.height, H))
+    const y = clamp(point.y, 0, H - height)
+    return { y, height }
+  }
+
+  function getPaddleOpacity(paddle: PhysicalPaddle) {
+    let opacity = getApparitionOpacity(paddle.side)
+    if (config.modifiers.paddle.outOfBody.enabled && paddle.lane !== 'missile') {
+      const modifier = config.modifiers.paddle.outOfBody
+      const base = Number.isFinite(modifier.paddleOpacity) ? modifier.paddleOpacity : 0.2
+      opacity *= clamp01(base)
+    }
+    return clamp01(opacity)
+  }
+
+  function drawOutOfBodyTrail(
+    paddle: PhysicalPaddle,
+    baseHex: string,
+    crackedColor: string,
+    tailOpacity: number,
+  ) {
+    const modifier = config.modifiers.paddle.outOfBody
+    if (!modifier.enabled) return
+    const trail = getOutOfBodyTrailForPaddle(paddle)
+    if (!trail) return
+    if (trail.points.length <= 1) return
+
+    const fadeStrength = clamp01(
+      Number.isFinite(modifier.trailFade) ? modifier.trailFade : 0.7,
+    )
+    const baseOpacity = clamp01(tailOpacity)
+    const edgeColor = paddle.side === 'left' ? LEFT_PADDLE_EDGE_COLOR : RIGHT_PADDLE_EDGE_COLOR
+
+    for (let i = trail.points.length - 1; i >= 0; i--) {
+      const point = trail.points[i]
+      const fadeIndex = trail.points.length - 1 - i
+      const alpha = clamp01(baseOpacity * Math.pow(fadeStrength, fadeIndex))
+      if (alpha <= 0.001) continue
+
+      const ghostPaddle: PhysicalPaddle = {
+        side: paddle.side,
+        lane: paddle.lane,
+        x: paddle.x,
+        y: point.y,
+        height: point.height,
+      }
+      const segments = buildPaddleSegments(ghostPaddle)
+
+      ctx.save()
+      ctx.globalAlpha = alpha
+      for (const segment of segments) {
+        if (segment.height <= 0 || segment.broken) continue
+        const fillColor = segment.cracked ? crackedColor : baseHex
+        const offset = getBendyOffset(segment.paddle, segment)
+        const rectX = segment.x + offset
+        ctx.fillStyle = fillColor
+        ctx.fillRect(rectX, segment.y, segment.width, segment.height)
+        ctx.fillStyle = edgeColor
+        if (segment.paddle.side === 'left') {
+          ctx.fillRect(rectX, segment.y, PADDLE_EDGE_WIDTH, segment.height)
+        } else {
+          ctx.fillRect(
+            rectX + segment.width - PADDLE_EDGE_WIDTH,
+            segment.y,
+            PADDLE_EDGE_WIDTH,
+            segment.height,
+          )
+        }
+      }
+      ctx.restore()
+    }
+  }
+
+  function updatePaddleMotion(dt: number) {
+    const safeDt = Math.max(dt, 1e-6)
+    for (const side of ['left', 'right'] as const) {
+      const motion = paddleMotion[side]
+      const outerY = side === 'left' ? state.leftY : state.rightY
+      const innerY = side === 'left' ? state.leftInnerY : state.rightInnerY
+      motion.outer.velocity = (outerY - motion.outer.previousY) / safeDt
+      motion.inner.velocity = (innerY - motion.inner.previousY) / safeDt
+      motion.outer.previousY = outerY
+      motion.inner.previousY = innerY
+    }
+  }
+
+  function syncPaddleMotionForSide(side: 'left' | 'right') {
+    const motion = paddleMotion[side]
+    if (side === 'left') {
+      motion.outer.previousY = state.leftY
+      motion.inner.previousY = state.leftInnerY
+    } else {
+      motion.outer.previousY = state.rightY
+      motion.inner.previousY = state.rightInnerY
+    }
+    motion.outer.velocity = 0
+    motion.inner.velocity = 0
+  }
+
+  function syncPaddleMotionState() {
+    syncPaddleMotionForSide('left')
+    syncPaddleMotionForSide('right')
+  }
+
+  function createInitialBendyState(): BendyState {
+    return { phase: Math.random() * Math.PI * 2, intensity: 0, amplitude: 0, wave: 0 }
+  }
+
+  function resetBendyState(enabled: boolean) {
+    for (const side of ['left', 'right'] as const) {
+      const state = bendyStates[side]
+      state.intensity = 0
+      state.amplitude = 0
+      state.wave = 0
+      state.phase = enabled ? Math.random() * Math.PI * 2 : 0
+    }
+  }
+
+  function updateBendyState(dt: number) {
+    const modifier = config.modifiers.paddle.bendy
+    const maxOffset = Math.max(
+      0,
+      Number.isFinite(modifier.maxOffset) ? modifier.maxOffset : 0,
+    )
+    const speedForMax = Math.max(
+      1,
+      Number.isFinite(modifier.speedForMaxBend)
+        ? modifier.speedForMaxBend
+        : config.paddleSpeed,
+    )
+    const oscillationSpeed = Math.max(
+      0,
+      Number.isFinite(modifier.oscillationSpeed) ? modifier.oscillationSpeed : 5,
+    )
+    const smoothingRate = 8
+
+    if (!modifier.enabled || maxOffset <= 0) {
+      const decay = 1 - Math.exp(-smoothingRate * dt)
+      for (const side of ['left', 'right'] as const) {
+        const state = bendyStates[side]
+        state.intensity += (0 - state.intensity) * decay
+        state.amplitude = 0
+        state.wave = 0
+      }
+      return
+    }
+
+    const decay = 1 - Math.exp(-smoothingRate * dt)
+    const angularSpeed = oscillationSpeed * Math.PI * 2
+
+    for (const side of ['left', 'right'] as const) {
+      const state = bendyStates[side]
+      const outerSpeed = Math.abs(paddleMotion[side].outer.velocity)
+      const innerSpeed = Math.abs(paddleMotion[side].inner.velocity)
+      const speed = Math.max(outerSpeed, innerSpeed)
+      const normalized = clamp01(speed / speedForMax)
+      state.intensity += (normalized - state.intensity) * decay
+      state.phase += angularSpeed * dt
+      if (!Number.isFinite(state.phase)) {
+        state.phase = 0
+      } else {
+        state.phase %= Math.PI * 2
+      }
+      state.wave = Math.sin(state.phase)
+      state.amplitude = state.intensity * maxOffset
+    }
+  }
+
+  function getBendyOffset(paddle: PhysicalPaddle, segment: PaddleSegment) {
+    if (!config.modifiers.paddle.bendy.enabled) return 0
+    if (paddle.lane === 'missile') return 0
+    const state = bendyStates[paddle.side]
+    const amplitude = state.amplitude
+    if (amplitude <= 0) return 0
+    const totalHeight = paddle.height || segment.height
+    if (!totalHeight || totalHeight <= 0) return 0
+    const center = segment.y + segment.height / 2
+    const relative = clamp((center - paddle.y) / totalHeight, 0, 1)
+    const distance = Math.min(1, Math.abs(relative - 0.5) * 2)
+    if (distance <= 0) return 0
+    const direction = relative < 0.5 ? -1 : 1
+    let offset = state.wave * amplitude * distance * direction
+    if (paddle.side === 'right') offset *= -1
+    return offset
   }
 
   function getPaddleControlState(
@@ -1611,6 +2242,273 @@ export function createPong(
     }
   }
 
+  function handleAngryPaddle(
+    side: 'left' | 'right',
+    dt: number,
+    paddleSpeed: number,
+    control: PaddleControlState,
+    modifier = config.modifiers.paddle.angry,
+  ) {
+    const dynamics = paddleDynamics[side]
+    const stretchSpeed = Math.max(
+      0,
+      Number.isFinite(modifier.stretchSpeed) ? modifier.stretchSpeed : 0,
+    )
+    const maxStretch = Math.max(
+      0,
+      Number.isFinite(modifier.maxStretch) ? modifier.maxStretch : 0,
+    )
+    const releaseSpeed = Math.max(
+      0,
+      Number.isFinite(modifier.releaseSpeed) ? modifier.releaseSpeed : 0,
+    )
+    const moveMultiplier = clamp(
+      Number.isFinite(modifier.moveSpeedMultiplier) ? modifier.moveSpeedMultiplier : 1,
+      0,
+      1,
+    )
+
+    if (control.hasDirectionalInput) {
+      const stretchDelta = clamp(
+        control.direction * stretchSpeed * dt,
+        -stretchSpeed * dt,
+        stretchSpeed * dt,
+      )
+      dynamics.angryStretch = clamp(dynamics.angryStretch + stretchDelta, -maxStretch, maxStretch)
+      applyStandardMovement(side, dt, paddleSpeed * moveMultiplier, control)
+      clampPaddlePosition(side)
+      return
+    }
+
+    if (releaseSpeed <= 0 || Math.abs(dynamics.angryStretch) < 1e-3) {
+      dynamics.angryStretch = 0
+      return
+    }
+
+    const releaseStep = clamp(
+      dynamics.angryStretch,
+      -releaseSpeed * dt,
+      releaseSpeed * dt,
+    )
+    dynamics.angryStretch -= releaseStep
+    if (side === 'left') {
+      state.leftY -= releaseStep
+    } else {
+      state.rightY -= releaseStep
+    }
+    clampPaddlePosition(side)
+  }
+
+  function handleInchwormPaddle(
+    side: 'left' | 'right',
+    dt: number,
+    paddleSpeed: number,
+    control: PaddleControlState,
+    modifier = config.modifiers.paddle.inchworm,
+  ) {
+    const dynamics = paddleDynamics[side]
+    const shrinkAmount = Math.max(
+      0,
+      Number.isFinite(modifier.shrinkAmount) ? modifier.shrinkAmount : 0,
+    )
+    const minimumHeight = Math.max(
+      20,
+      Number.isFinite(modifier.minimumHeight) ? modifier.minimumHeight : 40,
+    )
+    const shrinkSpeed = Math.max(
+      0,
+      Number.isFinite(modifier.shrinkSpeed) ? modifier.shrinkSpeed : paddleSpeed,
+    )
+    const extendSpeed = Math.max(
+      0,
+      Number.isFinite(modifier.extendSpeed) ? modifier.extendSpeed : paddleSpeed,
+    )
+
+    let inputDirection: -1 | 0 | 1 = 0
+    if (control.downRequested || control.direction > 0.35) inputDirection = 1
+    else if (control.upRequested || control.direction < -0.35) inputDirection = -1
+
+    if (dynamics.inchwormPhase === 'idle') {
+      const currentHeight = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+      dynamics.inchwormBaseHeight = Math.max(currentHeight, minimumHeight)
+      dynamics.inchwormTargetHeight = dynamics.inchwormBaseHeight
+    }
+
+    if (
+      inputDirection !== 0 &&
+      dynamics.inchwormDirection !== 0 &&
+      inputDirection !== dynamics.inchwormDirection &&
+      (dynamics.inchwormPhase === 'contracting' || dynamics.inchwormPhase === 'contracted')
+    ) {
+      dynamics.inchwormPhase = 'extending'
+      dynamics.inchwormPendingDirection = inputDirection
+    }
+
+    if (inputDirection !== 0 && !dynamics.inchwormWasInput) {
+      if (dynamics.inchwormPhase === 'idle') {
+        startInchwormContraction(side, inputDirection, shrinkAmount, minimumHeight)
+      } else if (dynamics.inchwormPhase === 'contracted') {
+        dynamics.inchwormPendingDirection = 0
+        dynamics.inchwormPhase = 'extending'
+      } else if (dynamics.inchwormPhase === 'extending') {
+        dynamics.inchwormPendingDirection = inputDirection
+      }
+    }
+
+    if (dynamics.inchwormPhase === 'contracting') {
+      const targetHeight = Math.max(minimumHeight, dynamics.inchwormTargetHeight)
+      const currentHeight = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+      const nextHeight = Math.max(targetHeight, currentHeight - shrinkSpeed * dt)
+      const anchor = dynamics.inchwormDirection === -1 ? 'top' : 'bottom'
+      setAnchoredPaddleHeight(side, nextHeight, anchor)
+      const updatedHeight = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+      if (updatedHeight <= targetHeight + 0.5) {
+        setAnchoredPaddleHeight(side, targetHeight, anchor)
+        dynamics.inchwormPhase = 'contracted'
+      }
+    } else if (dynamics.inchwormPhase === 'extending') {
+      const targetHeight = Math.max(minimumHeight, dynamics.inchwormBaseHeight)
+      const currentHeight = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+      const nextHeight = Math.min(targetHeight, currentHeight + extendSpeed * dt)
+      const anchor = dynamics.inchwormDirection === -1 ? 'bottom' : 'top'
+      setAnchoredPaddleHeight(side, nextHeight, anchor)
+      const updatedHeight = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+      if (updatedHeight >= targetHeight - 0.5) {
+        setAnchoredPaddleHeight(side, targetHeight, anchor)
+        dynamics.inchwormPhase = 'idle'
+        dynamics.inchwormDirection = 0
+        dynamics.inchwormBaseHeight = targetHeight
+        dynamics.inchwormTargetHeight = targetHeight
+        const pending = dynamics.inchwormPendingDirection
+        dynamics.inchwormPendingDirection = 0
+        if (pending !== 0) {
+          startInchwormContraction(side, pending, shrinkAmount, minimumHeight)
+        }
+      }
+    }
+
+    dynamics.inchwormWasInput = inputDirection !== 0
+  }
+
+  function startInchwormContraction(
+    side: 'left' | 'right',
+    direction: -1 | 1,
+    shrinkAmount: number,
+    minimumHeight: number,
+  ) {
+    const dynamics = paddleDynamics[side]
+    const currentHeight = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+    const baseHeight = Math.max(currentHeight, minimumHeight)
+    dynamics.inchwormBaseHeight = baseHeight
+    const target = Math.max(minimumHeight, baseHeight - shrinkAmount)
+    dynamics.inchwormTargetHeight = target
+    dynamics.inchwormDirection = direction
+    dynamics.inchwormPendingDirection = 0
+    if (baseHeight - target < 1e-3) {
+      dynamics.inchwormPhase = 'contracted'
+      return
+    }
+    dynamics.inchwormPhase = 'contracting'
+  }
+
+  function setAnchoredPaddleHeight(
+    side: 'left' | 'right',
+    height: number,
+    anchor: 'top' | 'bottom',
+  ) {
+    const clampedHeight = clamp(height, 10, H)
+    const prevTop = side === 'left' ? state.leftY : state.rightY
+    const prevHeight = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+    const prevBottom = prevTop + prevHeight
+
+    setPaddleHeight(side, clampedHeight, { preserveCenter: false })
+
+    if (anchor === 'top') {
+      const y = clamp(prevTop, 0, H - clampedHeight)
+      if (side === 'left') {
+        state.leftY = y
+      } else {
+        state.rightY = y
+      }
+    } else {
+      const y = clamp(prevBottom - clampedHeight, 0, H - clampedHeight)
+      if (side === 'left') {
+        state.leftY = y
+      } else {
+        state.rightY = y
+      }
+    }
+
+    clampPaddlePosition(side)
+  }
+
+  function handleSlinkyPaddle(
+    side: 'left' | 'right',
+    dt: number,
+    control: PaddleControlState,
+    modifier = config.modifiers.paddle.slinky,
+  ) {
+    const dynamics = paddleDynamics[side]
+    const flopRate = Math.max(
+      0,
+      Number.isFinite(modifier.flopRate) ? modifier.flopRate : 0,
+    )
+    if (flopRate <= 0) {
+      dynamics.slinkyTimer = 0
+      dynamics.slinkyDirection = 0
+      return
+    }
+
+    let direction: -1 | 0 | 1 = 0
+    if (control.downRequested || control.direction > 0.35) direction = 1
+    else if (control.upRequested || control.direction < -0.35) direction = -1
+
+    if (direction === 0) {
+      dynamics.slinkyTimer = 0
+      dynamics.slinkyDirection = 0
+      return
+    }
+
+    if (direction !== dynamics.slinkyDirection) {
+      dynamics.slinkyDirection = direction
+      dynamics.slinkyTimer = 0
+    }
+
+    const progressScale = Math.max(Math.abs(control.direction), control.hasDirectionalInput ? 1 : 0)
+    const interval = flopRate > 0 ? 1 / flopRate : Infinity
+    dynamics.slinkyTimer += dt * progressScale
+
+    while (dynamics.slinkyTimer >= interval) {
+      dynamics.slinkyTimer -= interval
+      performSlinkyFlop(side, direction)
+    }
+  }
+
+  function performSlinkyFlop(side: 'left' | 'right', direction: -1 | 1) {
+    const height = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+    if (height <= 0) return
+
+    if (direction < 0) {
+      const top = side === 'left' ? state.leftY : state.rightY
+      const targetTop = Math.max(0, top - height)
+      if (side === 'left') {
+        state.leftY = targetTop
+      } else {
+        state.rightY = targetTop
+      }
+    } else {
+      const top = side === 'left' ? state.leftY : state.rightY
+      const targetTop = Math.min(H - height, top + height)
+      if (side === 'left') {
+        state.leftY = targetTop
+      } else {
+        state.rightY = targetTop
+      }
+    }
+
+    clampPaddlePosition(side)
+  }
+
   function handleManualPaddle(
     side: 'left' | 'right',
     dt: number,
@@ -1630,6 +2528,21 @@ export function createPong(
 
     if (paddleModifiers.dundee.enabled) {
       handleDundeePaddle(side, dt, control, paddleModifiers.dundee)
+      return
+    }
+
+    if (paddleModifiers.slinky.enabled) {
+      handleSlinkyPaddle(side, dt, control, paddleModifiers.slinky)
+      return
+    }
+
+    if (paddleModifiers.inchworm.enabled) {
+      handleInchwormPaddle(side, dt, paddleSpeed, control, paddleModifiers.inchworm)
+      return
+    }
+
+    if (paddleModifiers.angry.enabled) {
+      handleAngryPaddle(side, dt, paddleSpeed, control, paddleModifiers.angry)
       return
     }
 
@@ -1792,6 +2705,9 @@ export function createPong(
     let multiplier = Number.isFinite(value) ? value : 1
     const paddleModifiers = config.modifiers.paddle
     const paddleModifierEntries = [
+      paddleModifiers.apparition,
+      paddleModifiers.outOfBody,
+      paddleModifiers.bendy,
       paddleModifiers.chilly,
       paddleModifiers.buckTooth,
       paddleModifiers.osteoWhat,
@@ -1800,6 +2716,9 @@ export function createPong(
       paddleModifiers.foosball,
       paddleModifiers.dizzy,
       paddleModifiers.bungee,
+      paddleModifiers.angry,
+      paddleModifiers.inchworm,
+      paddleModifiers.slinky,
       paddleModifiers.missileCommander,
       paddleModifiers.frisbee,
       paddleModifiers.dundee,
@@ -2370,50 +3289,69 @@ export function createPong(
   function getPhysicalPaddles(): PhysicalPaddle[] {
     const paddles: PhysicalPaddle[] = []
     const doublesEnabled = Boolean(config.doubles.enabled)
+    const outOfBodyEnabled = Boolean(config.modifiers.paddle.outOfBody.enabled)
 
     if (doublesEnabled) {
+      const leftInnerRect = outOfBodyEnabled
+        ? getOutOfBodyCollisionRect('left', 'inner')
+        : null
       paddles.push({
         side: 'left',
         lane: 'inner',
         x: getLeftInnerX(),
-        y: state.leftInnerY,
-        height: state.leftInnerPaddleHeight,
+        y: leftInnerRect ? leftInnerRect.y : state.leftInnerY,
+        height: leftInnerRect ? leftInnerRect.height : state.leftInnerPaddleHeight,
       })
+      const leftOuterRect = outOfBodyEnabled
+        ? getOutOfBodyCollisionRect('left', 'outer')
+        : null
       paddles.push({
         side: 'left',
         lane: 'outer',
         x: getLeftOuterX(),
-        y: state.leftY,
-        height: state.leftPaddleHeight,
+        y: leftOuterRect ? leftOuterRect.y : state.leftY,
+        height: leftOuterRect ? leftOuterRect.height : state.leftPaddleHeight,
       })
+      const rightInnerRect = outOfBodyEnabled
+        ? getOutOfBodyCollisionRect('right', 'inner')
+        : null
       paddles.push({
         side: 'right',
         lane: 'inner',
         x: getRightInnerX(),
-        y: state.rightInnerY,
-        height: state.rightInnerPaddleHeight,
+        y: rightInnerRect ? rightInnerRect.y : state.rightInnerY,
+        height: rightInnerRect ? rightInnerRect.height : state.rightInnerPaddleHeight,
       })
+      const rightOuterRect = outOfBodyEnabled
+        ? getOutOfBodyCollisionRect('right', 'outer')
+        : null
       paddles.push({
         side: 'right',
         lane: 'outer',
         x: getRightOuterX(),
-        y: state.rightY,
-        height: state.rightPaddleHeight,
+        y: rightOuterRect ? rightOuterRect.y : state.rightY,
+        height: rightOuterRect ? rightOuterRect.height : state.rightPaddleHeight,
       })
     } else {
+      const leftOuterRect = outOfBodyEnabled
+        ? getOutOfBodyCollisionRect('left', 'outer')
+        : null
       paddles.push({
         side: 'left',
         lane: 'outer',
         x: getLeftOuterX(),
-        y: state.leftY,
-        height: state.leftPaddleHeight,
+        y: leftOuterRect ? leftOuterRect.y : state.leftY,
+        height: leftOuterRect ? leftOuterRect.height : state.leftPaddleHeight,
       })
+      const rightOuterRect = outOfBodyEnabled
+        ? getOutOfBodyCollisionRect('right', 'outer')
+        : null
       paddles.push({
         side: 'right',
         lane: 'outer',
         x: getRightOuterX(),
-        y: state.rightY,
-        height: state.rightPaddleHeight,
+        y: rightOuterRect ? rightOuterRect.y : state.rightY,
+        height: rightOuterRect ? rightOuterRect.height : state.rightPaddleHeight,
       })
     }
 
@@ -2690,24 +3628,36 @@ export function createPong(
       const crackedRgb = mixRgb(baseRgb, WHITE_RGB, 0.35)
       const crackedColor = rgbaString(crackedRgb, 1)
 
+      const tailOpacity = getPaddleOpacity(paddle)
+      if (config.modifiers.paddle.outOfBody.enabled && paddle.lane !== 'missile') {
+        drawOutOfBodyTrail(paddle, baseHex, crackedColor, tailOpacity)
+      }
+
+      if (tailOpacity <= 0) continue
+
+      ctx.save()
+      ctx.globalAlpha = tailOpacity
       for (const segment of segments) {
         if (segment.height <= 0 || segment.broken) continue
         const fillColor = segment.cracked ? crackedColor : baseHex
+        const offset = getBendyOffset(paddle, segment)
+        const rectX = segment.x + offset
         ctx.fillStyle = fillColor
-        ctx.fillRect(segment.x, segment.y, segment.width, segment.height)
+        ctx.fillRect(rectX, segment.y, segment.width, segment.height)
         ctx.fillStyle =
           paddle.side === 'left' ? LEFT_PADDLE_EDGE_COLOR : RIGHT_PADDLE_EDGE_COLOR
         if (paddle.side === 'left') {
-          ctx.fillRect(segment.x, segment.y, PADDLE_EDGE_WIDTH, segment.height)
+          ctx.fillRect(rectX, segment.y, PADDLE_EDGE_WIDTH, segment.height)
         } else {
           ctx.fillRect(
-            segment.x + segment.width - PADDLE_EDGE_WIDTH,
+            rectX + segment.width - PADDLE_EDGE_WIDTH,
             segment.y,
             PADDLE_EDGE_WIDTH,
             segment.height,
           )
         }
       }
+      ctx.restore()
     }
 
     ctx.fillStyle = BALL_COLOR

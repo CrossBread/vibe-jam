@@ -10,6 +10,9 @@
   type PollokModifier,
   type SnowballModifier,
   type MeteorModifier,
+  type ApparitionModifier,
+  type OutOfBodyModifier,
+  type BendyModifier,
   type ChillyModifier,
   type BuckToothModifier,
   type OsteoWhatModifier,
@@ -18,6 +21,9 @@
   type FoosballModifier,
   type DizzyModifier,
   type BungeeModifier,
+  type AngryModifier,
+  type InchwormModifier,
+  type SlinkyModifier,
   type MissileCommanderModifier,
   type FrisbeeModifier,
   type DundeeModifier,
@@ -694,6 +700,9 @@ export function createDevOverlay(
     paddleSection.appendChild(paddleList)
 
     const {
+      apparition,
+      outOfBody,
+      bendy,
       chilly,
       buckTooth,
       osteoWhat,
@@ -702,10 +711,165 @@ export function createDevOverlay(
       foosball,
       dizzy,
       bungee,
+      angry,
+      inchworm,
+      slinky,
       missileCommander,
       frisbee,
       dundee,
     } = config.modifiers.paddle
+
+    paddleList.appendChild(
+      createModifierDetails(apparition, body => {
+        body.appendChild(
+          createSliderControl('Paddle Size Multiplier', apparition.paddleSizeMultiplier, {
+            min: 0.5,
+            max: 1.75,
+            step: 0.05,
+            format: v => `${v.toFixed(2)}×`,
+            onInput: v => (apparition.paddleSizeMultiplier = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Minimum Opacity', apparition.minOpacity, {
+            min: 0,
+            max: 1,
+            step: 0.01,
+            format: v => `${Math.round(v * 100)}%`,
+            onInput: v => (apparition.minOpacity = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Fade Duration', apparition.fadeDuration, {
+            min: 0,
+            max: 3,
+            step: 0.05,
+            format: v => `${v.toFixed(2)} s`,
+            onInput: v => (apparition.fadeDuration = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Visible Hold', apparition.visibleHoldDuration, {
+            min: 0,
+            max: 6,
+            step: 0.1,
+            format: v => `${v.toFixed(1)} s`,
+            onInput: v => (apparition.visibleHoldDuration = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Hidden Hold', apparition.hiddenHoldDuration, {
+            min: 0,
+            max: 6,
+            step: 0.1,
+            format: v => `${v.toFixed(1)} s`,
+            onInput: v => (apparition.hiddenHoldDuration = v),
+          }),
+        )
+      }),
+    )
+
+    paddleList.appendChild(
+      createModifierDetails(outOfBody, body => {
+        body.appendChild(
+          createSliderControl('Paddle Size Multiplier', outOfBody.paddleSizeMultiplier, {
+            min: 0.5,
+            max: 1.75,
+            step: 0.05,
+            format: v => `${v.toFixed(2)}×`,
+            onInput: v => (outOfBody.paddleSizeMultiplier = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Paddle Opacity', outOfBody.paddleOpacity, {
+            min: 0,
+            max: 1,
+            step: 0.01,
+            format: v => `${Math.round(v * 100)}%`,
+            onInput: v => (outOfBody.paddleOpacity = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Trail Length', outOfBody.trailLength, {
+            min: 2,
+            max: 16,
+            step: 1,
+            format: v => `${Math.round(v)} frames`,
+            onInput: v => (outOfBody.trailLength = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Sample Interval', outOfBody.sampleInterval, {
+            min: 0.01,
+            max: 0.2,
+            step: 0.01,
+            format: v => `${v.toFixed(2)} s`,
+            onInput: v => (outOfBody.sampleInterval = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Trail Fade', outOfBody.trailFade, {
+            min: 0.3,
+            max: 0.95,
+            step: 0.01,
+            format: v => `${Math.round(v * 100)}%`,
+            onInput: v => (outOfBody.trailFade = v),
+          }),
+        )
+      }),
+    )
+
+    paddleList.appendChild(
+      createModifierDetails(bendy, body => {
+        body.appendChild(
+          createSliderControl('Paddle Size Multiplier', bendy.paddleSizeMultiplier, {
+            min: 0.5,
+            max: 1.75,
+            step: 0.05,
+            format: v => `${v.toFixed(2)}×`,
+            onInput: v => (bendy.paddleSizeMultiplier = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Max Offset', bendy.maxOffset, {
+            min: 0,
+            max: 24,
+            step: 0.5,
+            format: v => `${v.toFixed(1)} px`,
+            onInput: v => (bendy.maxOffset = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Oscillation Speed', bendy.oscillationSpeed, {
+            min: 1,
+            max: 12,
+            step: 0.1,
+            format: v => `${v.toFixed(1)} Hz`,
+            onInput: v => (bendy.oscillationSpeed = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Speed For Max Bend', bendy.speedForMaxBend, {
+            min: 120,
+            max: 900,
+            step: 5,
+            format: v => `${Math.round(v)} px/s`,
+            onInput: v => (bendy.speedForMaxBend = v),
+          }),
+        )
+      }),
+    )
 
     paddleList.appendChild(
       createModifierDetails(chilly, body => {
@@ -962,6 +1126,138 @@ export function createDevOverlay(
             step: 5,
             format: v => `${Math.round(v)} px/s`,
             onInput: v => (bungee.returnSpeed = v),
+          }),
+        )
+      }),
+    )
+
+    paddleList.appendChild(
+      createModifierDetails(angry, body => {
+        body.appendChild(
+          createSliderControl('Paddle Size Multiplier', angry.paddleSizeMultiplier, {
+            min: 0.5,
+            max: 1.75,
+            step: 0.05,
+            format: v => `${v.toFixed(2)}×`,
+            onInput: v => (angry.paddleSizeMultiplier = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Stretch Speed', angry.stretchSpeed, {
+            min: 20,
+            max: 480,
+            step: 5,
+            format: v => `${Math.round(v)} px/s`,
+            onInput: v => (angry.stretchSpeed = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Maximum Stretch', angry.maxStretch, {
+            min: 10,
+            max: 140,
+            step: 1,
+            format: v => `${Math.round(v)} px`,
+            onInput: v => (angry.maxStretch = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Release Speed', angry.releaseSpeed, {
+            min: 20,
+            max: 720,
+            step: 5,
+            format: v => `${Math.round(v)} px/s`,
+            onInput: v => (angry.releaseSpeed = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Movement Multiplier', angry.moveSpeedMultiplier, {
+            min: 0.2,
+            max: 1,
+            step: 0.01,
+            format: v => `${v.toFixed(2)}×`,
+            onInput: v => (angry.moveSpeedMultiplier = v),
+          }),
+        )
+      }),
+    )
+
+    paddleList.appendChild(
+      createModifierDetails(inchworm, body => {
+        body.appendChild(
+          createSliderControl('Paddle Size Multiplier', inchworm.paddleSizeMultiplier, {
+            min: 0.5,
+            max: 1.75,
+            step: 0.05,
+            format: v => `${v.toFixed(2)}×`,
+            onInput: v => (inchworm.paddleSizeMultiplier = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Shrink Amount', inchworm.shrinkAmount, {
+            min: 0,
+            max: 96,
+            step: 1,
+            format: v => `${Math.round(v)} px`,
+            onInput: v => (inchworm.shrinkAmount = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Minimum Height', inchworm.minimumHeight, {
+            min: 24,
+            max: 180,
+            step: 1,
+            format: v => `${Math.round(v)} px`,
+            onInput: v => (inchworm.minimumHeight = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Shrink Speed', inchworm.shrinkSpeed, {
+            min: 20,
+            max: 600,
+            step: 5,
+            format: v => `${Math.round(v)} px/s`,
+            onInput: v => (inchworm.shrinkSpeed = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Extend Speed', inchworm.extendSpeed, {
+            min: 20,
+            max: 600,
+            step: 5,
+            format: v => `${Math.round(v)} px/s`,
+            onInput: v => (inchworm.extendSpeed = v),
+          }),
+        )
+      }),
+    )
+
+    paddleList.appendChild(
+      createModifierDetails(slinky, body => {
+        body.appendChild(
+          createSliderControl('Paddle Size Multiplier', slinky.paddleSizeMultiplier, {
+            min: 0.5,
+            max: 1.75,
+            step: 0.05,
+            format: v => `${v.toFixed(2)}×`,
+            onInput: v => (slinky.paddleSizeMultiplier = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Flops Per Second', slinky.flopRate, {
+            min: 0.2,
+            max: 6,
+            step: 0.1,
+            format: v => `${v.toFixed(2)} flops/s`,
+            onInput: v => (slinky.flopRate = v),
           }),
         )
       }),
@@ -1474,6 +1770,9 @@ function isDevConfig(value: unknown): value is DevConfig {
   const paddle = modifiers.paddle as Partial<Record<string, unknown>> | undefined
   if (!paddle || typeof paddle !== 'object') return false
 
+  if (!isApparitionModifier(paddle.apparition)) return false
+  if (!isOutOfBodyModifier(paddle.outOfBody)) return false
+  if (!isBendyModifier(paddle.bendy)) return false
   if (!isChillyModifier(paddle.chilly)) return false
   if (!isBuckToothModifier(paddle.buckTooth)) return false
   if (!isOsteoWhatModifier(paddle.osteoWhat)) return false
@@ -1624,6 +1923,41 @@ function isMeteorModifier(value: unknown): value is MeteorModifier {
     typeof candidate.startRadius === 'number' &&
     typeof candidate.minRadius === 'number' &&
     typeof candidate.shrinkRate === 'number'
+  )
+}
+
+function isApparitionModifier(value: unknown): value is ApparitionModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<ApparitionModifier>
+  return (
+    typeof candidate.minOpacity === 'number' &&
+    typeof candidate.fadeDuration === 'number' &&
+    typeof candidate.visibleHoldDuration === 'number' &&
+    typeof candidate.hiddenHoldDuration === 'number' &&
+    typeof candidate.paddleSizeMultiplier === 'number'
+  )
+}
+
+function isOutOfBodyModifier(value: unknown): value is OutOfBodyModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<OutOfBodyModifier>
+  return (
+    typeof candidate.paddleOpacity === 'number' &&
+    typeof candidate.trailLength === 'number' &&
+    typeof candidate.sampleInterval === 'number' &&
+    typeof candidate.trailFade === 'number' &&
+    typeof candidate.paddleSizeMultiplier === 'number'
+  )
+}
+
+function isBendyModifier(value: unknown): value is BendyModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<BendyModifier>
+  return (
+    typeof candidate.paddleSizeMultiplier === 'number' &&
+    typeof candidate.maxOffset === 'number' &&
+    typeof candidate.oscillationSpeed === 'number' &&
+    typeof candidate.speedForMaxBend === 'number'
   )
 }
 

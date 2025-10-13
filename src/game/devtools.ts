@@ -14,6 +14,9 @@ export type GravityWellKey = (typeof GRAVITY_WELL_KEYS)[number]
 
 export const BALL_MODIFIER_KEYS = ['kite', 'bumShuffle', 'pollok', 'snowball', 'meteor'] as const
 export const PADDLE_MODIFIER_KEYS = [
+  'apparition',
+  'outOfBody',
+  'bendy',
   'chilly',
   'buckTooth',
   'osteoWhat',
@@ -22,6 +25,9 @@ export const PADDLE_MODIFIER_KEYS = [
   'foosball',
   'dizzy',
   'bungee',
+  'angry',
+  'inchworm',
+  'slinky',
   'missileCommander',
   'frisbee',
   'dundee',
@@ -91,6 +97,29 @@ export interface ChillyModifier extends ModifierBase {
   paddleSizeMultiplier: number
 }
 
+export interface ApparitionModifier extends ModifierBase {
+  minOpacity: number
+  fadeDuration: number
+  visibleHoldDuration: number
+  hiddenHoldDuration: number
+  paddleSizeMultiplier: number
+}
+
+export interface OutOfBodyModifier extends ModifierBase {
+  paddleOpacity: number
+  trailLength: number
+  sampleInterval: number
+  trailFade: number
+  paddleSizeMultiplier: number
+}
+
+export interface BendyModifier extends ModifierBase {
+  paddleSizeMultiplier: number
+  maxOffset: number
+  oscillationSpeed: number
+  speedForMaxBend: number
+}
+
 export interface BuckToothModifier extends ModifierBase {
   gapSize: number
   paddleSizeMultiplier: number
@@ -130,6 +159,27 @@ export interface BungeeModifier extends ModifierBase {
   returnSpeed: number
 }
 
+export interface AngryModifier extends ModifierBase {
+  paddleSizeMultiplier: number
+  stretchSpeed: number
+  maxStretch: number
+  releaseSpeed: number
+  moveSpeedMultiplier: number
+}
+
+export interface InchwormModifier extends ModifierBase {
+  paddleSizeMultiplier: number
+  shrinkAmount: number
+  minimumHeight: number
+  shrinkSpeed: number
+  extendSpeed: number
+}
+
+export interface SlinkyModifier extends ModifierBase {
+  paddleSizeMultiplier: number
+  flopRate: number
+}
+
 export interface MissileCommanderModifier extends ModifierBase {
   paddleSizeMultiplier: number
   launchSpeed: number
@@ -151,6 +201,9 @@ export interface DundeeModifier extends ModifierBase {
 }
 
 export type PaddleModifiers = {
+  apparition: ApparitionModifier
+  outOfBody: OutOfBodyModifier
+  bendy: BendyModifier
   chilly: ChillyModifier
   buckTooth: BuckToothModifier
   osteoWhat: OsteoWhatModifier
@@ -159,6 +212,9 @@ export type PaddleModifiers = {
   foosball: FoosballModifier
   dizzy: DizzyModifier
   bungee: BungeeModifier
+  angry: AngryModifier
+  inchworm: InchwormModifier
+  slinky: SlinkyModifier
   missileCommander: MissileCommanderModifier
   frisbee: FrisbeeModifier
   dundee: DundeeModifier

@@ -139,6 +139,35 @@
       }
     },
     "paddle": {
+      "apparition": {
+        "name": "Apparition",
+        "description": "Paddles flicker between visible and translucent phases",
+        "enabled": false,
+        "minOpacity": 0.05,
+        "fadeDuration": 0.8,
+        "visibleHoldDuration": 3.2,
+        "hiddenHoldDuration": 1.4,
+        "paddleSizeMultiplier": 1
+      },
+      "outOfBody": {
+        "name": "Out of Body",
+        "description": "Spectral paddles leave a trailing echo; only the tail is solid",
+        "enabled": false,
+        "paddleOpacity": 0.2,
+        "trailLength": 6,
+        "sampleInterval": 0.05,
+        "trailFade": 0.7,
+        "paddleSizeMultiplier": 1
+      },
+      "bendy": {
+        "name": "Bendy",
+        "description": "Paddles flex into articulated segments while they travel",
+        "enabled": false,
+        "paddleSizeMultiplier": 1,
+        "maxOffset": 8,
+        "oscillationSpeed": 5,
+        "speedForMaxBend": 420
+      },
       "chilly": {
         "name": "Chilly",
         "description": "Paddles start large then shrink after each return; reset on point",
@@ -200,6 +229,33 @@
         "enabled": false,
         "paddleSizeMultiplier": 1,
         "returnSpeed": 240
+      },
+      "angry": {
+        "name": "Angry",
+        "description": "Stretch paddles in the input direction then fling back when released",
+        "enabled": false,
+        "paddleSizeMultiplier": 1,
+        "stretchSpeed": 200,
+        "maxStretch": 54,
+        "releaseSpeed": 380,
+        "moveSpeedMultiplier": 0.55
+      },
+      "inchworm": {
+        "name": "Inchworm",
+        "description": "Paddles scoot by shrinking then lunging forward on alternating taps",
+        "enabled": false,
+        "paddleSizeMultiplier": 1,
+        "shrinkAmount": 28,
+        "minimumHeight": 48,
+        "shrinkSpeed": 220,
+        "extendSpeed": 260
+      },
+      "slinky": {
+        "name": "Slinky",
+        "description": "Paddles tumble end over end instead of sliding",
+        "enabled": false,
+        "paddleSizeMultiplier": 1,
+        "flopRate": 2.6
       },
       "missileCommander": {
         "name": "Missile Commander",
