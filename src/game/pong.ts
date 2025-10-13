@@ -72,6 +72,20 @@ import { getBlackHoleWells } from './mods/arena/blackHole/blackHoleView'
 import { getSuperMassiveWells } from './mods/arena/superMassive/superMassiveView'
 import { getWhiteDwarfWells } from './mods/arena/whiteDwarf/whiteDwarfView'
 import {
+  createFogOfWarState,
+  resetFogOfWarState,
+  updateFogOfWarState,
+  type FogOfWarState,
+} from './mods/arena/fogOfWar/fogOfWarModifier'
+import { drawFogOfWarOverlay } from './mods/arena/fogOfWar/fogOfWarView'
+import {
+  createWonderlandState,
+  resetWonderlandState,
+  updateWonderlandState,
+  type WonderlandState,
+} from './mods/arena/wonderland/wonderlandModifier'
+import { drawWonderlandSnow } from './mods/arena/wonderland/wonderlandView'
+import {
   createApparitionState,
   resetApparitionStates as resetApparitionStateMap,
   updateApparitionStates as updateApparitionStateMap,
@@ -722,6 +736,8 @@ export function createPong(
   const irelandState: IrelandState = createIrelandState()
   const blackMoleState: BlackMoleState = createBlackMoleState(arenaDimensions)
   const gopherState: GopherState = createGopherState(arenaDimensions)
+  const fogOfWarState: FogOfWarState = createFogOfWarState()
+  const wonderlandState: WonderlandState = createWonderlandState()
   let activeGravityWells: ActiveGravityWell[] = []
   let announcement: Announcement | null = null
   let lastEnabledArenaModifiers = new Set<GravityWellKey>(
@@ -865,6 +881,8 @@ export function createPong(
     resetGopherState(gopherState, arenaDimensions)
     clearDivots(divotsState)
     clearIrelandWells(irelandState)
+    resetFogOfWarState(fogOfWarState)
+    resetWonderlandState(wonderlandState)
     activeGravityWells = []
     announcement = null
     lastEnabledArenaModifiers = new Set<GravityWellKey>(
@@ -957,6 +975,13 @@ export function createPong(
     )
     maintainDivotsState(divotsState, config.modifiers.arena.divots)
     ensureIrelandWells(irelandState, config.modifiers.arena.ireland, arenaDimensions)
+    updateFogOfWarState(fogOfWarState, config.modifiers.arena.fogOfWar, dt, arenaDimensions)
+    updateWonderlandState(
+      wonderlandState,
+      config.modifiers.arena.wonderland,
+      dt,
+      arenaDimensions,
+    )
 
     const leftGamepadActive =
       gamepadInput.leftAxis !== 0 || gamepadInput.leftUp || gamepadInput.leftDown
@@ -1347,6 +1372,8 @@ export function createPong(
 
     markIrelandNeedsRegeneration(irelandState)
     clearBumShuffleTrail(bumShuffleState)
+    resetFogOfWarState(fogOfWarState)
+    resetWonderlandState(wonderlandState)
 
     const modifier = config.modifiers.arena.ireland
     if (!modifier.enabled) {
@@ -2797,6 +2824,8 @@ export function createPong(
       if (key === 'ireland') clearIrelandWells(irelandState)
       if (key === 'blackMole') resetBlackMoleState(blackMoleState, arenaDimensions)
       if (key === 'gopher') resetGopherState(gopherState, arenaDimensions)
+      if (key === 'fogOfWar') resetFogOfWarState(fogOfWarState)
+      if (key === 'wonderland') resetWonderlandState(wonderlandState)
     }
 
     if (anyDisabled) {
@@ -2829,6 +2858,9 @@ export function createPong(
           break
         case 'divots':
           wells.push(...getDivotsWells(divotsState, arena.divots))
+          break
+        case 'fogOfWar':
+        case 'wonderland':
           break
         case 'ireland':
           wells.push(...getIrelandWells(irelandState, arena.ireland, arenaDimensions))
@@ -2939,6 +2971,8 @@ export function createPong(
         if (key === 'ireland') clearIrelandWells(irelandState)
         if (key === 'blackMole') resetBlackMoleState(blackMoleState, arenaDimensions)
         if (key === 'gopher') resetGopherState(gopherState, arenaDimensions)
+        if (key === 'fogOfWar') resetFogOfWarState(fogOfWarState)
+        if (key === 'wonderland') resetWonderlandState(wonderlandState)
       }
     }
 
@@ -2946,6 +2980,14 @@ export function createPong(
 
     if (nextKey === 'ireland') {
       markIrelandNeedsRegeneration(irelandState)
+    }
+
+    if (nextKey === 'fogOfWar') {
+      resetFogOfWarState(fogOfWarState)
+    }
+
+    if (nextKey === 'wonderland') {
+      resetWonderlandState(wonderlandState)
     }
 
     activeGravityWells = collectActiveGravityWells()
@@ -3595,6 +3637,9 @@ export function createPong(
         ctx.restore()
       }
     }
+
+    drawFogOfWarOverlay(ctx, fogOfWarState, config.modifiers.arena.fogOfWar, arenaDimensions)
+    drawWonderlandSnow(ctx, wonderlandState, config.modifiers.arena.wonderland, BALL_COLOR)
 
     const pipRadius = 6
     const pipSpacing = 22

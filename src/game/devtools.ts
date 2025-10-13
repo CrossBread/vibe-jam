@@ -7,6 +7,8 @@ export const GRAVITY_WELL_KEYS = [
   'superMassive',
   'whiteDwarf',
   'divots',
+  'fogOfWar',
+  'wonderland',
   'ireland',
   'russianRoulette',
 ] as const
@@ -57,6 +59,13 @@ export interface GravityWellModifier extends ModifierBase {
   wanderSpeed?: number
   illusionFadeDistance?: number
   illusionFadeSpeed?: number
+  fogExpansionSpeed?: number
+  fogMaxRadius?: number
+  fogMaxOpacity?: number
+  snowflakeCount?: number
+  snowflakeSize?: number
+  snowflakeSpeed?: number
+  snowOpacity?: number
 }
 
 export type ArenaModifiers = Record<GravityWellKey, GravityWellModifier>

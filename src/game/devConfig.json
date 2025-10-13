@@ -87,6 +87,35 @@
         "negativeTint": "#fef3c7",
         "includeInRandom": true
       },
+      "fogOfWar": {
+        "name": "Fog of War",
+        "description": "Darkness creeps from center court until the next point",
+        "enabled": false,
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "fogExpansionSpeed": 220,
+        "fogMaxRadius": 420,
+        "fogMaxOpacity": 0.85,
+        "positiveTint": "#020617",
+        "negativeTint": "#020617",
+        "includeInRandom": true
+      },
+      "wonderland": {
+        "name": "Wonderland",
+        "description": "A blinding blizzard of snow obscures the action",
+        "enabled": false,
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "snowflakeCount": 200,
+        "snowflakeSize": 8,
+        "snowflakeSpeed": 220,
+        "snowOpacity": 0.88,
+        "positiveTint": "#e7ecf3",
+        "negativeTint": "#e7ecf3",
+        "includeInRandom": true
+      },
       "russianRoulette": {
         "name": "Russian Roulette",
         "description": "Six launch decoys but only one ball counts",
