@@ -10,6 +10,8 @@ import { createTeaPartyModifier } from './teaParty/teaPartyEditor'
 import { createWonderlandModifier } from './wonderland/wonderlandEditor'
 import { createIrelandModifier } from './ireland/irelandEditor'
 import { createRussianRouletteModifier } from './russianRoulette/russianRouletteEditor'
+import { createSecondChancesModifier } from './secondChances/secondChancesEditor'
+import { createSpaceInvadersModifier } from './spaceInvaders/spaceInvadersEditor'
 import { createSuperMassiveModifier } from './superMassive/superMassiveEditor'
 import { createWhiteDwarfModifier } from './whiteDwarf/whiteDwarfEditor'
 
@@ -26,6 +28,8 @@ export const arenaModifierBuilders: ArenaBuilderMap = {
   divots: createDivotsModifier,
   fogOfWar: createFogOfWarModifier,
   wonderland: createWonderlandModifier,
+  secondChances: createSecondChancesModifier,
+  spaceInvaders: createSpaceInvadersModifier,
   ireland: createIrelandModifier,
   russianRoulette: createRussianRouletteModifier,
   drinkMe: createDrinkMeModifier,

@@ -6,6 +6,8 @@ import {
   type ArenaModifiers,
   type GravityWellKey,
   type GravityWellModifier,
+  type SecondChancesModifier,
+  type SpaceInvadersModifier,
 } from './devtools'
 import { createDevOverlay, showOverlay, toggleOverlay } from './devOverlay'
 import type { RGBColor } from './mods/ball/shared'
@@ -101,6 +103,24 @@ import {
   type WonderlandState,
 } from './mods/arena/wonderland/wonderlandModifier'
 import { drawWonderlandSnow } from './mods/arena/wonderland/wonderlandView'
+import {
+  clearSecondChancesState,
+  createSecondChancesState,
+  maintainSecondChancesState,
+  reflectBallWithSecondChanceShields,
+  resetSecondChancesShields,
+  type SecondChancesState,
+} from './mods/arena/secondChances/secondChancesModifier'
+import { drawSecondChanceShields } from './mods/arena/secondChances/secondChancesView'
+import {
+  clearSpaceInvadersState,
+  createSpaceInvadersState,
+  maintainSpaceInvadersState,
+  resetSpaceInvadersState,
+  resolveSpaceInvadersCollision,
+  type SpaceInvadersState,
+} from './mods/arena/spaceInvaders/spaceInvadersModifier'
+import { drawSpaceInvadersBarricades } from './mods/arena/spaceInvaders/spaceInvadersView'
 import {
   createApparitionState,
   resetApparitionStates as resetApparitionStateMap,
@@ -758,6 +778,8 @@ export function createPong(
   const wonderlandState: WonderlandState = createWonderlandState()
   const drinkMeState: DrinkMeState = createDrinkMeState()
   const teaPartyState: TeaPartyState = createTeaPartyState()
+  const secondChancesState: SecondChancesState = createSecondChancesState()
+  const spaceInvadersState: SpaceInvadersState = createSpaceInvadersState()
   let activeGravityWells: ActiveGravityWell[] = []
   let announcement: Announcement | null = null
   let lastEnabledArenaModifiers = new Set<GravityWellKey>(
@@ -768,6 +790,12 @@ export function createPong(
   const bumShuffleState: BumShuffleState = createBumShuffleState()
   const pollokState: PollokState = createPollokState()
   let completedBitesSinceLastPoint = 0
+  maintainSecondChancesState(secondChancesState, getSecondChancesModifier())
+  maintainSpaceInvadersState(
+    spaceInvadersState,
+    getSpaceInvadersModifier(),
+    arenaDimensions,
+  )
   initializeActiveModState()
   resetBallSize()
   initializePaddleHeights(true)
@@ -877,6 +905,8 @@ export function createPong(
 
   function resetBall(toLeft: boolean) {
     balls.length = 0
+    resetSecondChancesShields(secondChancesState, getSecondChancesModifier())
+    resetSpaceInvadersState(spaceInvadersState, getSpaceInvadersModifier(), arenaDimensions)
     if (config.modifiers.arena.russianRoulette.enabled) {
       spawnRussianRouletteBalls(toLeft)
     } else {
@@ -907,6 +937,8 @@ export function createPong(
     resetWonderlandState(wonderlandState)
     clearDrinkMeState(drinkMeState)
     clearTeaPartyState(teaPartyState)
+    clearSecondChancesState(secondChancesState)
+    clearSpaceInvadersState(spaceInvadersState)
     activeGravityWells = []
     announcement = null
     lastEnabledArenaModifiers = new Set<GravityWellKey>(
@@ -925,6 +957,12 @@ export function createPong(
     resetOutOfBodyTrails(true)
     resetBendyState(config.modifiers.paddle.bendy.enabled)
     syncPaddleMotionState()
+    maintainSecondChancesState(secondChancesState, getSecondChancesModifier())
+    maintainSpaceInvadersState(
+      spaceInvadersState,
+      getSpaceInvadersModifier(),
+      arenaDimensions,
+    )
     resetBall(Math.random() < 0.5)
   }
 
@@ -1006,6 +1044,12 @@ export function createPong(
       wonderlandState,
       config.modifiers.arena.wonderland,
       dt,
+      arenaDimensions,
+    )
+    maintainSecondChancesState(secondChancesState, getSecondChancesModifier())
+    maintainSpaceInvadersState(
+      spaceInvadersState,
+      getSpaceInvadersModifier(),
       arenaDimensions,
     )
 
@@ -1192,6 +1236,25 @@ export function createPong(
 
       handlePotionCollisions(ball)
 
+      const hitBarricade = resolveSpaceInvadersCollision(
+        spaceInvadersState,
+        getSpaceInvadersModifier(),
+        ball,
+      )
+      if (hitBarricade) {
+        radius = ball.radius
+      }
+
+      const shieldSide = reflectBallWithSecondChanceShields(
+        secondChancesState,
+        getSecondChancesModifier(),
+        ball,
+        arenaDimensions.width,
+      )
+      if (shieldSide) {
+        radius = ball.radius
+      }
+
       if (resolvePaddleCollisions(ball, paddles)) {
         radius = ball.radius
       }
@@ -1276,6 +1339,14 @@ export function createPong(
     }
 
     lastEnabledArenaModifiers = enabledKeys
+  }
+
+  function getSecondChancesModifier(): SecondChancesModifier {
+    return config.modifiers.arena.secondChances as SecondChancesModifier
+  }
+
+  function getSpaceInvadersModifier(): SpaceInvadersModifier {
+    return config.modifiers.arena.spaceInvaders as SpaceInvadersModifier
   }
 
   function showAnnouncement(lines: string[]) {
@@ -2858,6 +2929,8 @@ export function createPong(
       if (key === 'wonderland') resetWonderlandState(wonderlandState)
       if (key === 'drinkMe') clearDrinkMeState(drinkMeState)
       if (key === 'teaParty') clearTeaPartyState(teaPartyState)
+      if (key === 'secondChances') clearSecondChancesState(secondChancesState)
+      if (key === 'spaceInvaders') clearSpaceInvadersState(spaceInvadersState)
     }
 
     if (anyDisabled) {
@@ -2893,6 +2966,10 @@ export function createPong(
           break
         case 'fogOfWar':
         case 'wonderland':
+          break
+        case 'secondChances':
+          break
+        case 'spaceInvaders':
           break
         case 'ireland':
           wells.push(...getIrelandWells(irelandState, arena.ireland, arenaDimensions))
@@ -3099,6 +3176,19 @@ export function createPong(
         if (key === 'wonderland') resetWonderlandState(wonderlandState)
         if (key === 'drinkMe') clearDrinkMeState(drinkMeState)
         if (key === 'teaParty') clearTeaPartyState(teaPartyState)
+        if (key === 'secondChances') clearSecondChancesState(secondChancesState)
+        if (key === 'spaceInvaders') clearSpaceInvadersState(spaceInvadersState)
+      } else {
+        if (key === 'secondChances') {
+          const shieldModifier = getSecondChancesModifier()
+          maintainSecondChancesState(secondChancesState, shieldModifier)
+          resetSecondChancesShields(secondChancesState, shieldModifier)
+        }
+        if (key === 'spaceInvaders') {
+          const barricadeModifier = getSpaceInvadersModifier()
+          maintainSpaceInvadersState(spaceInvadersState, barricadeModifier, arenaDimensions)
+          resetSpaceInvadersState(spaceInvadersState, barricadeModifier, arenaDimensions)
+        }
       }
     }
 
@@ -3719,6 +3809,18 @@ export function createPong(
     drawPotionObjects(
       getTeaPartyObjects(teaPartyState, config.modifiers.arena.teaParty),
       config.modifiers.arena.teaParty,
+    )
+
+    drawSecondChanceShields(ctx, secondChancesState, getSecondChancesModifier(), {
+      arenaWidth: W,
+      arenaHeight: H,
+      backgroundRgb: ARENA_BACKGROUND_RGB,
+    })
+    drawSpaceInvadersBarricades(
+      ctx,
+      spaceInvadersState,
+      getSpaceInvadersModifier(),
+      { backgroundRgb: ARENA_BACKGROUND_RGB },
     )
 
     drawBallTrails()

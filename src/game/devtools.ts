@@ -9,6 +9,8 @@ export const GRAVITY_WELL_KEYS = [
   'divots',
   'fogOfWar',
   'wonderland',
+  'secondChances',
+  'spaceInvaders',
   'ireland',
   'russianRoulette',
   'drinkMe',
@@ -83,6 +85,17 @@ export interface DrinkMeModifier extends PaddlePotionModifier {}
 export interface TeaPartyModifier extends PaddlePotionModifier {}
 
 export type ArenaModifiers = Record<GravityWellKey, GravityWellModifier>
+
+export interface SecondChancesModifier extends GravityWellModifier {
+  maxHits?: number
+}
+
+export interface SpaceInvadersModifier extends GravityWellModifier {
+  barricadeHealth?: number
+  barricadeCount?: number
+  barricadeSpacing?: number
+  barricadeDistance?: number
+}
 
 export interface KiteModifier extends ModifierBase {
   tailLength: number

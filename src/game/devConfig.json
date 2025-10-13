@@ -116,6 +116,33 @@
         "negativeTint": "#e7ecf3",
         "includeInRandom": true
       },
+      "secondChances": {
+        "name": "Second Chances",
+        "description": "Fallback shields behind each goal absorb a few hits",
+        "enabled": false,
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "maxHits": 2,
+        "positiveTint": "#38bdf8",
+        "negativeTint": "#f472b6",
+        "includeInRandom": true
+      },
+      "spaceInvaders": {
+        "name": "Space Invaders",
+        "description": "Columns of barricades shield each side but break on impact",
+        "enabled": false,
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "barricadeHealth": 3,
+        "barricadeCount": 4,
+        "barricadeSpacing": 26,
+        "barricadeDistance": 120,
+        "positiveTint": "#facc15",
+        "negativeTint": "#34d399",
+        "includeInRandom": true
+      },
       "russianRoulette": {
         "name": "Russian Roulette",
         "description": "Six launch decoys but only one ball counts",

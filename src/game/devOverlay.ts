@@ -982,6 +982,38 @@ function isGravityWellModifier(value: unknown): value is GravityWellModifier {
     return false
   }
 
+  if ('maxHits' in candidate && typeof (candidate as { maxHits?: unknown }).maxHits !== 'number') {
+    return false
+  }
+
+  if (
+    'barricadeHealth' in candidate &&
+    typeof (candidate as { barricadeHealth?: unknown }).barricadeHealth !== 'number'
+  ) {
+    return false
+  }
+
+  if (
+    'barricadeCount' in candidate &&
+    typeof (candidate as { barricadeCount?: unknown }).barricadeCount !== 'number'
+  ) {
+    return false
+  }
+
+  if (
+    'barricadeSpacing' in candidate &&
+    typeof (candidate as { barricadeSpacing?: unknown }).barricadeSpacing !== 'number'
+  ) {
+    return false
+  }
+
+  if (
+    'barricadeDistance' in candidate &&
+    typeof (candidate as { barricadeDistance?: unknown }).barricadeDistance !== 'number'
+  ) {
+    return false
+  }
+
   return true
 }
 
