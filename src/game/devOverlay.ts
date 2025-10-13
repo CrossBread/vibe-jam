@@ -545,6 +545,14 @@ export function createDevOverlay(
       description.textContent = modifier.description
       body.appendChild(description)
 
+      body.appendChild(
+        createToggleControl('Include in Random Selection', modifier.includeInRandom, {
+          onChange: value => {
+            modifier.includeInRandom = value
+          },
+        }),
+      )
+
       buildBody(body)
 
       details.appendChild(body)
@@ -1569,6 +1577,14 @@ export function createDevOverlay(
       body.appendChild(description)
 
       body.appendChild(
+        createToggleControl('Include in Random Selection', modifier.includeInRandom, {
+          onChange: value => {
+            modifier.includeInRandom = value
+          },
+        }),
+      )
+
+      body.appendChild(
         createSliderControl('Gravity Strength', modifier.gravityStrength, {
           min: -8_000_000,
           max: 8_000_000,
@@ -1795,6 +1811,7 @@ function isGravityWellModifier(value: unknown): value is GravityWellModifier {
     typeof candidate.name !== 'string' ||
     typeof candidate.description !== 'string' ||
     typeof candidate.enabled !== 'boolean' ||
+    typeof candidate.includeInRandom !== 'boolean' ||
     typeof candidate.gravityStrength !== 'number' ||
     typeof candidate.gravityFalloff !== 'number' ||
     typeof candidate.radius !== 'number' ||
@@ -1879,7 +1896,8 @@ function hasModifierBaseFields(value: unknown): value is ModifierBase {
   return (
     typeof candidate.name === 'string' &&
     typeof candidate.description === 'string' &&
-    typeof candidate.enabled === 'boolean'
+    typeof candidate.enabled === 'boolean' &&
+    typeof candidate.includeInRandom === 'boolean'
   )
 }
 

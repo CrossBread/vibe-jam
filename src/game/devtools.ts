@@ -40,6 +40,7 @@ export interface ModifierBase {
   name: string
   description: string
   enabled: boolean
+  includeInRandom: boolean
 }
 
 export interface GravityWellModifier extends ModifierBase {

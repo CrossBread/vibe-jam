@@ -3203,8 +3203,16 @@ export function createPong(
   }
 
   function pickRandomMod(exclude: GravityWellKey | null) {
-    const available = GRAVITY_WELL_KEYS.filter(key => key !== exclude)
-    const pool = available.length > 0 ? available : GRAVITY_WELL_KEYS
+    const eligible = GRAVITY_WELL_KEYS.filter(
+      key => key !== exclude && config.modifiers.arena[key].includeInRandom,
+    )
+    const fallback = GRAVITY_WELL_KEYS.filter(key => key !== exclude)
+    const pool =
+      eligible.length > 0
+        ? eligible
+        : fallback.length > 0
+          ? fallback
+          : GRAVITY_WELL_KEYS
     return pool[Math.floor(Math.random() * pool.length)]
   }
 

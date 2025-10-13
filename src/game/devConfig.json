@@ -21,7 +21,8 @@
         "gravityFalloff": 110,
         "radius": 40,
         "positiveTint": "#94a3b8",
-        "negativeTint": "#e2e8f0"
+        "negativeTint": "#e2e8f0",
+        "includeInRandom": true
       },
       "blackMole": {
         "name": "Black Mole",
@@ -34,7 +35,8 @@
         "pauseDuration": 1.25,
         "wanderSpeed": 110,
         "positiveTint": "#2dd4bf",
-        "negativeTint": "#99f6e4"
+        "negativeTint": "#99f6e4",
+        "includeInRandom": true
       },
       "gopher": {
         "name": "Gopher",
@@ -47,7 +49,8 @@
         "pauseDuration": 1.1,
         "wanderSpeed": 125,
         "positiveTint": "#f472b6",
-        "negativeTint": "#fce7f3"
+        "negativeTint": "#fce7f3",
+        "includeInRandom": true
       },
       "superMassive": {
         "name": "Super Massive",
@@ -57,7 +60,8 @@
         "gravityFalloff": 141,
         "radius": 72,
         "positiveTint": "#60a5fa",
-        "negativeTint": "#bfdbfe"
+        "negativeTint": "#bfdbfe",
+        "includeInRandom": true
       },
       "whiteDwarf": {
         "name": "White Dwarf",
@@ -67,7 +71,8 @@
         "gravityFalloff": 77,
         "radius": 26,
         "positiveTint": "#e2e8f0",
-        "negativeTint": "#f8fafc"
+        "negativeTint": "#f8fafc",
+        "includeInRandom": true
       },
       "divots": {
         "name": "Divots",
@@ -79,7 +84,8 @@
         "maxDivots": 14,
         "spawnMargin": 64,
         "positiveTint": "#fbbf24",
-        "negativeTint": "#fef3c7"
+        "negativeTint": "#fef3c7",
+        "includeInRandom": true
       },
       "ireland": {
         "name": "Ireland",
@@ -96,7 +102,8 @@
         "minRadius": 24,
         "maxRadius": 86,
         "positiveTint": "#4ade80",
-        "negativeTint": "#bbf7d0"
+        "negativeTint": "#bbf7d0",
+        "includeInRandom": true
       }
     },
     "ball": {
@@ -104,13 +111,15 @@
         "name": "Kite",
         "description": "Short, fading tail that follows the ball",
         "enabled": false,
-        "tailLength": 28
+        "tailLength": 28,
+        "includeInRandom": true
       },
       "bumShuffle": {
         "name": "Bum Shuffle",
         "description": "Persistent trail that resets on the next point",
         "enabled": false,
-        "trailLength": 320
+        "trailLength": 320,
+        "includeInRandom": true
       },
       "pollok": {
         "name": "Pollok",
@@ -119,7 +128,8 @@
         "trailLength": 1200,
         "leftColor": "#f472b6",
         "rightColor": "#38bdf8",
-        "neutralColor": "#fbbf24"
+        "neutralColor": "#fbbf24",
+        "includeInRandom": true
       },
       "snowball": {
         "name": "Snowball",
@@ -127,7 +137,8 @@
         "enabled": false,
         "minRadius": 4,
         "maxRadius": 18,
-        "growthRate": 0.02
+        "growthRate": 0.02,
+        "includeInRandom": true
       },
       "meteor": {
         "name": "Meteor",
@@ -135,7 +146,8 @@
         "enabled": false,
         "startRadius": 18,
         "minRadius": 5,
-        "shrinkRate": 0.02
+        "shrinkRate": 0.02,
+        "includeInRandom": true
       }
     },
     "paddle": {
@@ -147,7 +159,8 @@
         "fadeDuration": 0.8,
         "visibleHoldDuration": 3.2,
         "hiddenHoldDuration": 1.4,
-        "paddleSizeMultiplier": 1
+        "paddleSizeMultiplier": 1,
+        "includeInRandom": true
       },
       "outOfBody": {
         "name": "Out of Body",
@@ -157,7 +170,8 @@
         "trailLength": 6,
         "sampleInterval": 0.05,
         "trailFade": 0.7,
-        "paddleSizeMultiplier": 1
+        "paddleSizeMultiplier": 1,
+        "includeInRandom": true
       },
       "bendy": {
         "name": "Bendy",
@@ -166,7 +180,8 @@
         "paddleSizeMultiplier": 1,
         "maxOffset": 8,
         "oscillationSpeed": 5,
-        "speedForMaxBend": 420
+        "speedForMaxBend": 420,
+        "includeInRandom": true
       },
       "chilly": {
         "name": "Chilly",
@@ -175,14 +190,16 @@
         "startingHeight": 132,
         "shrinkAmount": 6,
         "minimumHeight": 78,
-        "paddleSizeMultiplier": 1
+        "paddleSizeMultiplier": 1,
+        "includeInRandom": true
       },
       "buckTooth": {
         "name": "Buck Tooth",
         "description": "Split paddles with a configurable middle gap",
         "enabled": false,
         "gapSize": 18,
-        "paddleSizeMultiplier": 1
+        "paddleSizeMultiplier": 1,
+        "includeInRandom": true
       },
       "osteoWhat": {
         "name": "Osteo What?",
@@ -191,7 +208,8 @@
         "segmentCount": 6,
         "gapSize": 6,
         "hitsBeforeBreak": 2,
-        "paddleSizeMultiplier": 1
+        "paddleSizeMultiplier": 1,
+        "includeInRandom": true
       },
       "brokePhysics": {
         "name": "Broke Physics",
@@ -199,7 +217,8 @@
         "enabled": false,
         "centerAngle": 1.2,
         "edgeAngle": 0.05,
-        "paddleSizeMultiplier": 1
+        "paddleSizeMultiplier": 1,
+        "includeInRandom": true
       },
       "hadron": {
         "name": "Hadron",
@@ -208,27 +227,31 @@
         "splitAngle": 0.35,
         "armedColor": "#facc15",
         "disarmedColor": "#475569",
-        "paddleSizeMultiplier": 1
+        "paddleSizeMultiplier": 1,
+        "includeInRandom": true
       },
       "foosball": {
         "name": "Foosball",
         "description": "Triple paddles evenly spaced along the shaft",
         "enabled": false,
         "gapSize": 10,
-        "paddleSizeMultiplier": 1
+        "paddleSizeMultiplier": 1,
+        "includeInRandom": true
       },
       "dizzy": {
         "name": "Dizzy",
         "description": "Reverse the player's paddle controls",
         "enabled": false,
-        "paddleSizeMultiplier": 1
+        "paddleSizeMultiplier": 1,
+        "includeInRandom": true
       },
       "bungee": {
         "name": "Bungee",
         "description": "Paddles spring back to center unless held in place",
         "enabled": false,
         "paddleSizeMultiplier": 1,
-        "returnSpeed": 240
+        "returnSpeed": 240,
+        "includeInRandom": true
       },
       "angry": {
         "name": "Angry",
@@ -238,7 +261,8 @@
         "stretchSpeed": 200,
         "maxStretch": 54,
         "releaseSpeed": 380,
-        "moveSpeedMultiplier": 0.55
+        "moveSpeedMultiplier": 0.55,
+        "includeInRandom": true
       },
       "inchworm": {
         "name": "Inchworm",
@@ -248,14 +272,16 @@
         "shrinkAmount": 28,
         "minimumHeight": 48,
         "shrinkSpeed": 220,
-        "extendSpeed": 260
+        "extendSpeed": 260,
+        "includeInRandom": true
       },
       "slinky": {
         "name": "Slinky",
         "description": "Paddles tumble end over end instead of sliding",
         "enabled": false,
         "paddleSizeMultiplier": 1,
-        "flopRate": 2.6
+        "flopRate": 2.6,
+        "includeInRandom": true
       },
       "missileCommander": {
         "name": "Missile Commander",
@@ -265,14 +291,16 @@
         "launchSpeed": 520,
         "cooldown": 0.8,
         "missileHeight": 68,
-        "missileLifetime": 1.6
+        "missileLifetime": 1.6,
+        "includeInRandom": true
       },
       "frisbee": {
         "name": "Frisbee",
         "description": "Toss paddles from the arena edges without mid-flight reversal",
         "enabled": false,
         "paddleSizeMultiplier": 1,
-        "throwSpeed": 560
+        "throwSpeed": 560,
+        "includeInRandom": true
       },
       "dundee": {
         "name": "Dundee",
@@ -281,7 +309,8 @@
         "paddleSizeMultiplier": 1,
         "baseSpeed": 220,
         "acceleration": 520,
-        "maxSpeed": 560
+        "maxSpeed": 560,
+        "includeInRandom": true
       }
     }
   }
