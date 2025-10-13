@@ -1,6 +1,6 @@
-﻿import type { KiteModifier } from '../../devtools'
-import type { ModifierBuilder } from '../shared'
-import { createSliderControl } from '../shared'
+﻿import type { KiteModifier } from '../../../devtools'
+import type { ModifierBuilder } from '../../shared'
+import { createSliderControl } from '../../shared'
 
 export const createKiteModifier: ModifierBuilder<KiteModifier> = ({
   modifier,

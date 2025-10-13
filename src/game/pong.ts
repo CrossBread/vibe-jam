@@ -8,6 +8,33 @@ import {
   type GravityWellModifier,
 } from './devtools'
 import { createDevOverlay, showOverlay, toggleOverlay } from './devOverlay'
+import type { RGBColor } from './mods/ball/shared'
+import { clampByte, parseColorToRgb } from './mods/ball/shared'
+import {
+  clearBumShuffleTrail,
+  createBumShuffleState,
+  type BumShuffleState,
+  updateBumShuffleTrail,
+} from './mods/ball/bumShuffle/bumShuffleModifier'
+import { drawBumShuffleTrail } from './mods/ball/bumShuffle/bumShuffleView'
+import {
+  clearKiteTrail,
+  createKiteState,
+  type KiteState,
+  updateKiteTrail,
+} from './mods/ball/kite/kiteModifier'
+import { drawKiteTrail } from './mods/ball/kite/kiteView'
+import {
+  clearPollokTrail,
+  createPollokState,
+  getPollokColor,
+  registerPollokReturn,
+  type PollokState,
+  updatePollokTrail,
+} from './mods/ball/pollok/pollokModifier'
+import { drawPollokTrail } from './mods/ball/pollok/pollokView'
+import { applyMeteorShrink } from './mods/ball/meteor/meteorModifier'
+import { applySnowballGrowth } from './mods/ball/snowball/snowballModifier'
 
 export interface PongState {
   leftScore: number
@@ -112,22 +139,6 @@ interface Announcement {
   elapsed: number
   holdDuration: number
   fadeDuration: number
-}
-
-interface TrailPoint {
-  x: number
-  y: number
-  radius?: number
-}
-
-interface ColoredTrailPoint extends TrailPoint {
-  color: string
-}
-
-interface RGBColor {
-  r: number
-  g: number
-  b: number
 }
 
 interface PaddleHeightOptions {
@@ -720,10 +731,9 @@ export function createPong(
     getEnabledArenaModifierKeys(config.modifiers.arena),
   )
   let activeModKey: GravityWellKey | null = null
-  const kiteTrail: TrailPoint[] = []
-  const bumShuffleTrail: TrailPoint[] = []
-  const pollokTrail: ColoredTrailPoint[] = []
-  let lastReturner: 'left' | 'right' | null = null
+  const kiteState: KiteState = createKiteState()
+  const bumShuffleState: BumShuffleState = createBumShuffleState()
+  const pollokState: PollokState = createPollokState()
   let completedBitesSinceLastPoint = 0
   initializeActiveModState()
   resetBallSize()
@@ -788,9 +798,9 @@ export function createPong(
   function resetBall(toLeft: boolean) {
     balls.length = 0
     balls.push(createBall(toLeft))
-    lastReturner = null
+    pollokState.lastReturner = null
     resetBallSize()
-    clearKiteTrail()
+    clearKiteTrail(kiteState)
     syncPrimaryBallState()
   }
 
@@ -816,10 +826,9 @@ export function createPong(
     lastEnabledArenaModifiers = new Set<GravityWellKey>(
       getEnabledArenaModifierKeys(config.modifiers.arena),
     )
-    clearKiteTrail()
-    clearBumShuffleTrail()
-    clearPollokTrail()
-    lastReturner = null
+    clearKiteTrail(kiteState)
+    clearBumShuffleTrail(bumShuffleState)
+    clearPollokTrail(pollokState)
     rearmHadron()
     syncOsteoState(true)
     initializePaddleHeights(true)
@@ -1155,7 +1164,7 @@ export function createPong(
   }
 
   function handlePaddleReturn(side: 'left' | 'right', ball: BallState) {
-    lastReturner = side
+    registerPollokReturn(pollokState, side)
     registerPipReturn()
     resetBallSize(ball)
     spawnDivotWell()
@@ -1247,7 +1256,7 @@ export function createPong(
     }
 
     irelandNeedsRegeneration = true
-    clearBumShuffleTrail()
+    clearBumShuffleTrail(bumShuffleState)
 
     const modifier = config.modifiers.arena.ireland as IrelandModifier
     if (!modifier.enabled) {
@@ -2923,25 +2932,11 @@ export function createPong(
     let radius = BALL_R
 
     if (snowball.enabled) {
-      const rawMin = Number.isFinite(snowball.minRadius) ? snowball.minRadius : BALL_R * 0.5
-      const rawMax = Number.isFinite(snowball.maxRadius) ? snowball.maxRadius : BALL_R * 2
-      const minRadius = clamp(rawMin, 1, 160)
-      const maxRadius = clamp(Math.max(rawMax, minRadius), minRadius, 200)
-      const growthRate = Number.isFinite(snowball.growthRate)
-        ? Math.max(0, snowball.growthRate)
-        : 0
-      radius = clamp(minRadius + ball.travelDistance * growthRate, minRadius, maxRadius)
+      radius = applySnowballGrowth(snowball, ball.travelDistance, BALL_R)
     }
 
     if (meteor.enabled) {
-      const rawStart = Number.isFinite(meteor.startRadius) ? meteor.startRadius : BALL_R * 2
-      const startRadius = clamp(rawStart, 2, 220)
-      const rawMin = Number.isFinite(meteor.minRadius) ? meteor.minRadius : BALL_R * 0.75
-      const minRadius = clamp(Math.min(rawMin, startRadius), 1, startRadius)
-      const shrinkRate = Number.isFinite(meteor.shrinkRate)
-        ? Math.max(0, meteor.shrinkRate)
-        : 0
-      radius = clamp(startRadius - ball.travelDistance * shrinkRate, minRadius, startRadius)
+      radius = applyMeteorShrink(meteor, ball.travelDistance, BALL_R)
     }
 
     ball.radius = radius
@@ -2956,34 +2951,16 @@ export function createPong(
     const y = state.ballY
     const radius = getBallRadius()
 
-    if (ball.kite.enabled) {
-      const maxLength = clampTrailLength(ball.kite.tailLength, 4, MAX_KITE_HISTORY)
-      addTrailPoint(kiteTrail, x, y, maxLength, 0, radius)
-    } else if (kiteTrail.length > 0) {
-      clearKiteTrail()
-    }
-
-    if (ball.bumShuffle.enabled) {
-      const maxLength = clampTrailLength(ball.bumShuffle.trailLength, 40, MAX_BUM_SHUFFLE_HISTORY)
-      addTrailPoint(bumShuffleTrail, x, y, maxLength, BUM_SHUFFLE_DISTANCE_SQ, radius)
-    } else if (bumShuffleTrail.length > 0) {
-      clearBumShuffleTrail()
-    }
-
-    if (ball.pollok.enabled) {
-      const maxLength = clampTrailLength(ball.pollok.trailLength, 80, MAX_POLLOK_HISTORY)
-      addColoredTrailPoint(
-        pollokTrail,
-        x,
-        y,
-        getPollokColor(),
-        maxLength,
-        POLLOK_DISTANCE_SQ,
-        radius,
-      )
-    } else if (pollokTrail.length > 0) {
-      clearPollokTrail()
-    }
+    updateKiteTrail(kiteState, ball.kite, x, y, radius)
+    updateBumShuffleTrail(bumShuffleState, ball.bumShuffle, x, y, radius)
+    updatePollokTrail(
+      pollokState,
+      ball.pollok,
+      x,
+      y,
+      radius,
+      getPollokColor(pollokState, ball.pollok),
+    )
   }
 
   function updateMovingWellState(key: MovingWellKey, dt: number) {
@@ -3745,74 +3722,17 @@ export function createPong(
   }
 
   function drawBallTrails() {
-    drawBumShuffleTrail()
-    drawPollokTrail()
-    drawKiteTrail()
-  }
-
-  function drawBumShuffleTrail() {
-    const modifier = config.modifiers.ball.bumShuffle
-    if (!modifier.enabled || bumShuffleTrail.length < 2) return
-
-    ctx.save()
-    const latestRadius =
-      bumShuffleTrail[bumShuffleTrail.length - 1]?.radius ?? getBallRadius()
-    ctx.lineWidth = Math.max(1, latestRadius * 1.35)
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    ctx.strokeStyle = BALL_COLOR
-    ctx.beginPath()
-    ctx.moveTo(bumShuffleTrail[0].x, bumShuffleTrail[0].y)
-    for (let i = 1; i < bumShuffleTrail.length; i++) {
-      ctx.lineTo(bumShuffleTrail[i].x, bumShuffleTrail[i].y)
-    }
-    ctx.stroke()
-    ctx.restore()
-  }
-
-  function drawPollokTrail() {
-    const modifier = config.modifiers.ball.pollok
-    if (!modifier.enabled || pollokTrail.length < 2) return
-
-    ctx.save()
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-
-    const fallbackRadius = getBallRadius()
-    for (let i = 1; i < pollokTrail.length; i++) {
-      const prev = pollokTrail[i - 1]
-      const current = pollokTrail[i]
-      if (prev.x === current.x && prev.y === current.y) continue
-      const prevRadius = prev.radius ?? fallbackRadius
-      const currentRadius = current.radius ?? fallbackRadius
-      const averageRadius = (prevRadius + currentRadius) * 0.5
-      ctx.lineWidth = Math.max(1, averageRadius * 1.45)
-      ctx.strokeStyle = current.color
-      ctx.beginPath()
-      ctx.moveTo(prev.x, prev.y)
-      ctx.lineTo(current.x, current.y)
-      ctx.stroke()
-    }
-
-    ctx.restore()
-  }
-
-  function drawKiteTrail() {
-    const modifier = config.modifiers.ball.kite
-    if (!modifier.enabled || kiteTrail.length === 0) return
-
-    ctx.save()
-    const length = kiteTrail.length
-    for (let i = 0; i < length; i++) {
-      const point = kiteTrail[i]
-      const alpha = ((i + 1) / length) * 0.8
-      ctx.fillStyle = applyAlphaToColor(BALL_COLOR, Math.min(1, alpha))
-      ctx.beginPath()
-      const radius = point.radius ?? getBallRadius()
-      ctx.arc(point.x, point.y, radius, 0, Math.PI * 2)
-      ctx.fill()
-    }
-    ctx.restore()
+    const ballModifiers = config.modifiers.ball
+    drawBumShuffleTrail(ctx, bumShuffleState, ballModifiers.bumShuffle, {
+      baseColor: BALL_COLOR,
+      getBallRadius,
+    })
+    drawPollokTrail(ctx, pollokState, ballModifiers.pollok, { getBallRadius })
+    drawKiteTrail(ctx, kiteState, ballModifiers.kite, {
+      baseColor: BALL_COLOR,
+      applyAlpha: applyAlphaToColor,
+      getBallRadius,
+    })
   }
 
   function drawAnnouncement() {
@@ -3855,116 +3775,6 @@ export function createPong(
     ctx.restore()
   }
 
-  function getPollokColor() {
-    const modifier = config.modifiers.ball.pollok
-    if (lastReturner === 'left') return modifier.leftColor
-    if (lastReturner === 'right') return modifier.rightColor
-    return modifier.neutralColor
-  }
-
-  function clampTrailLength(value: number | undefined, min: number, max: number) {
-    if (!Number.isFinite(value)) return min
-    const length = Math.floor(value as number)
-    return Math.max(min, Math.min(max, length))
-  }
-
-  function addTrailPoint(
-    points: TrailPoint[],
-    x: number,
-    y: number,
-    maxLength: number,
-    minDistanceSq = 0,
-    radius?: number,
-  ) {
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return
-    const last = points[points.length - 1]
-    if (last && minDistanceSq > 0) {
-      const dx = last.x - x
-      const dy = last.y - y
-      if (dx * dx + dy * dy < minDistanceSq) {
-        last.x = x
-        last.y = y
-        if (radius !== undefined) last.radius = radius
-        return
-      }
-    }
-    const nextPoint: TrailPoint = { x, y }
-    if (radius !== undefined) nextPoint.radius = radius
-    points.push(nextPoint)
-    if (points.length > maxLength) {
-      points.splice(0, points.length - maxLength)
-    }
-  }
-
-  function addColoredTrailPoint(
-    points: ColoredTrailPoint[],
-    x: number,
-    y: number,
-    color: string,
-    maxLength: number,
-    minDistanceSq = 0,
-    radius?: number,
-  ) {
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return
-    const last = points[points.length - 1]
-    if (last && minDistanceSq > 0) {
-      const dx = last.x - x
-      const dy = last.y - y
-      if (dx * dx + dy * dy < minDistanceSq) {
-        last.x = x
-        last.y = y
-        last.color = color
-        if (radius !== undefined) last.radius = radius
-        return
-      }
-    }
-    const nextPoint: ColoredTrailPoint = { x, y, color }
-    if (radius !== undefined) nextPoint.radius = radius
-    points.push(nextPoint)
-    if (points.length > maxLength) {
-      points.splice(0, points.length - maxLength)
-    }
-  }
-
-  function clearKiteTrail() {
-    if (kiteTrail.length > 0) kiteTrail.length = 0
-  }
-
-  function clearBumShuffleTrail() {
-    if (bumShuffleTrail.length > 0) bumShuffleTrail.length = 0
-  }
-
-  function clearPollokTrail() {
-    if (pollokTrail.length > 0) pollokTrail.length = 0
-    lastReturner = null
-  }
-
-  function parseColorToRgb(color: string, fallback: RGBColor): RGBColor {
-    if (typeof color !== 'string') return fallback
-    const trimmed = color.trim()
-    if (trimmed.length === 0) return fallback
-    if (trimmed.startsWith('#')) {
-      return hexToRgb(trimmed)
-    }
-
-    const rgbMatch = trimmed.match(/^rgba?\(([^)]+)\)$/i)
-    if (rgbMatch) {
-      const parts = rgbMatch[1]
-        .split(',')
-        .map(part => Number.parseFloat(part.trim()))
-        .filter(Number.isFinite)
-      if (parts.length >= 3) {
-        return {
-          r: clampByte(parts[0]),
-          g: clampByte(parts[1]),
-          b: clampByte(parts[2]),
-        }
-      }
-    }
-
-    return fallback
-  }
-
   function hexToRgb(hex: string): RGBColor {
     const value = hex.trim().replace('#', '')
     if (value.length === 3) {
@@ -4005,18 +3815,10 @@ export function createPong(
     return Math.max(0, Math.min(1, value))
   }
 
-  function clampByte(value: number): number {
-    if (!Number.isFinite(value)) return 0
-    return Math.max(0, Math.min(255, Math.round(value)))
-  }
-
   function applyAlphaToColor(hex: string, alpha: number) {
     const clamped = Math.max(0, Math.min(1, alpha))
-    const value = hex.replace('#', '')
-    const r = parseInt(value.slice(0, 2), 16)
-    const g = parseInt(value.slice(2, 4), 16)
-    const b = parseInt(value.slice(4, 6), 16)
-    return `rgba(${r}, ${g}, ${b}, ${clamped})`
+    const color = hexToRgb(hex)
+    return `rgba(${color.r}, ${color.g}, ${color.b}, ${clamped})`
   }
 
   function randomRange(min: number, max: number) {
