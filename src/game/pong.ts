@@ -823,12 +823,12 @@ export function createPong(
     spaceInvadersState,
     getSpaceInvadersModifier(),
     arenaDimensions,
+    areSidesSwapped(),
   )
   maintainMinesweeperState(
     minesweeperState,
     getMinesweeperModifier(),
     arenaDimensions,
-    areSidesSwapped(),
   )
   initializeActiveModState()
   resetBallSize()
@@ -946,6 +946,12 @@ export function createPong(
       arenaDimensions,
       areSidesSwapped(),
     )
+    resetSpaceInvadersState(
+      spaceInvadersState,
+      getSpaceInvadersModifier(),
+      arenaDimensions,
+      areSidesSwapped(),
+    )
     resetMinesweeperState(minesweeperState, getMinesweeperModifier(), arenaDimensions)
     if (config.modifiers.arena.russianRoulette.enabled) {
       spawnRussianRouletteBalls(toLeft)
@@ -1005,12 +1011,12 @@ export function createPong(
       spaceInvadersState,
       getSpaceInvadersModifier(),
       arenaDimensions,
+      areSidesSwapped(),
     )
     maintainMinesweeperState(
       minesweeperState,
       getMinesweeperModifier(),
       arenaDimensions,
-      areSidesSwapped(),
     )
     resetBall(Math.random() < 0.5)
   }
@@ -1989,7 +1995,7 @@ export function createPong(
         ctx.fillStyle = fillColor
         ctx.fillRect(rectX, segment.y, segment.width, segment.height)
         ctx.fillStyle = edgeColor
-        if (segment.paddle.side === 'left') {
+        if (segment.paddle.physicalSide === 'left') {
           ctx.fillRect(rectX, segment.y, PADDLE_EDGE_WIDTH, segment.height)
         } else {
           ctx.fillRect(
@@ -2011,7 +2017,7 @@ export function createPong(
     ctx.fillStyle = CHARLOTTE_PADDLE_COLOR
     ctx.fillRect(paddle.x, paddle.y, PADDLE_W, paddle.height)
     ctx.fillStyle = CHARLOTTE_EDGE_COLOR
-    if (paddle.side === 'left') {
+    if (paddle.physicalSide === 'left') {
       ctx.fillRect(paddle.x, paddle.y, PADDLE_EDGE_WIDTH, paddle.height)
     } else {
       ctx.fillRect(
@@ -3726,7 +3732,7 @@ export function createPong(
       return []
     }
 
-    const xOffset = paddle.side === 'left' ? PADDLE_W - width : 0
+    const xOffset = paddle.physicalSide === 'left' ? PADDLE_W - width : 0
     const x = paddle.x + xOffset
     const y = anchor === 'top' ? 0 : H - length
 
@@ -4021,7 +4027,7 @@ export function createPong(
         ctx.fillRect(rectX, segment.y, segment.width, segment.height)
         ctx.fillStyle =
           paddle.side === 'left' ? LEFT_PADDLE_EDGE_COLOR : RIGHT_PADDLE_EDGE_COLOR
-        if (paddle.side === 'left') {
+        if (paddle.physicalSide === 'left') {
           ctx.fillRect(rectX, segment.y, PADDLE_EDGE_WIDTH, segment.height)
         } else {
           ctx.fillRect(

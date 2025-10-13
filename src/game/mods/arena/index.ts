@@ -16,8 +16,8 @@ import { createSpaceInvadersModifier } from './spaceInvaders/spaceInvadersEditor
 import { createMinesweeperModifier } from './minesweeper/minesweeperEditor'
 import { createSuperMassiveModifier } from './superMassive/superMassiveEditor'
 import { createWhiteDwarfModifier } from './whiteDwarf/whiteDwarfEditor'
-import { createMadHatterModifier } from './madHatter/madHatterEditor'
 import { createJupiterModifier } from './jupiter/jupiterEditor'
+import { createMadHatterModifier } from './madHatter/madHatterEditor'
 
 type ArenaBuilderMap = {
   [K in GravityWellKey]: ModifierBuilder<ArenaModifiers[K]>
