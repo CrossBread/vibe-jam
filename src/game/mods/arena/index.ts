@@ -1,12 +1,12 @@
 ﻿import type { ArenaModifiers, GravityWellKey } from '../../devtools'
 import type { ModifierBuilder } from '../shared'
-import { createBlackHoleModifier } from './blackHole'
-import { createBlackMoleModifier } from './blackMole'
-import { createDivotsModifier } from './divots'
-import { createGopherModifier } from './gopher'
-import { createIrelandModifier } from './ireland'
-import { createSuperMassiveModifier } from './superMassive'
-import { createWhiteDwarfModifier } from './whiteDwarf'
+import { createBlackHoleModifier } from './blackHole/blackHoleEditor'
+import { createBlackMoleModifier } from './blackMole/blackMoleEditor'
+import { createDivotsModifier } from './divots/divotsEditor'
+import { createGopherModifier } from './gopher/gopherEditor'
+import { createIrelandModifier } from './ireland/irelandEditor'
+import { createSuperMassiveModifier } from './superMassive/superMassiveEditor'
+import { createWhiteDwarfModifier } from './whiteDwarf/whiteDwarfEditor'
 
 type ArenaBuilderMap = {
   [K in GravityWellKey]: ModifierBuilder<ArenaModifiers[K]>

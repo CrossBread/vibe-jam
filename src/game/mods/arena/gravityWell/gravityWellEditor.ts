@@ -1,6 +1,6 @@
-﻿import type { GravityWellModifier } from '../../devtools'
-import type { ModifierBuilder } from '../shared'
-import { createColorControl, createSliderControl } from '../shared'
+﻿import type { GravityWellModifier } from '../../../devtools'
+import type { ModifierBuilder } from '../../shared'
+import { createColorControl, createSliderControl } from '../../shared'
 
 export const createGravityWellModifier: ModifierBuilder<GravityWellModifier> = ({
   modifier,

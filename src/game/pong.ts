@@ -35,6 +35,42 @@ import {
 import { drawPollokTrail } from './mods/ball/pollok/pollokView'
 import { applyMeteorShrink } from './mods/ball/meteor/meteorModifier'
 import { applySnowballGrowth } from './mods/ball/snowball/snowballModifier'
+import type { ActiveGravityWell, ArenaDimensions } from './mods/arena/shared'
+import { drawGravityWells } from './mods/arena/gravityWell/gravityWellView'
+import {
+  createDivotsState,
+  clearDivots,
+  spawnDivotWell as addDivotWell,
+  updateDivotsState as maintainDivotsState,
+  type DivotsState,
+} from './mods/arena/divots/divotsModifier'
+import { getDivotsWells } from './mods/arena/divots/divotsView'
+import {
+  createIrelandState,
+  clearIrelandWells,
+  ensureIrelandWells,
+  markIrelandNeedsRegeneration,
+  regenerateIrelandWells as rebuildIrelandWells,
+  type IrelandState,
+} from './mods/arena/ireland/irelandModifier'
+import { getIrelandWells } from './mods/arena/ireland/irelandView'
+import {
+  createBlackMoleState,
+  resetBlackMoleState,
+  updateBlackMoleState,
+  type BlackMoleState,
+} from './mods/arena/blackMole/blackMoleModifier'
+import { getBlackMoleWells } from './mods/arena/blackMole/blackMoleView'
+import {
+  createGopherState,
+  resetGopherState,
+  updateGopherState,
+  type GopherState,
+} from './mods/arena/gopher/gopherModifier'
+import { getGopherWells } from './mods/arena/gopher/gopherView'
+import { getBlackHoleWells } from './mods/arena/blackHole/blackHoleView'
+import { getSuperMassiveWells } from './mods/arena/superMassive/superMassiveView'
+import { getWhiteDwarfWells } from './mods/arena/whiteDwarf/whiteDwarfView'
 
 export interface PongState {
   leftScore: number
@@ -88,51 +124,6 @@ export interface PongOptions {
 }
 
 type KeySet = Record<string, boolean>
-
-interface MovingWellState {
-  x: number
-  y: number
-  targetX: number
-  targetY: number
-  pauseTimer: number
-  hasTarget: boolean
-}
-
-interface ActiveGravityWell {
-  key: GravityWellKey
-  x: number
-  y: number
-  gravityStrength: number
-  gravityFalloff: number // squared falloff radius used for force calculations
-  radius: number
-  positiveTint: string
-  negativeTint: string
-}
-
-interface StoredWell {
-  x: number
-  y: number
-  gravityStrength: number
-  gravityFalloff: number // squared falloff radius
-  radius: number
-}
-
-type MovingWellKey = 'blackMole' | 'gopher'
-
-type DivotsModifier = GravityWellModifier & {
-  maxDivots?: number
-  spawnMargin?: number
-}
-
-type IrelandModifier = GravityWellModifier & {
-  wellCount?: number
-  minGravityStrength?: number
-  maxGravityStrength?: number
-  minGravityFalloff?: number
-  maxGravityFalloff?: number
-  minRadius?: number
-  maxRadius?: number
-}
 
 interface Announcement {
   lines: string[]
@@ -703,28 +694,11 @@ export function createPong(
   let previousInchwormEnabled = config.modifiers.paddle.inchworm.enabled
   let previousSlinkyEnabled = config.modifiers.paddle.slinky.enabled
 
-  const movingWellStates: Record<MovingWellKey, MovingWellState> = {
-    blackMole: {
-      x: W * 0.5,
-      y: H * 0.5,
-      targetX: W * 0.5,
-      targetY: H * 0.5,
-      pauseTimer: 0,
-      hasTarget: false,
-    },
-    gopher: {
-      x: W * 0.5,
-      y: H * 0.5,
-      targetX: W * 0.5,
-      targetY: H * 0.5,
-      pauseTimer: 0,
-      hasTarget: false,
-    },
-  }
-
-  const divotWells: StoredWell[] = []
-  const irelandWells: StoredWell[] = []
-  let irelandNeedsRegeneration = true
+  const arenaDimensions: ArenaDimensions = { width: W, height: H }
+  const divotsState: DivotsState = createDivotsState()
+  const irelandState: IrelandState = createIrelandState()
+  const blackMoleState: BlackMoleState = createBlackMoleState(arenaDimensions)
+  const gopherState: GopherState = createGopherState(arenaDimensions)
   let activeGravityWells: ActiveGravityWell[] = []
   let announcement: Announcement | null = null
   let lastEnabledArenaModifiers = new Set<GravityWellKey>(
@@ -815,12 +789,10 @@ export function createPong(
     completedBitesSinceLastPoint = 0
     leftAIEnabled = true
     rightAIEnabled = true
-    for (const movingState of Object.values(movingWellStates)) {
-      resetMovingWellState(movingState)
-    }
-    divotWells.length = 0
-    irelandWells.length = 0
-    irelandNeedsRegeneration = true
+    resetBlackMoleState(blackMoleState, arenaDimensions)
+    resetGopherState(gopherState, arenaDimensions)
+    clearDivots(divotsState)
+    clearIrelandWells(irelandState)
     activeGravityWells = []
     announcement = null
     lastEnabledArenaModifiers = new Set<GravityWellKey>(
@@ -896,10 +868,20 @@ export function createPong(
 
     syncStateIntoPrimaryBall()
 
-    updateMovingWellState('blackMole', dt)
-    updateMovingWellState('gopher', dt)
-    updateDivotsState()
-    updateIrelandState()
+    updateBlackMoleState(
+      blackMoleState,
+      config.modifiers.arena.blackMole,
+      dt,
+      arenaDimensions,
+    )
+    updateGopherState(
+      gopherState,
+      config.modifiers.arena.gopher,
+      dt,
+      arenaDimensions,
+    )
+    maintainDivotsState(divotsState, config.modifiers.arena.divots)
+    ensureIrelandWells(irelandState, config.modifiers.arena.ireland, arenaDimensions)
 
     const leftGamepadActive =
       gamepadInput.leftAxis !== 0 || gamepadInput.leftUp || gamepadInput.leftDown
@@ -1235,7 +1217,7 @@ export function createPong(
   }
 
   function clearDivotWells() {
-    if (divotWells.length > 0) divotWells.length = 0
+    clearDivots(divotsState)
   }
 
   function handlePointScored() {
@@ -1255,17 +1237,17 @@ export function createPong(
       state.completedBitesSinceLastPoint = 0
     }
 
-    irelandNeedsRegeneration = true
+    markIrelandNeedsRegeneration(irelandState)
     clearBumShuffleTrail(bumShuffleState)
 
-    const modifier = config.modifiers.arena.ireland as IrelandModifier
+    const modifier = config.modifiers.arena.ireland
     if (!modifier.enabled) {
-      irelandWells.length = 0
+      clearIrelandWells(irelandState)
+      activeGravityWells = collectActiveGravityWells()
       return
     }
 
-    regenerateIrelandWells(modifier)
-    irelandNeedsRegeneration = false
+    rebuildIrelandWells(irelandState, modifier, arenaDimensions)
     activeGravityWells = collectActiveGravityWells()
   }
 
@@ -2803,14 +2785,10 @@ export function createPong(
       modifier.enabled = false
       anyDisabled = true
 
-      if (key === 'divots') clearDivotWells()
-      if (key === 'ireland') {
-        irelandWells.length = 0
-        irelandNeedsRegeneration = true
-      }
-      if (key === 'blackMole' || key === 'gopher') {
-        resetMovingWellState(movingWellStates[key])
-      }
+      if (key === 'divots') clearDivots(divotsState)
+      if (key === 'ireland') clearIrelandWells(irelandState)
+      if (key === 'blackMole') resetBlackMoleState(blackMoleState, arenaDimensions)
+      if (key === 'gopher') resetGopherState(gopherState, arenaDimensions)
     }
 
     if (anyDisabled) {
@@ -2821,80 +2799,33 @@ export function createPong(
   }
 
   function collectActiveGravityWells(): ActiveGravityWell[] {
+    const arena = config.modifiers.arena
     const wells: ActiveGravityWell[] = []
-    for (const [key, modifier] of getGravityWellsEntries(config.modifiers.arena)) {
-      if (!modifier.enabled) continue
 
-      if (key === 'blackMole' || key === 'gopher') {
-        const state = movingWellStates[key]
-        wells.push({
-          key,
-          x: state.x,
-          y: state.y,
-          gravityStrength: modifier.gravityStrength,
-          gravityFalloff: toGravityFalloffValue(modifier.gravityFalloff),
-          radius: modifier.radius,
-          positiveTint: modifier.positiveTint,
-          negativeTint: modifier.negativeTint,
-        })
-        continue
+    for (const key of GRAVITY_WELL_KEYS) {
+      switch (key) {
+        case 'blackHole':
+          wells.push(...getBlackHoleWells(arena.blackHole, arenaDimensions))
+          break
+        case 'blackMole':
+          wells.push(...getBlackMoleWells(blackMoleState, arena.blackMole))
+          break
+        case 'gopher':
+          wells.push(...getGopherWells(gopherState, arena.gopher))
+          break
+        case 'superMassive':
+          wells.push(...getSuperMassiveWells(arena.superMassive, arenaDimensions))
+          break
+        case 'whiteDwarf':
+          wells.push(...getWhiteDwarfWells(arena.whiteDwarf, arenaDimensions))
+          break
+        case 'divots':
+          wells.push(...getDivotsWells(divotsState, arena.divots))
+          break
+        case 'ireland':
+          wells.push(...getIrelandWells(irelandState, arena.ireland, arenaDimensions))
+          break
       }
-
-      if (key === 'divots') {
-        for (const well of divotWells) {
-          wells.push({
-            key,
-            x: well.x,
-            y: well.y,
-            gravityStrength: well.gravityStrength,
-            gravityFalloff: well.gravityFalloff,
-            radius: well.radius,
-            positiveTint: modifier.positiveTint,
-            negativeTint: modifier.negativeTint,
-          })
-        }
-        continue
-      }
-
-      if (key === 'ireland') {
-        const wellsToRender =
-          irelandWells.length > 0
-            ? irelandWells
-            : [
-                {
-                  x: W * 0.5,
-                  y: H * 0.5,
-                  gravityStrength: modifier.gravityStrength,
-                  gravityFalloff: toGravityFalloffValue(modifier.gravityFalloff),
-                  radius: modifier.radius,
-                },
-              ]
-
-        for (const well of wellsToRender) {
-          wells.push({
-            key,
-            x: well.x,
-            y: well.y,
-            gravityStrength: well.gravityStrength,
-            gravityFalloff: well.gravityFalloff,
-            radius: well.radius,
-            positiveTint: modifier.positiveTint,
-            negativeTint: modifier.negativeTint,
-          })
-        }
-        continue
-      }
-
-      wells.push({
-        key,
-        x: W * 0.5,
-        y: H * 0.5,
-        gravityStrength: modifier.gravityStrength,
-        gravityFalloff: toGravityFalloffValue(modifier.gravityFalloff),
-        radius: modifier.radius,
-        positiveTint: modifier.positiveTint,
-        negativeTint: modifier.negativeTint,
-      })
     }
 
     return wells
@@ -2963,174 +2894,9 @@ export function createPong(
     )
   }
 
-  function updateMovingWellState(key: MovingWellKey, dt: number) {
-    const state = movingWellStates[key]
-    const modifier = config.modifiers.arena[key]
-    if (!modifier.enabled) {
-      resetMovingWellState(state)
-      return
-    }
-
-    const widthPercentage = clamp(modifier.wanderWidthPercentage ?? 0.33, 0.05, 1)
-    const wanderSpeed = Math.max(0, modifier.wanderSpeed ?? 110)
-    const pauseDuration = Math.max(0, modifier.pauseDuration ?? 1.25)
-
-    const halfWidth = (W * widthPercentage) / 2
-    const halfHeight = (H * widthPercentage) / 2
-    const minX = W * 0.5 - halfWidth
-    const maxX = W * 0.5 + halfWidth
-    const minY = H * 0.5 - halfHeight
-    const maxY = H * 0.5 + halfHeight
-
-    state.x = clamp(state.x, minX, maxX)
-    state.y = clamp(state.y, minY, maxY)
-    state.targetX = clamp(state.targetX, minX, maxX)
-    state.targetY = clamp(state.targetY, minY, maxY)
-
-    const pickNextTarget = () => {
-      state.targetX = randomRange(minX, maxX)
-      state.targetY = randomRange(minY, maxY)
-      state.hasTarget = true
-    }
-
-    if (!state.hasTarget) {
-      pickNextTarget()
-    }
-
-    if (state.pauseTimer > 0) {
-      state.pauseTimer = Math.max(0, state.pauseTimer - dt)
-      if (state.pauseTimer === 0) {
-        pickNextTarget()
-      }
-      return
-    }
-
-    const dx = state.targetX - state.x
-    const dy = state.targetY - state.y
-    const dist = Math.hypot(dx, dy)
-    if (dist === 0) {
-      state.pauseTimer = pauseDuration
-      return
-    }
-
-    const step = wanderSpeed * dt
-    if (dist <= step) {
-      state.x = state.targetX
-      state.y = state.targetY
-      state.pauseTimer = pauseDuration
-      return
-    }
-
-    const invDist = 1 / dist
-    state.x += dx * invDist * step
-    state.y += dy * invDist * step
-  }
-
-  function updateDivotsState() {
-    const modifier = config.modifiers.arena.divots as DivotsModifier
-    if (!modifier.enabled) {
-      if (divotWells.length > 0) divotWells.length = 0
-      return
-    }
-
-    const maxDivots = Math.max(1, Math.floor(modifier.maxDivots ?? 12))
-    if (divotWells.length > maxDivots) {
-      divotWells.splice(0, divotWells.length - maxDivots)
-    }
-  }
-
-  function updateIrelandState() {
-    const modifier = config.modifiers.arena.ireland as IrelandModifier
-    if (!modifier.enabled) {
-      if (irelandWells.length > 0) irelandWells.length = 0
-      irelandNeedsRegeneration = true
-      return
-    }
-
-    if (irelandNeedsRegeneration || irelandWells.length === 0) {
-      regenerateIrelandWells(modifier)
-      irelandNeedsRegeneration = false
-    }
-  }
-
-  function regenerateIrelandWells(modifier: IrelandModifier) {
-    irelandWells.length = 0
-
-    const wellCount = Math.max(1, Math.floor(modifier.wellCount ?? 14))
-    const [minStrength, maxStrength] = resolveRange(
-      modifier.minGravityStrength,
-      modifier.maxGravityStrength,
-      modifier.gravityStrength * 0.5,
-      modifier.gravityStrength * 1.5,
-    )
-    const [minFalloff, maxFalloff] = resolveRange(
-      modifier.minGravityFalloff,
-      modifier.maxGravityFalloff,
-      modifier.gravityFalloff * 0.5,
-      modifier.gravityFalloff * 1.5,
-    )
-    const [minRadius, maxRadius] = resolveRange(
-      modifier.minRadius,
-      modifier.maxRadius,
-      Math.max(16, modifier.radius * 0.5),
-      Math.max(20, modifier.radius * 1.25),
-    )
-
-    for (let i = 0; i < wellCount; i++) {
-      const radius = randomRange(minRadius, maxRadius)
-      const margin = Math.max(20, radius)
-      const minX = Math.max(margin, 0)
-      const maxX = Math.min(W - margin, W)
-      const minY = Math.max(margin, 0)
-      const maxY = Math.min(H - margin, H)
-      const x = minX <= maxX ? randomRange(minX, maxX) : W * 0.5
-      const y = minY <= maxY ? randomRange(minY, maxY) : H * 0.5
-      const gravityStrength = randomRange(minStrength, maxStrength)
-      const gravityFalloff = randomRange(minFalloff, maxFalloff)
-      irelandWells.push({
-        x,
-        y,
-        gravityStrength,
-        gravityFalloff: toGravityFalloffValue(gravityFalloff),
-        radius,
-      })
-    }
-  }
-
   function spawnDivotWell() {
-    const modifier = config.modifiers.arena.divots as DivotsModifier
-    if (!modifier.enabled) return
-
-    const maxDivots = Math.max(1, Math.floor(modifier.maxDivots ?? 12))
-    const margin = Math.max(20, modifier.spawnMargin ?? modifier.radius ?? 0)
-    const minX = Math.max(margin, 0)
-    const maxX = Math.min(W - margin, W)
-    const minY = Math.max(margin, 0)
-    const maxY = Math.min(H - margin, H)
-    const x = minX <= maxX ? randomRange(minX, maxX) : W * 0.5
-    const y = minY <= maxY ? randomRange(minY, maxY) : H * 0.5
-
-    const newWell: StoredWell = {
-      x,
-      y,
-      gravityStrength: modifier.gravityStrength,
-      gravityFalloff: toGravityFalloffValue(modifier.gravityFalloff),
-      radius: modifier.radius,
-    }
-    divotWells.push(newWell)
-
-    if (divotWells.length > maxDivots) {
-      divotWells.splice(0, divotWells.length - maxDivots)
-    }
-  }
-
-  function resetMovingWellState(state: MovingWellState) {
-    state.x = W * 0.5
-    state.y = H * 0.5
-    state.targetX = W * 0.5
-    state.targetY = H * 0.5
-    state.pauseTimer = 0
-    state.hasTarget = false
+    const modifier = config.modifiers.arena.divots
+    addDivotWell(divotsState, modifier, arenaDimensions)
   }
 
   function initializeActiveModState() {
@@ -3160,20 +2926,16 @@ export function createPong(
 
       if (!shouldEnable) {
         if (key === 'divots') clearDivotWells()
-        if (key === 'ireland') {
-          irelandWells.length = 0
-          irelandNeedsRegeneration = true
-        }
-        if (key === 'blackMole' || key === 'gopher') {
-          resetMovingWellState(movingWellStates[key])
-        }
+        if (key === 'ireland') clearIrelandWells(irelandState)
+        if (key === 'blackMole') resetBlackMoleState(blackMoleState, arenaDimensions)
+        if (key === 'gopher') resetGopherState(gopherState, arenaDimensions)
       }
     }
 
     activeModKey = nextKey
 
     if (nextKey === 'ireland') {
-      irelandNeedsRegeneration = true
+      markIrelandNeedsRegeneration(irelandState)
     }
 
     activeGravityWells = collectActiveGravityWells()
@@ -3191,57 +2953,6 @@ export function createPong(
           ? fallback
           : GRAVITY_WELL_KEYS
     return pool[Math.floor(Math.random() * pool.length)]
-  }
-
-  function resolveRange(
-    minValue: number | undefined,
-    maxValue: number | undefined,
-    fallbackMin: number,
-    fallbackMax: number,
-  ): [number, number] {
-    let min = typeof minValue === 'number' && Number.isFinite(minValue) ? minValue : fallbackMin
-    let max = typeof maxValue === 'number' && Number.isFinite(maxValue) ? maxValue : fallbackMax
-    if (min > max) {
-      ;[min, max] = [max, min]
-    }
-    return [min, max]
-  }
-
-  function createGravityWellGradient(
-    context: CanvasRenderingContext2D,
-    well: ActiveGravityWell,
-  ): CanvasGradient {
-    const gradient = context.createRadialGradient(
-      well.x,
-      well.y,
-      0,
-      well.x,
-      well.y,
-      well.radius,
-    )
-
-    const magnitude = clamp01(Math.abs(well.gravityStrength) / MAX_GRAVITY_VISUAL_STRENGTH)
-    const tintHex = well.gravityStrength >= 0 ? well.positiveTint : well.negativeTint
-    const tint = parseColorToRgb(tintHex, ARENA_BACKGROUND_RGB)
-
-    if (well.gravityStrength >= 0) {
-      const innerColor = mixRgb(tint, BLACK_RGB, 0.6 + 0.4 * magnitude)
-      const midColor = mixRgb(tint, WHITE_RGB, 0.3 + 0.35 * magnitude)
-      const innerAlpha = 0.35 + 0.45 * magnitude
-      const midAlpha = 0.18 + 0.22 * magnitude
-      gradient.addColorStop(0, rgbaString(innerColor, innerAlpha))
-      gradient.addColorStop(0.45, rgbaString(midColor, midAlpha))
-    } else {
-      const innerColor = mixRgb(tint, WHITE_RGB, 0.55 + 0.45 * magnitude)
-      const midColor = mixRgb(tint, ARENA_BACKGROUND_RGB, 0.1 + 0.25 * magnitude)
-      const innerAlpha = 0.45 + 0.45 * magnitude
-      const midAlpha = 0.25 + 0.25 * magnitude
-      gradient.addColorStop(0, rgbaString(innerColor, innerAlpha))
-      gradient.addColorStop(0.45, rgbaString(midColor, midAlpha))
-    }
-
-    gradient.addColorStop(1, rgbaString(ARENA_BACKGROUND_RGB, 0))
-    return gradient
   }
 
   function getMaxInnerOffset() {
@@ -3590,13 +3301,12 @@ export function createPong(
     ctx.stroke()
     ctx.setLineDash([])
 
-    for (const well of activeGravityWells) {
-      const gradient = createGravityWellGradient(ctx, well)
-      ctx.fillStyle = gradient
-      ctx.beginPath()
-      ctx.arc(well.x, well.y, well.radius, 0, Math.PI * 2)
-      ctx.fill()
-    }
+    drawGravityWells(ctx, activeGravityWells, {
+      backgroundRgb: ARENA_BACKGROUND_RGB,
+      blackRgb: BLACK_RGB,
+      whiteRgb: WHITE_RGB,
+      maxVisualStrength: MAX_GRAVITY_VISUAL_STRENGTH,
+    })
 
     drawBallTrails()
 
