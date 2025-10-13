@@ -11,6 +11,8 @@ export const GRAVITY_WELL_KEYS = [
   'wonderland',
   'ireland',
   'russianRoulette',
+  'drinkMe',
+  'teaParty',
 ] as const
 
 export type GravityWellKey = (typeof GRAVITY_WELL_KEYS)[number]
@@ -67,6 +69,18 @@ export interface GravityWellModifier extends ModifierBase {
   snowflakeSpeed?: number
   snowOpacity?: number
 }
+
+export interface PaddlePotionModifier extends GravityWellModifier {
+  objectRadius?: number
+  spawnCount?: number
+  shrinkAmount?: number
+  growAmount?: number
+  objectColor?: string
+}
+
+export interface DrinkMeModifier extends PaddlePotionModifier {}
+
+export interface TeaPartyModifier extends PaddlePotionModifier {}
 
 export type ArenaModifiers = Record<GravityWellKey, GravityWellModifier>
 

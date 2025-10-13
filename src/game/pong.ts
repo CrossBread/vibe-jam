@@ -68,6 +68,22 @@ import {
   type GopherState,
 } from './mods/arena/gopher/gopherModifier'
 import { getGopherWells } from './mods/arena/gopher/gopherView'
+import {
+  clearDrinkMeState,
+  createDrinkMeState,
+  maintainDrinkMeState,
+  respawnDrinkMeObject,
+  type DrinkMeState,
+} from './mods/arena/drinkMe/drinkMeModifier'
+import { getDrinkMeObjects } from './mods/arena/drinkMe/drinkMeView'
+import {
+  clearTeaPartyState,
+  createTeaPartyState,
+  maintainTeaPartyState,
+  respawnTeaPartyObject,
+  type TeaPartyState,
+} from './mods/arena/teaParty/teaPartyModifier'
+import { getTeaPartyObjects } from './mods/arena/teaParty/teaPartyView'
 import { getBlackHoleWells } from './mods/arena/blackHole/blackHoleView'
 import { getSuperMassiveWells } from './mods/arena/superMassive/superMassiveView'
 import { getWhiteDwarfWells } from './mods/arena/whiteDwarf/whiteDwarfView'
@@ -167,6 +183,7 @@ interface BallState {
   travelDistance: number
   isReal: boolean
   opacity: number
+  lastPaddleHit: 'left' | 'right' | null
 }
 
 type PaddleLane = 'outer' | 'inner' | 'missile'
@@ -284,6 +301,7 @@ export function createPong(
   const CHARLOTTE_PADDLE_COLOR = '#6b7280'
   const CHARLOTTE_EDGE_COLOR = '#4b5563'
   const MIN_CHARLOTTE_WEB_LENGTH = 6
+  const MIN_POTION_PADDLE_HEIGHT = 36
 
   const defaults = createDevConfig()
   const config = deepClone(defaults)
@@ -738,6 +756,8 @@ export function createPong(
   const gopherState: GopherState = createGopherState(arenaDimensions)
   const fogOfWarState: FogOfWarState = createFogOfWarState()
   const wonderlandState: WonderlandState = createWonderlandState()
+  const drinkMeState: DrinkMeState = createDrinkMeState()
+  const teaPartyState: TeaPartyState = createTeaPartyState()
   let activeGravityWells: ActiveGravityWell[] = []
   let announcement: Announcement | null = null
   let lastEnabledArenaModifiers = new Set<GravityWellKey>(
@@ -772,6 +792,7 @@ export function createPong(
       travelDistance: 0,
       isReal: true,
       opacity: 1,
+      lastPaddleHit: null,
     }
   }
 
@@ -791,6 +812,7 @@ export function createPong(
       travelDistance: 0,
       isReal: false,
       opacity: 1,
+      lastPaddleHit: null,
     }
   }
 
@@ -883,6 +905,8 @@ export function createPong(
     clearIrelandWells(irelandState)
     resetFogOfWarState(fogOfWarState)
     resetWonderlandState(wonderlandState)
+    clearDrinkMeState(drinkMeState)
+    clearTeaPartyState(teaPartyState)
     activeGravityWells = []
     announcement = null
     lastEnabledArenaModifiers = new Set<GravityWellKey>(
@@ -974,6 +998,8 @@ export function createPong(
       arenaDimensions,
     )
     maintainDivotsState(divotsState, config.modifiers.arena.divots)
+    maintainDrinkMeState(drinkMeState, config.modifiers.arena.drinkMe, arenaDimensions)
+    maintainTeaPartyState(teaPartyState, config.modifiers.arena.teaParty, arenaDimensions)
     ensureIrelandWells(irelandState, config.modifiers.arena.ireland, arenaDimensions)
     updateFogOfWarState(fogOfWarState, config.modifiers.arena.fogOfWar, dt, arenaDimensions)
     updateWonderlandState(
@@ -1164,6 +1190,8 @@ export function createPong(
 
       ball.opacity = 1
 
+      handlePotionCollisions(ball)
+
       if (resolvePaddleCollisions(ball, paddles)) {
         radius = ball.radius
       }
@@ -1277,6 +1305,7 @@ export function createPong(
   }
 
   function handlePaddleReturn(side: 'left' | 'right', ball: BallState) {
+    ball.lastPaddleHit = side
     registerPollokReturn(pollokState, side)
     registerPipReturn()
     resetBallSize(ball)
@@ -1344,6 +1373,7 @@ export function createPong(
       travelDistance: ball.travelDistance,
       isReal: true,
       opacity: 1,
+      lastPaddleHit: ball.lastPaddleHit,
     }
 
     balls.push(newBall)
@@ -2826,6 +2856,8 @@ export function createPong(
       if (key === 'gopher') resetGopherState(gopherState, arenaDimensions)
       if (key === 'fogOfWar') resetFogOfWarState(fogOfWarState)
       if (key === 'wonderland') resetWonderlandState(wonderlandState)
+      if (key === 'drinkMe') clearDrinkMeState(drinkMeState)
+      if (key === 'teaParty') clearTeaPartyState(teaPartyState)
     }
 
     if (anyDisabled) {
@@ -2866,6 +2898,9 @@ export function createPong(
           wells.push(...getIrelandWells(irelandState, arena.ireland, arenaDimensions))
           break
         case 'russianRoulette':
+          break
+        case 'drinkMe':
+        case 'teaParty':
           break
       }
     }
@@ -2941,6 +2976,95 @@ export function createPong(
     addDivotWell(divotsState, modifier, arenaDimensions)
   }
 
+  function handlePotionCollisions(ball: BallState) {
+    const lastHit = ball.lastPaddleHit
+    if (!lastHit) return
+
+    const opponent: 'left' | 'right' = lastHit === 'left' ? 'right' : 'left'
+    const drinkMeModifier = config.modifiers.arena.drinkMe
+    if (drinkMeModifier.enabled) {
+      const index = findPotionCollision(drinkMeState, drinkMeModifier, ball)
+      if (index !== -1) {
+        const shrinkAmount = getPotionShrinkAmount(drinkMeModifier)
+        if (shrinkAmount > 0) {
+          modifyPaddleHeight(opponent, -shrinkAmount)
+        }
+        respawnDrinkMeObject(drinkMeState, index, drinkMeModifier, arenaDimensions, {
+          x: ball.x,
+          y: ball.y,
+          radius: ball.radius,
+        })
+      }
+    }
+
+    const teaPartyModifier = config.modifiers.arena.teaParty
+    if (teaPartyModifier.enabled) {
+      const index = findPotionCollision(teaPartyState, teaPartyModifier, ball)
+      if (index !== -1) {
+        const shrinkAmount = getPotionShrinkAmount(teaPartyModifier)
+        if (shrinkAmount > 0) {
+          modifyPaddleHeight(opponent, -shrinkAmount)
+        }
+        const growAmount = getPotionGrowAmount(teaPartyModifier)
+        if (growAmount > 0) {
+          modifyPaddleHeight(lastHit, growAmount)
+        }
+        respawnTeaPartyObject(teaPartyState, index, teaPartyModifier, arenaDimensions, {
+          x: ball.x,
+          y: ball.y,
+          radius: ball.radius,
+        })
+      }
+    }
+  }
+
+  function findPotionCollision(
+    state: DrinkMeState | TeaPartyState,
+    modifier: GravityWellModifier & { objectRadius?: number },
+    ball: BallState,
+  ): number {
+    if (!modifier.enabled || state.objects.length === 0) return -1
+    for (let i = 0; i < state.objects.length; i++) {
+      const object = state.objects[i]
+      const combinedRadius = object.radius + ball.radius
+      const dx = ball.x - object.x
+      const dy = ball.y - object.y
+      if (dx * dx + dy * dy <= combinedRadius * combinedRadius) {
+        return i
+      }
+    }
+    return -1
+  }
+
+  function getPotionShrinkAmount(modifier: GravityWellModifier & { shrinkAmount?: number }) {
+    const raw = Number.isFinite(modifier.shrinkAmount) ? Number(modifier.shrinkAmount) : 0
+    return Math.max(0, raw)
+  }
+
+  function getPotionGrowAmount(modifier: GravityWellModifier & { growAmount?: number }) {
+    const raw = Number.isFinite(modifier.growAmount) ? Number(modifier.growAmount) : 0
+    return Math.max(0, raw)
+  }
+
+  function modifyPaddleHeight(side: 'left' | 'right', delta: number) {
+    if (!Number.isFinite(delta) || delta === 0) return
+
+    const currentHeight = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+    let minimumHeight = MIN_POTION_PADDLE_HEIGHT
+    const chillyModifier = config.modifiers.paddle.chilly
+    if (chillyModifier.enabled) {
+      const { minimumHeight: chillyMin } = getChillySettingsForSide(side, chillyModifier)
+      minimumHeight = Math.max(minimumHeight, chillyMin)
+    }
+
+    const nextHeight = clamp(currentHeight + delta, minimumHeight, H)
+    if (nextHeight === currentHeight) return
+
+    setPaddleHeight(side, nextHeight, { preserveCenter: true })
+    clampPaddlePosition(side)
+    updateCharlotteAnchors()
+  }
+
   function initializeActiveModState() {
     const enabledMods = GRAVITY_WELL_KEYS.filter(key => config.modifiers.arena[key].enabled)
     if (enabledMods.length === 0) {
@@ -2973,6 +3097,8 @@ export function createPong(
         if (key === 'gopher') resetGopherState(gopherState, arenaDimensions)
         if (key === 'fogOfWar') resetFogOfWarState(fogOfWarState)
         if (key === 'wonderland') resetWonderlandState(wonderlandState)
+        if (key === 'drinkMe') clearDrinkMeState(drinkMeState)
+        if (key === 'teaParty') clearTeaPartyState(teaPartyState)
       }
     }
 
@@ -3546,6 +3672,25 @@ export function createPong(
     return angleMagnitude * direction
   }
 
+  function drawPotionObjects(
+    objects: { x: number; y: number; radius: number }[],
+    modifier: GravityWellModifier & { objectColor?: string },
+  ) {
+    if (!modifier.enabled || objects.length === 0) return
+
+    const fallbackColor = modifier.positiveTint ?? '#f97316'
+    const color = typeof modifier.objectColor === 'string' ? modifier.objectColor : fallbackColor
+    ctx.save()
+    ctx.fillStyle = color
+    for (const object of objects) {
+      if (object.radius <= 0) continue
+      ctx.beginPath()
+      ctx.arc(object.x, object.y, object.radius, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.restore()
+  }
+
   function draw() {
     ctx.fillStyle = ARENA_BACKGROUND
     ctx.fillRect(0, 0, W, H)
@@ -3566,6 +3711,15 @@ export function createPong(
       whiteRgb: WHITE_RGB,
       maxVisualStrength: MAX_GRAVITY_VISUAL_STRENGTH,
     })
+
+    drawPotionObjects(
+      getDrinkMeObjects(drinkMeState, config.modifiers.arena.drinkMe),
+      config.modifiers.arena.drinkMe,
+    )
+    drawPotionObjects(
+      getTeaPartyObjects(teaPartyState, config.modifiers.arena.teaParty),
+      config.modifiers.arena.teaParty,
+    )
 
     drawBallTrails()
 

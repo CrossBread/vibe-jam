@@ -146,6 +146,37 @@
         "positiveTint": "#4ade80",
         "negativeTint": "#bbf7d0",
         "includeInRandom": true
+      },
+      "drinkMe": {
+        "name": "Drink Me",
+        "description": "Potion orbs that shrink the opponent when you tag them",
+        "enabled": false,
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 20,
+        "objectRadius": 18,
+        "spawnCount": 4,
+        "shrinkAmount": 28,
+        "objectColor": "#f97316",
+        "positiveTint": "#f97316",
+        "negativeTint": "#fde68a",
+        "includeInRandom": true
+      },
+      "teaParty": {
+        "name": "Tea Party",
+        "description": "Hit the sweets to shrink foes and grow your paddle",
+        "enabled": false,
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 20,
+        "objectRadius": 20,
+        "spawnCount": 3,
+        "shrinkAmount": 24,
+        "growAmount": 20,
+        "objectColor": "#a855f7",
+        "positiveTint": "#a855f7",
+        "negativeTint": "#ede9fe",
+        "includeInRandom": true
       }
     },
     "ball": {
