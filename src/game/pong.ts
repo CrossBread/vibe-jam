@@ -144,7 +144,7 @@ interface BallState {
   travelDistance: number
 }
 
-type PaddleLane = 'outer' | 'inner'
+type PaddleLane = 'outer' | 'inner' | 'missile'
 
 interface PhysicalPaddle {
   side: 'left' | 'right'
@@ -169,6 +169,23 @@ interface PaddleSegment {
 interface OsteoSegmentState {
   hits: number
   broken: boolean
+}
+
+interface ActiveMissilePaddle {
+  side: 'left' | 'right'
+  y: number
+  height: number
+  vy: number
+  age: number
+  lifetime: number
+}
+
+interface PaddleControlState {
+  direction: number
+  relativeDelta: number
+  hasDirectionalInput: boolean
+  upRequested: boolean
+  downRequested: boolean
 }
 
 export function createPong(
@@ -549,10 +566,24 @@ export function createPong(
   const MAX_ACTIVE_BALLS = 6
   const hadronStatus: Record<'left' | 'right', boolean> = { left: true, right: true }
   const osteoStates: Record<'left' | 'right', Record<PaddleLane, OsteoSegmentState[]>> = {
-    left: { outer: [], inner: [] },
-    right: { outer: [], inner: [] },
+    left: { outer: [], inner: [], missile: [] },
+    right: { outer: [], inner: [], missile: [] },
   }
   let previousOsteoSignature: string | null = null
+  const missilePaddles: ActiveMissilePaddle[] = []
+  const missileCooldowns: Record<'left' | 'right', number> = { left: 0, right: 0 }
+  interface PaddleDynamicsState {
+    velocity: number
+    frisbeeFlying: boolean
+    frisbeeDirection: -1 | 0 | 1
+  }
+  const paddleDynamics: Record<'left' | 'right', PaddleDynamicsState> = {
+    left: { velocity: 0, frisbeeFlying: false, frisbeeDirection: 0 },
+    right: { velocity: 0, frisbeeFlying: false, frisbeeDirection: 0 },
+  }
+  let previousMissileEnabled = config.modifiers.paddle.missileCommander.enabled
+  let previousFrisbeeEnabled = config.modifiers.paddle.frisbee.enabled
+  let previousDundeeEnabled = config.modifiers.paddle.dundee.enabled
 
   const movingWellStates: Record<MovingWellKey, MovingWellState> = {
     blackMole: {
@@ -774,32 +805,26 @@ export function createPong(
         state.leftInnerY = state.leftY
       }
     } else {
-      const keyDirection = doublesEnabled ? 0 : (keys['w'] ? -1 : 0) + (keys['s'] ? 1 : 0)
-      let gamePadDirection = 0
-      if (gamepadInput.leftAxis)
-        gamePadDirection += gamepadInput.leftAxis * config.paddleSpeed * dt
-      if (gamepadInput.leftUp) gamePadDirection -= config.paddleSpeed * dt
-      if (gamepadInput.leftDown) gamePadDirection += config.paddleSpeed * dt
-
-      const totalDirection = clamp(
-        keyDirection + touchControls.left.direction + gamePadDirection,
-        -1,
-        1,
-      )
-      state.leftY += totalDirection * config.paddleSpeed * dt
-      if (touchControls.left.relativeDelta !== 0) {
-        state.leftY += touchControls.left.relativeDelta
-        touchControls.left.relativeDelta = 0
-      }
+      const control = getPaddleControlState('left', doublesEnabled, gamepadInput)
+      handleManualPaddle('left', dt, leftPaddleSpeed, control)
 
       if (doublesEnabled) {
-        let innerGamepad = 0
-        if (gamepadInput.rightAxis)
-          innerGamepad += gamepadInput.rightAxis * config.paddleSpeed * dt
-        if (gamepadInput.rightUp) innerGamepad -= config.paddleSpeed * dt
-        if (gamepadInput.rightDown) innerGamepad += config.paddleSpeed * dt
-        const innerDirection = clamp(innerGamepad, -1, 1)
-        state.leftInnerY += innerDirection * config.paddleSpeed * dt
+        if (config.modifiers.paddle.missileCommander.enabled) {
+          const target = clamp(
+            H * 0.5 - state.leftInnerPaddleHeight / 2,
+            0,
+            H - state.leftInnerPaddleHeight,
+          )
+          state.leftInnerY = target
+        } else {
+          let innerGamepad = 0
+          if (gamepadInput.rightAxis)
+            innerGamepad += gamepadInput.rightAxis * config.paddleSpeed * dt
+          if (gamepadInput.rightUp) innerGamepad -= config.paddleSpeed * dt
+          if (gamepadInput.rightDown) innerGamepad += config.paddleSpeed * dt
+          const innerDirection = clamp(innerGamepad, -1, 1)
+          state.leftInnerY += innerDirection * config.paddleSpeed * dt
+        }
       } else {
         state.leftInnerY = state.leftY
       }
@@ -817,33 +842,28 @@ export function createPong(
         state.rightInnerY = state.rightY
       }
     } else {
-      const keyDirection = (keys['ArrowUp'] ? -1 : 0) + (keys['ArrowDown'] ? 1 : 0)
-      let gamePadDirection = 0
-      if (!doublesEnabled) {
-        if (gamepadInput.rightAxis)
-          gamePadDirection += gamepadInput.rightAxis * config.paddleSpeed * dt
-        if (gamepadInput.rightUp) gamePadDirection -= config.paddleSpeed * dt
-        if (gamepadInput.rightDown) gamePadDirection += config.paddleSpeed * dt
-      }
-      const totalDirection = clamp(
-        keyDirection + touchControls.right.direction + gamePadDirection,
-        -1,
-        1,
-      )
-      state.rightY += totalDirection * config.paddleSpeed * dt
-      if (touchControls.right.relativeDelta !== 0) {
-        state.rightY += touchControls.right.relativeDelta
-        touchControls.right.relativeDelta = 0
-      }
+      const control = getPaddleControlState('right', doublesEnabled, gamepadInput)
+      handleManualPaddle('right', dt, rightPaddleSpeed, control)
 
       if (doublesEnabled) {
-        const innerKeyDirection = (keys['w'] ? -1 : 0) + (keys['s'] ? 1 : 0)
-        const innerDirection = clamp(innerKeyDirection, -1, 1)
-        state.rightInnerY += innerDirection * config.paddleSpeed * dt
+        if (config.modifiers.paddle.missileCommander.enabled) {
+          const target = clamp(
+            H * 0.5 - state.rightInnerPaddleHeight / 2,
+            0,
+            H - state.rightInnerPaddleHeight,
+          )
+          state.rightInnerY = target
+        } else {
+          const innerKeyDirection = (keys['w'] ? -1 : 0) + (keys['s'] ? 1 : 0)
+          const innerDirection = clamp(innerKeyDirection, -1, 1)
+          state.rightInnerY += innerDirection * config.paddleSpeed * dt
+        }
       } else {
         state.rightInnerY = state.rightY
       }
     }
+
+    updateMissilePaddles(dt)
 
     state.leftY = clamp(state.leftY, 0, H - leftPaddleHeight)
     state.rightY = clamp(state.rightY, 0, H - rightPaddleHeight)
@@ -1142,6 +1162,8 @@ export function createPong(
     state.rightInnerPaddleHeight = state.rightPaddleHeight
     state.leftInnerY = state.leftY
     state.rightInnerY = state.rightY
+    resetMissilePaddles()
+    resetPaddleDynamics()
   }
 
   function syncDoublesState(enabled: boolean) {
@@ -1203,6 +1225,39 @@ export function createPong(
     previousLeftSizeMultiplier = leftMultiplier
     previousRightSizeMultiplier = rightMultiplier
 
+    const missileEnabled = config.modifiers.paddle.missileCommander.enabled
+    if (missileEnabled !== previousMissileEnabled) {
+      resetMissilePaddles()
+      resetPaddleDynamics()
+      if (missileEnabled) {
+        centerPaddle('left')
+        centerPaddle('right')
+      }
+      previousMissileEnabled = missileEnabled
+    }
+
+    const frisbeeEnabled = config.modifiers.paddle.frisbee.enabled
+    if (frisbeeEnabled !== previousFrisbeeEnabled) {
+      resetPaddleDynamics()
+      previousFrisbeeEnabled = frisbeeEnabled
+    }
+
+    const dundeeModifier = config.modifiers.paddle.dundee
+    const dundeeEnabled = dundeeModifier.enabled
+    if (dundeeEnabled !== previousDundeeEnabled) {
+      resetPaddleDynamics()
+      if (dundeeEnabled) {
+        const base = clamp(
+          Number.isFinite(dundeeModifier.baseSpeed) ? dundeeModifier.baseSpeed : 0,
+          -Math.abs(dundeeModifier.maxSpeed || 0),
+          Math.abs(dundeeModifier.maxSpeed || 0),
+        )
+        paddleDynamics.left.velocity = base
+        paddleDynamics.right.velocity = base
+      }
+      previousDundeeEnabled = dundeeEnabled
+    }
+
     clampPaddlePosition('left')
     clampPaddlePosition('right')
     state.leftPaddleHeight = leftPaddleHeight
@@ -1221,6 +1276,366 @@ export function createPong(
 
     if (!config.modifiers.paddle.hadron.enabled) {
       rearmHadron()
+    }
+  }
+
+  function resetMissilePaddles() {
+    missilePaddles.length = 0
+    missileCooldowns.left = 0
+    missileCooldowns.right = 0
+  }
+
+  function resetPaddleDynamics() {
+    paddleDynamics.left.velocity = 0
+    paddleDynamics.left.frisbeeFlying = false
+    paddleDynamics.left.frisbeeDirection = 0
+    paddleDynamics.right.velocity = 0
+    paddleDynamics.right.frisbeeFlying = false
+    paddleDynamics.right.frisbeeDirection = 0
+  }
+
+  function centerPaddle(side: 'left' | 'right') {
+    const height = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+    const y = clamp(H * 0.5 - height / 2, 0, H - height)
+    if (side === 'left') {
+      state.leftY = y
+      if (!config.doubles.enabled || config.modifiers.paddle.missileCommander.enabled) {
+        state.leftInnerY = y
+      }
+    } else {
+      state.rightY = y
+      if (!config.doubles.enabled || config.modifiers.paddle.missileCommander.enabled) {
+        state.rightInnerY = y
+      }
+    }
+  }
+
+  function getPaddleControlState(
+    side: 'left' | 'right',
+    doublesEnabled: boolean,
+    gamepadInput: GamepadInput,
+  ): PaddleControlState {
+    let direction = 0
+    let upPressed = false
+    let downPressed = false
+    let analogUsed = false
+
+    if (side === 'left') {
+      if (!doublesEnabled) {
+        if (keys['w']) {
+          direction -= 1
+          upPressed = true
+        }
+        if (keys['s']) {
+          direction += 1
+          downPressed = true
+        }
+      }
+
+      const axis = withDeadzone(gamepadInput.leftAxis)
+      if (axis !== 0) {
+        direction += axis
+        analogUsed = true
+      }
+      if (gamepadInput.leftUp) {
+        direction -= 1
+        upPressed = true
+      }
+      if (gamepadInput.leftDown) {
+        direction += 1
+        downPressed = true
+      }
+    } else {
+      if (keys['ArrowUp']) {
+        direction -= 1
+        upPressed = true
+      }
+      if (keys['ArrowDown']) {
+        direction += 1
+        downPressed = true
+      }
+
+      if (!doublesEnabled) {
+        const axis = withDeadzone(gamepadInput.rightAxis)
+        if (axis !== 0) {
+          direction += axis
+          analogUsed = true
+        }
+        if (gamepadInput.rightUp) {
+          direction -= 1
+          upPressed = true
+        }
+        if (gamepadInput.rightDown) {
+          direction += 1
+          downPressed = true
+        }
+      }
+    }
+
+    const touchDirection = touchControls[side].direction
+    if (touchDirection !== 0) {
+      direction += touchDirection
+    }
+
+    let relativeDelta = touchControls[side].relativeDelta
+    touchControls[side].relativeDelta = 0
+
+    const dizzyModifier = config.modifiers.paddle.dizzy
+    if (dizzyModifier.enabled) {
+      direction *= -1
+      relativeDelta *= -1
+      const originalUp = upPressed
+      upPressed = downPressed
+      downPressed = originalUp
+    }
+
+    direction = clamp(direction, -1, 1)
+
+    const hasDirectionalInput =
+      Math.abs(direction) > 1e-3 ||
+      Math.abs(relativeDelta) > 1e-3 ||
+      upPressed ||
+      downPressed ||
+      analogUsed ||
+      touchDirection !== 0
+
+    return {
+      direction,
+      relativeDelta,
+      hasDirectionalInput,
+      upRequested: upPressed || direction < -0.25,
+      downRequested: downPressed || direction > 0.25,
+    }
+  }
+
+  function applyStandardMovement(
+    side: 'left' | 'right',
+    dt: number,
+    paddleSpeed: number,
+    control: PaddleControlState,
+  ) {
+    const delta = control.direction * paddleSpeed * dt + control.relativeDelta
+    if (side === 'left') {
+      state.leftY += delta
+    } else {
+      state.rightY += delta
+    }
+  }
+
+  function applyBungeeReturn(
+    side: 'left' | 'right',
+    dt: number,
+    modifier = config.modifiers.paddle.bungee,
+  ) {
+    const speed = Number.isFinite(modifier.returnSpeed)
+      ? Math.max(0, modifier.returnSpeed)
+      : 0
+    if (speed <= 0) return
+    const height = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+    const target = clamp(H * 0.5 - height / 2, 0, H - height)
+    const current = side === 'left' ? state.leftY : state.rightY
+    const delta = target - current
+    const maxStep = speed * dt
+    const step = clamp(delta, -maxStep, maxStep)
+    if (side === 'left') {
+      state.leftY += step
+    } else {
+      state.rightY += step
+    }
+  }
+
+  function handleMissileCommander(
+    side: 'left' | 'right',
+    dt: number,
+    control: PaddleControlState,
+    modifier = config.modifiers.paddle.missileCommander,
+  ) {
+    const height = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+    const centerY = clamp(H * 0.5 - height / 2, 0, H - height)
+    if (side === 'left') {
+      state.leftY = centerY
+    } else {
+      state.rightY = centerY
+    }
+
+    missileCooldowns[side] = Math.max(0, missileCooldowns[side] - dt)
+
+    const launchSpeed = Number.isFinite(modifier.launchSpeed)
+      ? modifier.launchSpeed
+      : 0
+    const cooldown = Math.max(0, Number.isFinite(modifier.cooldown) ? modifier.cooldown : 0)
+
+    const threshold = 0.2
+    if (control.direction < -threshold && missileCooldowns[side] <= 0 && launchSpeed !== 0) {
+      spawnMissilePaddle(side, -Math.abs(launchSpeed), modifier)
+      missileCooldowns[side] = cooldown
+    } else if (control.direction > threshold && missileCooldowns[side] <= 0 && launchSpeed !== 0) {
+      spawnMissilePaddle(side, Math.abs(launchSpeed), modifier)
+      missileCooldowns[side] = cooldown
+    }
+  }
+
+  function spawnMissilePaddle(
+    side: 'left' | 'right',
+    velocity: number,
+    modifier = config.modifiers.paddle.missileCommander,
+  ) {
+    const baseHeight = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+    const missileHeightRaw = Number.isFinite(modifier.missileHeight)
+      ? modifier.missileHeight
+      : baseHeight
+    const missileHeight = clamp(missileHeightRaw, 10, H)
+    const paddleY = side === 'left' ? state.leftY : state.rightY
+    const y = clamp(paddleY + baseHeight / 2 - missileHeight / 2, 0, H - missileHeight)
+    const lifetime = Math.max(0.1, Number.isFinite(modifier.missileLifetime) ? modifier.missileLifetime : 1)
+    missilePaddles.push({
+      side,
+      y,
+      height: missileHeight,
+      vy: velocity,
+      age: 0,
+      lifetime,
+    })
+  }
+
+  function updateMissilePaddles(dt: number) {
+    for (let i = missilePaddles.length - 1; i >= 0; i--) {
+      const missile = missilePaddles[i]
+      missile.age += dt
+      missile.y += missile.vy * dt
+      if (missile.y + missile.height < 0 || missile.y > H || missile.age >= missile.lifetime) {
+        missilePaddles.splice(i, 1)
+      } else {
+        missile.y = clamp(missile.y, 0, Math.max(0, H - missile.height))
+      }
+    }
+  }
+
+  function handleFrisbeePaddle(
+    side: 'left' | 'right',
+    dt: number,
+    control: PaddleControlState,
+    modifier = config.modifiers.paddle.frisbee,
+  ) {
+    const dynamics = paddleDynamics[side]
+    const height = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+    const throwSpeed = Math.max(0, Number.isFinite(modifier.throwSpeed) ? modifier.throwSpeed : 0)
+
+    if (!dynamics.frisbeeFlying) {
+      if (throwSpeed > 0 && control.upRequested) {
+        dynamics.frisbeeFlying = true
+        dynamics.frisbeeDirection = -1
+        dynamics.velocity = -throwSpeed
+        if (side === 'left') {
+          state.leftY = H - height
+        } else {
+          state.rightY = H - height
+        }
+      } else if (throwSpeed > 0 && control.downRequested) {
+        dynamics.frisbeeFlying = true
+        dynamics.frisbeeDirection = 1
+        dynamics.velocity = throwSpeed
+        if (side === 'left') {
+          state.leftY = 0
+        } else {
+          state.rightY = 0
+        }
+      } else {
+        dynamics.velocity = 0
+      }
+      return
+    }
+
+    if (side === 'left') {
+      state.leftY += dynamics.velocity * dt
+      if (dynamics.velocity < 0 && state.leftY <= 0) {
+        state.leftY = 0
+        dynamics.velocity = 0
+        dynamics.frisbeeFlying = false
+        dynamics.frisbeeDirection = 0
+      } else if (dynamics.velocity > 0 && state.leftY >= H - height) {
+        state.leftY = H - height
+        dynamics.velocity = 0
+        dynamics.frisbeeFlying = false
+        dynamics.frisbeeDirection = 0
+      }
+      return
+    }
+
+    state.rightY += dynamics.velocity * dt
+    if (dynamics.velocity < 0 && state.rightY <= 0) {
+      state.rightY = 0
+      dynamics.velocity = 0
+      dynamics.frisbeeFlying = false
+      dynamics.frisbeeDirection = 0
+    } else if (dynamics.velocity > 0 && state.rightY >= H - height) {
+      state.rightY = H - height
+      dynamics.velocity = 0
+      dynamics.frisbeeFlying = false
+      dynamics.frisbeeDirection = 0
+    }
+  }
+
+  function handleDundeePaddle(
+    side: 'left' | 'right',
+    dt: number,
+    control: PaddleControlState,
+    modifier = config.modifiers.paddle.dundee,
+  ) {
+    const dynamics = paddleDynamics[side]
+    const acceleration = Number.isFinite(modifier.acceleration) ? modifier.acceleration : 0
+    const maxSpeed = Math.max(0, Number.isFinite(modifier.maxSpeed) ? modifier.maxSpeed : 0)
+    const height = side === 'left' ? leftPaddleHeight : rightPaddleHeight
+
+    dynamics.velocity += control.direction * acceleration * dt
+    dynamics.velocity = clamp(dynamics.velocity, -maxSpeed, maxSpeed)
+    if (side === 'left') {
+      state.leftY += dynamics.velocity * dt
+      if (state.leftY <= 0) {
+        state.leftY = 0
+        dynamics.velocity = Math.abs(dynamics.velocity)
+      } else if (state.leftY >= H - height) {
+        state.leftY = H - height
+        dynamics.velocity = -Math.abs(dynamics.velocity)
+      }
+      return
+    }
+
+    state.rightY += dynamics.velocity * dt
+    if (state.rightY <= 0) {
+      state.rightY = 0
+      dynamics.velocity = Math.abs(dynamics.velocity)
+    } else if (state.rightY >= H - height) {
+      state.rightY = H - height
+      dynamics.velocity = -Math.abs(dynamics.velocity)
+    }
+  }
+
+  function handleManualPaddle(
+    side: 'left' | 'right',
+    dt: number,
+    paddleSpeed: number,
+    control: PaddleControlState,
+  ) {
+    const paddleModifiers = config.modifiers.paddle
+    if (paddleModifiers.missileCommander.enabled) {
+      handleMissileCommander(side, dt, control, paddleModifiers.missileCommander)
+      return
+    }
+
+    if (paddleModifiers.frisbee.enabled) {
+      handleFrisbeePaddle(side, dt, control, paddleModifiers.frisbee)
+      return
+    }
+
+    if (paddleModifiers.dundee.enabled) {
+      handleDundeePaddle(side, dt, control, paddleModifiers.dundee)
+      return
+    }
+
+    applyStandardMovement(side, dt, paddleSpeed, control)
+    if (paddleModifiers.bungee.enabled && !control.hasDirectionalInput) {
+      applyBungeeReturn(side, dt, paddleModifiers.bungee)
     }
   }
 
@@ -1260,8 +1675,10 @@ export function createPong(
     if (!modifier.enabled) {
       osteoStates.left.outer = []
       osteoStates.left.inner = []
+      osteoStates.left.missile = []
       osteoStates.right.outer = []
       osteoStates.right.inner = []
+      osteoStates.right.missile = []
       previousOsteoSignature = null
       return
     }
@@ -1282,8 +1699,10 @@ export function createPong(
         Array.from({ length: segmentCount }, () => ({ hits: 0, broken: false }))
       osteoStates.left.outer = createSegments()
       osteoStates.left.inner = createSegments()
+      osteoStates.left.missile = []
       osteoStates.right.outer = createSegments()
       osteoStates.right.inner = createSegments()
+      osteoStates.right.missile = []
       return
     }
 
@@ -1370,7 +1789,28 @@ export function createPong(
   function getPaddleSizeMultiplier(side: 'left' | 'right') {
     const value =
       side === 'left' ? config.leftPaddleSizeMultiplier : config.rightPaddleSizeMultiplier
-    const multiplier = Number.isFinite(value) ? value : 1
+    let multiplier = Number.isFinite(value) ? value : 1
+    const paddleModifiers = config.modifiers.paddle
+    const paddleModifierEntries = [
+      paddleModifiers.chilly,
+      paddleModifiers.buckTooth,
+      paddleModifiers.osteoWhat,
+      paddleModifiers.brokePhysics,
+      paddleModifiers.hadron,
+      paddleModifiers.foosball,
+      paddleModifiers.dizzy,
+      paddleModifiers.bungee,
+      paddleModifiers.missileCommander,
+      paddleModifiers.frisbee,
+      paddleModifiers.dundee,
+    ]
+    for (const modifier of paddleModifierEntries) {
+      if (!modifier.enabled) continue
+      const value = Number.isFinite(modifier.paddleSizeMultiplier)
+        ? modifier.paddleSizeMultiplier
+        : 1
+      multiplier *= value
+    }
     return Math.max(0.1, multiplier)
   }
 
@@ -1960,23 +2400,33 @@ export function createPong(
         y: state.rightY,
         height: state.rightPaddleHeight,
       })
-      return paddles
+    } else {
+      paddles.push({
+        side: 'left',
+        lane: 'outer',
+        x: getLeftOuterX(),
+        y: state.leftY,
+        height: state.leftPaddleHeight,
+      })
+      paddles.push({
+        side: 'right',
+        lane: 'outer',
+        x: getRightOuterX(),
+        y: state.rightY,
+        height: state.rightPaddleHeight,
+      })
     }
 
-    paddles.push({
-      side: 'left',
-      lane: 'outer',
-      x: getLeftOuterX(),
-      y: state.leftY,
-      height: state.leftPaddleHeight,
-    })
-    paddles.push({
-      side: 'right',
-      lane: 'outer',
-      x: getRightOuterX(),
-      y: state.rightY,
-      height: state.rightPaddleHeight,
-    })
+    for (const missile of missilePaddles) {
+      paddles.push({
+        side: missile.side,
+        lane: 'missile',
+        x: missile.side === 'left' ? getLeftOuterX() : getRightOuterX(),
+        y: missile.y,
+        height: missile.height,
+      })
+    }
+
     return paddles
   }
 
@@ -1988,6 +2438,10 @@ export function createPong(
       y: paddle.y,
       width: PADDLE_W,
       height: paddle.height,
+    }
+
+    if (paddle.lane === 'missile') {
+      return [baseSegment]
     }
 
     const osteoModifier = config.modifiers.paddle.osteoWhat

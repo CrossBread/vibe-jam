@@ -16,6 +16,11 @@
   type BrokePhysicsModifier,
   type HadronModifier,
   type FoosballModifier,
+  type DizzyModifier,
+  type BungeeModifier,
+  type MissileCommanderModifier,
+  type FrisbeeModifier,
+  type DundeeModifier,
   type ModifiersConfig,
   type DoublesConfig,
 } from './devtools'
@@ -688,11 +693,32 @@ export function createDevOverlay(
     paddleList.className = 'dev-overlay__modifiers'
     paddleSection.appendChild(paddleList)
 
-    const { chilly, buckTooth, osteoWhat, brokePhysics, hadron, foosball } =
-      config.modifiers.paddle
+    const {
+      chilly,
+      buckTooth,
+      osteoWhat,
+      brokePhysics,
+      hadron,
+      foosball,
+      dizzy,
+      bungee,
+      missileCommander,
+      frisbee,
+      dundee,
+    } = config.modifiers.paddle
 
     paddleList.appendChild(
       createModifierDetails(chilly, body => {
+        body.appendChild(
+          createSliderControl('Paddle Size Multiplier', chilly.paddleSizeMultiplier, {
+            min: 0.5,
+            max: 1.75,
+            step: 0.05,
+            format: v => `${v.toFixed(2)}×`,
+            onInput: v => (chilly.paddleSizeMultiplier = v),
+          }),
+        )
+
         body.appendChild(
           createSliderControl('Starting Height', chilly.startingHeight, {
             min: 60,
@@ -728,6 +754,20 @@ export function createDevOverlay(
     paddleList.appendChild(
       createModifierDetails(buckTooth, body => {
         body.appendChild(
+          createSliderControl(
+            'Paddle Size Multiplier',
+            buckTooth.paddleSizeMultiplier,
+            {
+              min: 0.5,
+              max: 1.75,
+              step: 0.05,
+              format: v => `${v.toFixed(2)}×`,
+              onInput: v => (buckTooth.paddleSizeMultiplier = v),
+            },
+          ),
+        )
+
+        body.appendChild(
           createSliderControl('Gap Size', buckTooth.gapSize, {
             min: 0,
             max: 160,
@@ -741,6 +781,20 @@ export function createDevOverlay(
 
     paddleList.appendChild(
       createModifierDetails(osteoWhat, body => {
+        body.appendChild(
+          createSliderControl(
+            'Paddle Size Multiplier',
+            osteoWhat.paddleSizeMultiplier,
+            {
+              min: 0.5,
+              max: 1.75,
+              step: 0.05,
+              format: v => `${v.toFixed(2)}×`,
+              onInput: v => (osteoWhat.paddleSizeMultiplier = v),
+            },
+          ),
+        )
+
         body.appendChild(
           createSliderControl('Segment Count', osteoWhat.segmentCount, {
             min: 2,
@@ -777,6 +831,20 @@ export function createDevOverlay(
       createModifierDetails(brokePhysics, body => {
         body.appendChild(
           createSliderControl(
+            'Paddle Size Multiplier',
+            brokePhysics.paddleSizeMultiplier,
+            {
+              min: 0.5,
+              max: 1.75,
+              step: 0.05,
+              format: v => `${v.toFixed(2)}×`,
+              onInput: v => (brokePhysics.paddleSizeMultiplier = v),
+            },
+          ),
+        )
+
+        body.appendChild(
+          createSliderControl(
             'Center Angle',
             radiansToDegrees(brokePhysics.centerAngle),
             {
@@ -804,6 +872,16 @@ export function createDevOverlay(
     paddleList.appendChild(
       createModifierDetails(hadron, body => {
         body.appendChild(
+          createSliderControl('Paddle Size Multiplier', hadron.paddleSizeMultiplier, {
+            min: 0.5,
+            max: 1.75,
+            step: 0.05,
+            format: v => `${v.toFixed(2)}×`,
+            onInput: v => (hadron.paddleSizeMultiplier = v),
+          }),
+        )
+
+        body.appendChild(
           createSliderControl('Split Angle Offset', radiansToDegrees(hadron.splitAngle), {
             min: 0,
             max: 60,
@@ -830,12 +908,186 @@ export function createDevOverlay(
     paddleList.appendChild(
       createModifierDetails(foosball, body => {
         body.appendChild(
+          createSliderControl('Paddle Size Multiplier', foosball.paddleSizeMultiplier, {
+            min: 0.5,
+            max: 1.75,
+            step: 0.05,
+            format: v => `${v.toFixed(2)}×`,
+            onInput: v => (foosball.paddleSizeMultiplier = v),
+          }),
+        )
+
+        body.appendChild(
           createSliderControl('Gap Size', foosball.gapSize, {
             min: 0,
             max: 80,
             step: 1,
             format: v => `${Math.round(v)} px`,
             onInput: v => (foosball.gapSize = v),
+          }),
+        )
+      }),
+    )
+
+    paddleList.appendChild(
+      createModifierDetails(dizzy, body => {
+        body.appendChild(
+          createSliderControl('Paddle Size Multiplier', dizzy.paddleSizeMultiplier, {
+            min: 0.5,
+            max: 1.75,
+            step: 0.05,
+            format: v => `${v.toFixed(2)}×`,
+            onInput: v => (dizzy.paddleSizeMultiplier = v),
+          }),
+        )
+      }),
+    )
+
+    paddleList.appendChild(
+      createModifierDetails(bungee, body => {
+        body.appendChild(
+          createSliderControl('Paddle Size Multiplier', bungee.paddleSizeMultiplier, {
+            min: 0.5,
+            max: 1.75,
+            step: 0.05,
+            format: v => `${v.toFixed(2)}×`,
+            onInput: v => (bungee.paddleSizeMultiplier = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Return Speed', bungee.returnSpeed, {
+            min: 60,
+            max: 640,
+            step: 5,
+            format: v => `${Math.round(v)} px/s`,
+            onInput: v => (bungee.returnSpeed = v),
+          }),
+        )
+      }),
+    )
+
+    paddleList.appendChild(
+      createModifierDetails(missileCommander, body => {
+        body.appendChild(
+          createSliderControl(
+            'Paddle Size Multiplier',
+            missileCommander.paddleSizeMultiplier,
+            {
+              min: 0.5,
+              max: 1.75,
+              step: 0.05,
+              format: v => `${v.toFixed(2)}×`,
+              onInput: v => (missileCommander.paddleSizeMultiplier = v),
+            },
+          ),
+        )
+
+        body.appendChild(
+          createSliderControl('Launch Speed', missileCommander.launchSpeed, {
+            min: 120,
+            max: 800,
+            step: 5,
+            format: v => `${Math.round(v)} px/s`,
+            onInput: v => (missileCommander.launchSpeed = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Launch Cooldown', missileCommander.cooldown, {
+            min: 0.2,
+            max: 3,
+            step: 0.05,
+            format: v => `${v.toFixed(2)} s`,
+            onInput: v => (missileCommander.cooldown = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Missile Height', missileCommander.missileHeight, {
+            min: 20,
+            max: 160,
+            step: 1,
+            format: v => `${Math.round(v)} px`,
+            onInput: v => (missileCommander.missileHeight = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Missile Lifetime', missileCommander.missileLifetime, {
+            min: 0.5,
+            max: 4,
+            step: 0.05,
+            format: v => `${v.toFixed(2)} s`,
+            onInput: v => (missileCommander.missileLifetime = v),
+          }),
+        )
+      }),
+    )
+
+    paddleList.appendChild(
+      createModifierDetails(frisbee, body => {
+        body.appendChild(
+          createSliderControl('Paddle Size Multiplier', frisbee.paddleSizeMultiplier, {
+            min: 0.5,
+            max: 1.75,
+            step: 0.05,
+            format: v => `${v.toFixed(2)}×`,
+            onInput: v => (frisbee.paddleSizeMultiplier = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Throw Speed', frisbee.throwSpeed, {
+            min: 120,
+            max: 900,
+            step: 5,
+            format: v => `${Math.round(v)} px/s`,
+            onInput: v => (frisbee.throwSpeed = v),
+          }),
+        )
+      }),
+    )
+
+    paddleList.appendChild(
+      createModifierDetails(dundee, body => {
+        body.appendChild(
+          createSliderControl('Paddle Size Multiplier', dundee.paddleSizeMultiplier, {
+            min: 0.5,
+            max: 1.75,
+            step: 0.05,
+            format: v => `${v.toFixed(2)}×`,
+            onInput: v => (dundee.paddleSizeMultiplier = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Base Speed', dundee.baseSpeed, {
+            min: 60,
+            max: 640,
+            step: 5,
+            format: v => `${Math.round(v)} px/s`,
+            onInput: v => (dundee.baseSpeed = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Acceleration', dundee.acceleration, {
+            min: 60,
+            max: 900,
+            step: 5,
+            format: v => `${Math.round(v)} px/s²`,
+            onInput: v => (dundee.acceleration = v),
+          }),
+        )
+
+        body.appendChild(
+          createSliderControl('Max Speed', dundee.maxSpeed, {
+            min: 120,
+            max: 1200,
+            step: 5,
+            format: v => `${Math.round(v)} px/s`,
+            onInput: v => (dundee.maxSpeed = v),
           }),
         )
       }),
@@ -1228,6 +1480,11 @@ function isDevConfig(value: unknown): value is DevConfig {
   if (!isBrokePhysicsModifier(paddle.brokePhysics)) return false
   if (!isHadronModifier(paddle.hadron)) return false
   if (!isFoosballModifier(paddle.foosball)) return false
+  if (!isDizzyModifier(paddle.dizzy)) return false
+  if (!isBungeeModifier(paddle.bungee)) return false
+  if (!isMissileCommanderModifier(paddle.missileCommander)) return false
+  if (!isFrisbeeModifier(paddle.frisbee)) return false
+  if (!isDundeeModifier(paddle.dundee)) return false
 
   return true
 }
@@ -1376,14 +1633,18 @@ function isChillyModifier(value: unknown): value is ChillyModifier {
   return (
     typeof candidate.startingHeight === 'number' &&
     typeof candidate.shrinkAmount === 'number' &&
-    typeof candidate.minimumHeight === 'number'
+    typeof candidate.minimumHeight === 'number' &&
+    typeof candidate.paddleSizeMultiplier === 'number'
   )
 }
 
 function isBuckToothModifier(value: unknown): value is BuckToothModifier {
   if (!hasModifierBaseFields(value)) return false
   const candidate = value as Partial<BuckToothModifier>
-  return typeof candidate.gapSize === 'number'
+  return (
+    typeof candidate.gapSize === 'number' &&
+    typeof candidate.paddleSizeMultiplier === 'number'
+  )
 }
 
 function isOsteoWhatModifier(value: unknown): value is OsteoWhatModifier {
@@ -1392,7 +1653,8 @@ function isOsteoWhatModifier(value: unknown): value is OsteoWhatModifier {
   return (
     typeof candidate.segmentCount === 'number' &&
     typeof candidate.gapSize === 'number' &&
-    typeof candidate.hitsBeforeBreak === 'number'
+    typeof candidate.hitsBeforeBreak === 'number' &&
+    typeof candidate.paddleSizeMultiplier === 'number'
   )
 }
 
@@ -1401,7 +1663,8 @@ function isBrokePhysicsModifier(value: unknown): value is BrokePhysicsModifier {
   const candidate = value as Partial<BrokePhysicsModifier>
   return (
     typeof candidate.centerAngle === 'number' &&
-    typeof candidate.edgeAngle === 'number'
+    typeof candidate.edgeAngle === 'number' &&
+    typeof candidate.paddleSizeMultiplier === 'number'
   )
 }
 
@@ -1411,14 +1674,67 @@ function isHadronModifier(value: unknown): value is HadronModifier {
   return (
     typeof candidate.splitAngle === 'number' &&
     typeof candidate.armedColor === 'string' &&
-    typeof candidate.disarmedColor === 'string'
+    typeof candidate.disarmedColor === 'string' &&
+    typeof candidate.paddleSizeMultiplier === 'number'
   )
 }
 
 function isFoosballModifier(value: unknown): value is FoosballModifier {
   if (!hasModifierBaseFields(value)) return false
   const candidate = value as Partial<FoosballModifier>
-  return typeof candidate.gapSize === 'number'
+  return (
+    typeof candidate.gapSize === 'number' &&
+    typeof candidate.paddleSizeMultiplier === 'number'
+  )
+}
+
+function isDizzyModifier(value: unknown): value is DizzyModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<DizzyModifier>
+  return typeof candidate.paddleSizeMultiplier === 'number'
+}
+
+function isBungeeModifier(value: unknown): value is BungeeModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<BungeeModifier>
+  return (
+    typeof candidate.paddleSizeMultiplier === 'number' &&
+    typeof candidate.returnSpeed === 'number'
+  )
+}
+
+function isMissileCommanderModifier(
+  value: unknown,
+): value is MissileCommanderModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<MissileCommanderModifier>
+  return (
+    typeof candidate.paddleSizeMultiplier === 'number' &&
+    typeof candidate.launchSpeed === 'number' &&
+    typeof candidate.cooldown === 'number' &&
+    typeof candidate.missileHeight === 'number' &&
+    typeof candidate.missileLifetime === 'number'
+  )
+}
+
+function isFrisbeeModifier(value: unknown): value is FrisbeeModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<FrisbeeModifier>
+  return (
+    typeof candidate.paddleSizeMultiplier === 'number' &&
+    typeof candidate.throwSpeed === 'number'
+  )
+}
+
+function isDundeeModifier(value: unknown): value is DundeeModifier {
+  if (!hasModifierBaseFields(value)) return false
+  const candidate = value as Partial<DundeeModifier>
+  return (
+    typeof candidate.paddleSizeMultiplier === 'number' &&
+    typeof candidate.baseSpeed === 'number' &&
+    typeof candidate.acceleration === 'number' &&
+    typeof candidate.maxSpeed === 'number'
+  )
 }
 
 function isDoublesConfig(value: unknown): value is DoublesConfig {

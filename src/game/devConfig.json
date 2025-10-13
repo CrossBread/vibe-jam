@@ -145,13 +145,15 @@
         "enabled": false,
         "startingHeight": 132,
         "shrinkAmount": 6,
-        "minimumHeight": 78
+        "minimumHeight": 78,
+        "paddleSizeMultiplier": 1
       },
       "buckTooth": {
         "name": "Buck Tooth",
         "description": "Split paddles with a configurable middle gap",
         "enabled": false,
-        "gapSize": 18
+        "gapSize": 18,
+        "paddleSizeMultiplier": 1
       },
       "osteoWhat": {
         "name": "Osteo What?",
@@ -159,14 +161,16 @@
         "enabled": false,
         "segmentCount": 6,
         "gapSize": 6,
-        "hitsBeforeBreak": 2
+        "hitsBeforeBreak": 2,
+        "paddleSizeMultiplier": 1
       },
       "brokePhysics": {
         "name": "Broke Physics",
         "description": "Center hits deflect steeply while edges stay straight",
         "enabled": false,
         "centerAngle": 1.2,
-        "edgeAngle": 0.05
+        "edgeAngle": 0.05,
+        "paddleSizeMultiplier": 1
       },
       "hadron": {
         "name": "Hadron",
@@ -174,13 +178,54 @@
         "enabled": false,
         "splitAngle": 0.35,
         "armedColor": "#facc15",
-        "disarmedColor": "#475569"
+        "disarmedColor": "#475569",
+        "paddleSizeMultiplier": 1
       },
       "foosball": {
         "name": "Foosball",
         "description": "Triple paddles evenly spaced along the shaft",
         "enabled": false,
-        "gapSize": 10
+        "gapSize": 10,
+        "paddleSizeMultiplier": 1
+      },
+      "dizzy": {
+        "name": "Dizzy",
+        "description": "Reverse the player's paddle controls",
+        "enabled": false,
+        "paddleSizeMultiplier": 1
+      },
+      "bungee": {
+        "name": "Bungee",
+        "description": "Paddles spring back to center unless held in place",
+        "enabled": false,
+        "paddleSizeMultiplier": 1,
+        "returnSpeed": 240
+      },
+      "missileCommander": {
+        "name": "Missile Commander",
+        "description": "Stationary paddles fire temporary blockers instead of moving",
+        "enabled": false,
+        "paddleSizeMultiplier": 1,
+        "launchSpeed": 520,
+        "cooldown": 0.8,
+        "missileHeight": 68,
+        "missileLifetime": 1.6
+      },
+      "frisbee": {
+        "name": "Frisbee",
+        "description": "Toss paddles from the arena edges without mid-flight reversal",
+        "enabled": false,
+        "paddleSizeMultiplier": 1,
+        "throwSpeed": 560
+      },
+      "dundee": {
+        "name": "Dundee",
+        "description": "Paddles cruise constantly and bounce while you steer with acceleration",
+        "enabled": false,
+        "paddleSizeMultiplier": 1,
+        "baseSpeed": 220,
+        "acceleration": 520,
+        "maxSpeed": 560
       }
     }
   }

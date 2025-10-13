@@ -20,6 +20,11 @@ export const PADDLE_MODIFIER_KEYS = [
   'brokePhysics',
   'hadron',
   'foosball',
+  'dizzy',
+  'bungee',
+  'missileCommander',
+  'frisbee',
+  'dundee',
 ] as const
 
 export type BallModifierKey = (typeof BALL_MODIFIER_KEYS)[number]
@@ -83,31 +88,66 @@ export interface ChillyModifier extends ModifierBase {
   startingHeight: number
   shrinkAmount: number
   minimumHeight: number
+  paddleSizeMultiplier: number
 }
 
 export interface BuckToothModifier extends ModifierBase {
   gapSize: number
+  paddleSizeMultiplier: number
 }
 
 export interface OsteoWhatModifier extends ModifierBase {
   segmentCount: number
   gapSize: number
   hitsBeforeBreak: number
+  paddleSizeMultiplier: number
 }
 
 export interface BrokePhysicsModifier extends ModifierBase {
   centerAngle: number
   edgeAngle: number
+  paddleSizeMultiplier: number
 }
 
 export interface HadronModifier extends ModifierBase {
   splitAngle: number
   armedColor: string
   disarmedColor: string
+  paddleSizeMultiplier: number
 }
 
 export interface FoosballModifier extends ModifierBase {
   gapSize: number
+  paddleSizeMultiplier: number
+}
+
+export interface DizzyModifier extends ModifierBase {
+  paddleSizeMultiplier: number
+}
+
+export interface BungeeModifier extends ModifierBase {
+  paddleSizeMultiplier: number
+  returnSpeed: number
+}
+
+export interface MissileCommanderModifier extends ModifierBase {
+  paddleSizeMultiplier: number
+  launchSpeed: number
+  cooldown: number
+  missileHeight: number
+  missileLifetime: number
+}
+
+export interface FrisbeeModifier extends ModifierBase {
+  paddleSizeMultiplier: number
+  throwSpeed: number
+}
+
+export interface DundeeModifier extends ModifierBase {
+  paddleSizeMultiplier: number
+  baseSpeed: number
+  acceleration: number
+  maxSpeed: number
 }
 
 export type PaddleModifiers = {
@@ -117,6 +157,11 @@ export type PaddleModifiers = {
   brokePhysics: BrokePhysicsModifier
   hadron: HadronModifier
   foosball: FoosballModifier
+  dizzy: DizzyModifier
+  bungee: BungeeModifier
+  missileCommander: MissileCommanderModifier
+  frisbee: FrisbeeModifier
+  dundee: DundeeModifier
 }
 
 export interface ModifiersConfig {
