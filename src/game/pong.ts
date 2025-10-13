@@ -220,6 +220,7 @@ type PaddleLane = 'outer' | 'inner' | 'missile'
 
 interface PhysicalPaddle {
   side: 'left' | 'right'
+  physicalSide: 'left' | 'right'
   lane: PaddleLane
   x: number
   y: number
@@ -811,6 +812,7 @@ export function createPong(
     minesweeperState,
     getMinesweeperModifier(),
     arenaDimensions,
+    areSidesSwapped(),
   )
   initializeActiveModState()
   resetBallSize()
@@ -922,7 +924,12 @@ export function createPong(
   function resetBall(toLeft: boolean) {
     balls.length = 0
     resetSecondChancesShields(secondChancesState, getSecondChancesModifier())
-    resetSpaceInvadersState(spaceInvadersState, getSpaceInvadersModifier(), arenaDimensions)
+    resetSpaceInvadersState(
+      spaceInvadersState,
+      getSpaceInvadersModifier(),
+      arenaDimensions,
+      areSidesSwapped(),
+    )
     resetMinesweeperState(minesweeperState, getMinesweeperModifier(), arenaDimensions)
     if (config.modifiers.arena.russianRoulette.enabled) {
       spawnRussianRouletteBalls(toLeft)
@@ -985,6 +992,7 @@ export function createPong(
       minesweeperState,
       getMinesweeperModifier(),
       arenaDimensions,
+      areSidesSwapped(),
     )
     resetBall(Math.random() < 0.5)
   }
@@ -1074,6 +1082,7 @@ export function createPong(
       spaceInvadersState,
       getSpaceInvadersModifier(),
       arenaDimensions,
+      areSidesSwapped(),
     )
     maintainMinesweeperState(
       minesweeperState,
@@ -1287,6 +1296,7 @@ export function createPong(
         getSecondChancesModifier(),
         ball,
         arenaDimensions.width,
+        areSidesSwapped(),
       )
       if (shieldSide) {
         radius = ball.radius
@@ -1297,11 +1307,11 @@ export function createPong(
       }
 
       if (ball.x < -radius) {
-        pointAwarded = 'right'
+        pointAwarded = getPointAwardedForExit('left')
         break
       }
       if (ball.x > W + radius) {
-        pointAwarded = 'left'
+        pointAwarded = getPointAwardedForExit('right')
         break
       }
     }
@@ -1925,6 +1935,7 @@ export function createPong(
 
       const ghostPaddle: PhysicalPaddle = {
         side: paddle.side,
+        physicalSide: paddle.physicalSide,
         lane: paddle.lane,
         x: paddle.x,
         y: point.y,
@@ -3023,6 +3034,8 @@ export function createPong(
         case 'drinkMe':
         case 'teaParty':
           break
+        case 'madHatter':
+          break
       }
     }
 
@@ -3231,8 +3244,19 @@ export function createPong(
         }
         if (key === 'spaceInvaders') {
           const barricadeModifier = getSpaceInvadersModifier()
-          maintainSpaceInvadersState(spaceInvadersState, barricadeModifier, arenaDimensions)
-          resetSpaceInvadersState(spaceInvadersState, barricadeModifier, arenaDimensions)
+          const swapSides = areSidesSwapped()
+          maintainSpaceInvadersState(
+            spaceInvadersState,
+            barricadeModifier,
+            arenaDimensions,
+            swapSides,
+          )
+          resetSpaceInvadersState(
+            spaceInvadersState,
+            barricadeModifier,
+            arenaDimensions,
+            swapSides,
+          )
         }
         if (key === 'minesweeper') {
           const minesweeperModifier = getMinesweeperModifier()
@@ -3273,6 +3297,22 @@ export function createPong(
     return pool[Math.floor(Math.random() * pool.length)]
   }
 
+  function areSidesSwapped(): boolean {
+    return Boolean(config.modifiers.arena.madHatter.enabled)
+  }
+
+  function getPhysicalSide(side: 'left' | 'right'): 'left' | 'right' {
+    if (!areSidesSwapped()) return side
+    return side === 'left' ? 'right' : 'left'
+  }
+
+  function getPointAwardedForExit(exitSide: 'left' | 'right'): 'left' | 'right' {
+    if (!areSidesSwapped()) {
+      return exitSide === 'left' ? 'right' : 'left'
+    }
+    return exitSide
+  }
+
   function getMaxInnerOffset() {
     return Math.max(0, W / 2 - 40 - 2 * PADDLE_W)
   }
@@ -3285,19 +3325,30 @@ export function createPong(
   }
 
   function getLeftOuterX() {
-    return 40
+    return getOuterXFor('left')
   }
 
   function getRightOuterX() {
-    return W - 40 - PADDLE_W
+    return getOuterXFor('right')
   }
 
   function getLeftInnerX() {
-    return W / 2 - getInnerOffset() - PADDLE_W
+    return getInnerXFor('left')
   }
 
   function getRightInnerX() {
-    return W / 2 + getInnerOffset()
+    return getInnerXFor('right')
+  }
+
+  function getOuterXFor(side: 'left' | 'right') {
+    const physical = getPhysicalSide(side)
+    return physical === 'left' ? 40 : W - 40 - PADDLE_W
+  }
+
+  function getInnerXFor(side: 'left' | 'right') {
+    const physical = getPhysicalSide(side)
+    const offset = getInnerOffset()
+    return physical === 'left' ? W / 2 - offset - PADDLE_W : W / 2 + offset
   }
 
   function getPhysicalPaddles(): PhysicalPaddle[] {
@@ -3311,6 +3362,7 @@ export function createPong(
         : null
       paddles.push({
         side: 'left',
+        physicalSide: getPhysicalSide('left'),
         lane: 'inner',
         x: getLeftInnerX(),
         y: leftInnerRect ? leftInnerRect.y : state.leftInnerY,
@@ -3321,6 +3373,7 @@ export function createPong(
         : null
       paddles.push({
         side: 'left',
+        physicalSide: getPhysicalSide('left'),
         lane: 'outer',
         x: getLeftOuterX(),
         y: leftOuterRect ? leftOuterRect.y : state.leftY,
@@ -3331,6 +3384,7 @@ export function createPong(
         : null
       paddles.push({
         side: 'right',
+        physicalSide: getPhysicalSide('right'),
         lane: 'inner',
         x: getRightInnerX(),
         y: rightInnerRect ? rightInnerRect.y : state.rightInnerY,
@@ -3341,6 +3395,7 @@ export function createPong(
         : null
       paddles.push({
         side: 'right',
+        physicalSide: getPhysicalSide('right'),
         lane: 'outer',
         x: getRightOuterX(),
         y: rightOuterRect ? rightOuterRect.y : state.rightY,
@@ -3352,6 +3407,7 @@ export function createPong(
         : null
       paddles.push({
         side: 'left',
+        physicalSide: getPhysicalSide('left'),
         lane: 'outer',
         x: getLeftOuterX(),
         y: leftOuterRect ? leftOuterRect.y : state.leftY,
@@ -3362,6 +3418,7 @@ export function createPong(
         : null
       paddles.push({
         side: 'right',
+        physicalSide: getPhysicalSide('right'),
         lane: 'outer',
         x: getRightOuterX(),
         y: rightOuterRect ? rightOuterRect.y : state.rightY,
@@ -3372,6 +3429,7 @@ export function createPong(
     for (const missile of missilePaddles) {
       paddles.push({
         side: missile.side,
+        physicalSide: getPhysicalSide(missile.side),
         lane: 'missile',
         x: missile.side === 'left' ? getLeftOuterX() : getRightOuterX(),
         y: missile.y,
@@ -3756,7 +3814,7 @@ export function createPong(
     if (ball.y <= top || ball.y >= bottom) return false
 
     const radius = ball.radius
-    if (segment.paddle.side === 'left') {
+    if (segment.paddle.physicalSide === 'left') {
       const contact = ball.x - radius
       if (contact <= segment.x || contact >= segment.x + segment.width) return false
       ball.x = segment.x + segment.width + radius
@@ -3772,7 +3830,7 @@ export function createPong(
     const speed = Math.hypot(ball.vx, ball.vy) * config.speedIncreaseOnHit
     const deflection = computeDeflectionAngle(segment.paddle.side, rel, ball.vy)
 
-    if (segment.paddle.side === 'left') {
+    if (segment.paddle.physicalSide === 'left') {
       ball.vx = Math.cos(deflection) * speed
       ball.vy = Math.sin(deflection) * speed
     } else {
@@ -3867,6 +3925,7 @@ export function createPong(
       arenaWidth: W,
       arenaHeight: H,
       backgroundRgb: ARENA_BACKGROUND_RGB,
+      swapSides: areSidesSwapped(),
     })
     drawSpaceInvadersBarricades(
       ctx,

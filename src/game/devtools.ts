@@ -16,6 +16,7 @@ export const GRAVITY_WELL_KEYS = [
   'russianRoulette',
   'drinkMe',
   'teaParty',
+  'madHatter',
 ] as const
 
 export type GravityWellKey = (typeof GRAVITY_WELL_KEYS)[number]

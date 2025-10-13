@@ -34,6 +34,7 @@ export interface SpaceInvadersState {
   left: SpaceInvadersBarricade[]
   right: SpaceInvadersBarricade[]
   lastConfig: SpaceInvadersConfigSnapshot | null
+  lastSwapSides: boolean
 }
 
 const BASE_BARRICADE_WIDTH = 26
@@ -46,6 +47,7 @@ export function createSpaceInvadersState(): SpaceInvadersState {
     left: [],
     right: [],
     lastConfig: null,
+    lastSwapSides: false,
   }
 }
 
@@ -53,12 +55,14 @@ export function clearSpaceInvadersState(state: SpaceInvadersState) {
   state.left.length = 0
   state.right.length = 0
   state.lastConfig = null
+  state.lastSwapSides = false
 }
 
 export function maintainSpaceInvadersState(
   state: SpaceInvadersState,
   modifier: SpaceInvadersModifier,
   dimensions: ArenaDimensions,
+  swapSides = false,
 ) {
   if (!modifier.enabled) {
     clearSpaceInvadersState(state)
@@ -66,9 +70,15 @@ export function maintainSpaceInvadersState(
   }
 
   const config = sanitizeConfig(modifier, dimensions)
-  if (!state.lastConfig || !isSameConfig(state.lastConfig, config)) {
-    rebuildBarricades(state, config, dimensions)
+  const shouldRebuild =
+    !state.lastConfig ||
+    !isSameConfig(state.lastConfig, config) ||
+    state.lastSwapSides !== swapSides
+
+  if (shouldRebuild) {
+    rebuildBarricades(state, config, dimensions, swapSides)
     state.lastConfig = config
+    state.lastSwapSides = swapSides
   }
 }
 
@@ -76,6 +86,7 @@ export function resetSpaceInvadersState(
   state: SpaceInvadersState,
   modifier: SpaceInvadersModifier,
   dimensions: ArenaDimensions,
+  swapSides = false,
 ) {
   if (!modifier.enabled) {
     clearSpaceInvadersState(state)
@@ -83,8 +94,9 @@ export function resetSpaceInvadersState(
   }
 
   const config = sanitizeConfig(modifier, dimensions)
-  rebuildBarricades(state, config, dimensions)
+  rebuildBarricades(state, config, dimensions, swapSides)
   state.lastConfig = config
+  state.lastSwapSides = swapSides
 }
 
 export function resolveSpaceInvadersCollision(
@@ -117,6 +129,7 @@ function rebuildBarricades(
   state: SpaceInvadersState,
   config: SpaceInvadersConfigSnapshot,
   dimensions: ArenaDimensions,
+  swapSides: boolean,
 ) {
   state.left.length = 0
   state.right.length = 0
@@ -124,8 +137,8 @@ function rebuildBarricades(
   const totalHeight = config.count * config.height + (config.count - 1) * config.spacing
   const startY = Math.max(0, (dimensions.height - totalHeight) / 2)
 
-  const leftX = computeColumnX('left', config, dimensions)
-  const rightX = computeColumnX('right', config, dimensions)
+  const leftX = computeColumnX('left', config, dimensions, swapSides)
+  const rightX = computeColumnX('right', config, dimensions, swapSides)
 
   for (let i = 0; i < config.count; i++) {
     const y = startY + i * (config.height + config.spacing)
@@ -159,8 +172,12 @@ function computeColumnX(
   side: BarricadeSide,
   config: SpaceInvadersConfigSnapshot,
   dimensions: ArenaDimensions,
+  swapSides: boolean,
 ): number {
-  const centerOffset = side === 'left' ? -config.distance : config.distance
+  const physicalSide: BarricadeSide = swapSides
+    ? (side === 'left' ? 'right' : 'left')
+    : side
+  const centerOffset = physicalSide === 'left' ? -config.distance : config.distance
   const centerX = dimensions.width / 2 + centerOffset
   const minX = 0
   const maxX = Math.max(0, dimensions.width - config.width)

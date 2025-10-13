@@ -91,30 +91,57 @@ export function reflectBallWithSecondChanceShields(
   modifier: SecondChancesModifier,
   ball: BallLike,
   arenaWidth: number,
+  swapSides = false,
 ): ShieldSide | null {
   if (!modifier.enabled) return null
 
   const radius = Math.max(1, ball.radius)
 
-  if (state.left && state.left.hitsRemaining > 0 && ball.vx < 0) {
-    const contact = ball.x - radius
-    if (contact <= 0) {
-      ball.x = radius + BOUNDARY_EPSILON
-      ball.vx = Math.abs(ball.vx)
-      applyShieldDamage(state, 'left')
-      return 'left'
+  if (state.left && state.left.hitsRemaining > 0) {
+    if (!swapSides && ball.vx < 0) {
+      const contact = ball.x - radius
+      if (contact <= 0) {
+        ball.x = radius + BOUNDARY_EPSILON
+        ball.vx = Math.abs(ball.vx)
+        applyShieldDamage(state, 'left')
+        return 'left'
+      }
+    }
+
+    if (swapSides && ball.vx > 0) {
+      const contact = ball.x + radius
+      if (contact >= arenaWidth) {
+        const targetX = arenaWidth - radius - BOUNDARY_EPSILON
+        const clampedX = Math.min(arenaWidth - radius, Math.max(radius, targetX))
+        ball.x = clampedX
+        ball.vx = -Math.abs(ball.vx)
+        applyShieldDamage(state, 'left')
+        return 'left'
+      }
     }
   }
 
-  if (state.right && state.right.hitsRemaining > 0 && ball.vx > 0) {
-    const contact = ball.x + radius
-    if (contact >= arenaWidth) {
-      const targetX = arenaWidth - radius - BOUNDARY_EPSILON
-      const clampedX = Math.min(arenaWidth - radius, Math.max(radius, targetX))
-      ball.x = clampedX
-      ball.vx = -Math.abs(ball.vx)
-      applyShieldDamage(state, 'right')
-      return 'right'
+  if (state.right && state.right.hitsRemaining > 0) {
+    if (!swapSides && ball.vx > 0) {
+      const contact = ball.x + radius
+      if (contact >= arenaWidth) {
+        const targetX = arenaWidth - radius - BOUNDARY_EPSILON
+        const clampedX = Math.min(arenaWidth - radius, Math.max(radius, targetX))
+        ball.x = clampedX
+        ball.vx = -Math.abs(ball.vx)
+        applyShieldDamage(state, 'right')
+        return 'right'
+      }
+    }
+
+    if (swapSides && ball.vx < 0) {
+      const contact = ball.x - radius
+      if (contact <= 0) {
+        ball.x = radius + BOUNDARY_EPSILON
+        ball.vx = Math.abs(ball.vx)
+        applyShieldDamage(state, 'right')
+        return 'right'
+      }
     }
   }
 

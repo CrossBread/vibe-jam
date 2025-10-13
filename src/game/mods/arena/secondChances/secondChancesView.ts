@@ -7,6 +7,7 @@ export interface SecondChancesDrawOptions {
   arenaWidth: number
   arenaHeight: number
   backgroundRgb: RGBColor
+  swapSides?: boolean
 }
 
 const LEFT_FALLBACK: RGBColor = { r: 56, g: 189, b: 248 }
@@ -22,9 +23,14 @@ export function drawSecondChanceShields(
 ) {
   if (!modifier.enabled) return
 
+  const swapSides = Boolean(options.swapSides)
+
   if (state.left) {
+    const x = swapSides
+      ? Math.max(0, options.arenaWidth - SHIELD_THICKNESS)
+      : 0
     drawShield(ctx, state.left, {
-      x: 0,
+      x,
       width: SHIELD_THICKNESS,
       height: options.arenaHeight,
       color: parseColorToRgb(modifier.positiveTint, LEFT_FALLBACK),
@@ -33,8 +39,9 @@ export function drawSecondChanceShields(
   }
 
   if (state.right) {
+    const x = swapSides ? 0 : Math.max(0, options.arenaWidth - SHIELD_THICKNESS)
     drawShield(ctx, state.right, {
-      x: Math.max(0, options.arenaWidth - SHIELD_THICKNESS),
+      x,
       width: SHIELD_THICKNESS,
       height: options.arenaHeight,
       color: parseColorToRgb(modifier.negativeTint, RIGHT_FALLBACK),

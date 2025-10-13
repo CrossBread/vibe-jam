@@ -219,6 +219,17 @@
         "positiveTint": "#a855f7",
         "negativeTint": "#ede9fe",
         "includeInRandom": true
+      },
+      "madHatter": {
+        "name": "Mad Hatter",
+        "description": "Players swap sides while the UI stays put",
+        "enabled": false,
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "positiveTint": "#38bdf8",
+        "negativeTint": "#ef4444",
+        "includeInRandom": true
       }
     },
     "ball": {
