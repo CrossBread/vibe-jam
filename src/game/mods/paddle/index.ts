@@ -7,6 +7,7 @@ import { createBrokePhysicsModifier } from './brokePhysics/brokePhysicsEditor'
 import { createBuckToothModifier } from './buckTooth/buckToothEditor'
 import { createBungeeModifier } from './bungee/bungeeEditor'
 import { createChillyModifier } from './chilly/chillyEditor'
+import { createCharlotteModifier } from './charlotte/charlotteEditor'
 import { createDizzyModifier } from './dizzy/dizzyEditor'
 import { createDundeeModifier } from './dundee/dundeeEditor'
 import { createFoosballModifier } from './foosball/foosballEditor'
@@ -17,6 +18,7 @@ import { createMissileCommanderModifier } from './missileCommander/missileComman
 import { createOutOfBodyModifier } from './outOfBody/outOfBodyEditor'
 import { createOsteoWhatModifier } from './osteoWhat/osteoWhatEditor'
 import { createSlinkyModifier } from './slinky/slinkyEditor'
+import { createCrabbyModifier } from './crabby/crabbyEditor'
 type PaddleBuilderMap = {
   [K in PaddleModifierKey]: ModifierBuilder<PaddleModifiers[K]>
 }
@@ -26,6 +28,7 @@ export const paddleModifierBuilders: PaddleBuilderMap = {
   outOfBody: createOutOfBodyModifier,
   bendy: createBendyModifier,
   chilly: createChillyModifier,
+  crabby: createCrabbyModifier,
   buckTooth: createBuckToothModifier,
   osteoWhat: createOsteoWhatModifier,
   brokePhysics: createBrokePhysicsModifier,
@@ -39,4 +42,5 @@ export const paddleModifierBuilders: PaddleBuilderMap = {
   missileCommander: createMissileCommanderModifier,
   frisbee: createFrisbeeModifier,
   dundee: createDundeeModifier,
+  charlotte: createCharlotteModifier,
 }

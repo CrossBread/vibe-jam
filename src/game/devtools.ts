@@ -19,6 +19,7 @@ export const PADDLE_MODIFIER_KEYS = [
   'bendy',
   'chilly',
   'buckTooth',
+  'crabby',
   'osteoWhat',
   'brokePhysics',
   'hadron',
@@ -31,6 +32,7 @@ export const PADDLE_MODIFIER_KEYS = [
   'missileCommander',
   'frisbee',
   'dundee',
+  'charlotte',
 ] as const
 
 export type BallModifierKey = (typeof BALL_MODIFIER_KEYS)[number]
@@ -126,6 +128,14 @@ export interface BuckToothModifier extends ModifierBase {
   paddleSizeMultiplier: number
 }
 
+export interface CrabbyModifier extends ModifierBase {
+  gapSize: number
+  clawRatio: number
+  clawAdvantage: number
+  swapSides: boolean
+  paddleSizeMultiplier: number
+}
+
 export interface OsteoWhatModifier extends ModifierBase {
   segmentCount: number
   gapSize: number
@@ -201,12 +211,19 @@ export interface DundeeModifier extends ModifierBase {
   maxSpeed: number
 }
 
+export interface CharlotteModifier extends ModifierBase {
+  paddleSizeMultiplier: number
+  webWidthMultiplier: number
+  maxWebLengthMultiplier: number
+}
+
 export type PaddleModifiers = {
   apparition: ApparitionModifier
   outOfBody: OutOfBodyModifier
   bendy: BendyModifier
   chilly: ChillyModifier
   buckTooth: BuckToothModifier
+  crabby: CrabbyModifier
   osteoWhat: OsteoWhatModifier
   brokePhysics: BrokePhysicsModifier
   hadron: HadronModifier
@@ -219,6 +236,7 @@ export type PaddleModifiers = {
   missileCommander: MissileCommanderModifier
   frisbee: FrisbeeModifier
   dundee: DundeeModifier
+  charlotte: CharlotteModifier
 }
 
 export interface ModifiersConfig {

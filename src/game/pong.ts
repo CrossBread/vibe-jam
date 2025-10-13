@@ -175,6 +175,12 @@ interface PaddleSegment {
   broken?: boolean
 }
 
+type CharlotteAnchor = 'top' | 'bottom' | null
+
+interface CharlotteWebState {
+  anchor: CharlotteAnchor
+}
+
 interface OutOfBodyTrailPoint {
   y: number
   height: number
@@ -259,6 +265,9 @@ export function createPong(
   const LEFT_PADDLE_EDGE_COLOR = '#38bdf8'
   const RIGHT_PADDLE_EDGE_COLOR = '#ef4444'
   const PADDLE_EDGE_WIDTH = 4
+  const CHARLOTTE_PADDLE_COLOR = '#6b7280'
+  const CHARLOTTE_EDGE_COLOR = '#4b5563'
+  const MIN_CHARLOTTE_WEB_LENGTH = 6
 
   const defaults = createDevConfig()
   const config = deepClone(defaults)
@@ -600,6 +609,7 @@ export function createPong(
   let previousLeftSizeMultiplier = getPaddleSizeMultiplier('left')
   let previousRightSizeMultiplier = getPaddleSizeMultiplier('right')
   let previousDoublesEnabled = config.doubles.enabled
+  let previousCharlotteEnabled = config.modifiers.paddle.charlotte.enabled
 
   const balls: BallState[] = state.balls
   const MAX_ACTIVE_BALLS = 6
@@ -607,6 +617,18 @@ export function createPong(
   const osteoStates: Record<'left' | 'right', Record<PaddleLane, OsteoSegmentState[]>> = {
     left: { outer: [], inner: [], missile: [] },
     right: { outer: [], inner: [], missile: [] },
+  }
+  const charlotteStates: Record<'left' | 'right', Record<PaddleLane, CharlotteWebState>> = {
+    left: {
+      outer: createCharlotteState(),
+      inner: createCharlotteState(),
+      missile: createCharlotteState(),
+    },
+    right: {
+      outer: createCharlotteState(),
+      inner: createCharlotteState(),
+      missile: createCharlotteState(),
+    },
   }
   let previousOsteoSignature: string | null = null
   const missilePaddles: ActiveMissilePaddle[] = []
@@ -808,6 +830,7 @@ export function createPong(
     resetApparitionStateMap(paddleApparitionStates, config.modifiers.paddle.apparition, {
       randomize: true,
     })
+    resetCharlotteStates()
     resetOutOfBodyTrails(true)
     resetBendyState(config.modifiers.paddle.bendy.enabled)
     syncPaddleMotionState()
@@ -983,6 +1006,8 @@ export function createPong(
       state.leftInnerY = state.leftY
       state.rightInnerY = state.rightY
     }
+
+    updateCharlotteAnchors()
 
     updatePaddleMotion(dt)
     updateOutOfBodyTrails(dt)
@@ -1282,6 +1307,7 @@ export function createPong(
     state.rightInnerY = state.rightY
     resetMissilePaddles()
     resetPaddleDynamics()
+    resetCharlotteStates()
   }
 
   function syncDoublesState(enabled: boolean) {
@@ -1294,6 +1320,7 @@ export function createPong(
       state.leftInnerY = state.leftY
       state.rightInnerY = state.rightY
     }
+    updateCharlotteAnchors()
   }
 
   function updatePaddleModifierState() {
@@ -1417,6 +1444,12 @@ export function createPong(
       previousSlinkyEnabled = slinkyEnabled
     }
 
+    const charlotteEnabled = config.modifiers.paddle.charlotte.enabled
+    if (charlotteEnabled !== previousCharlotteEnabled) {
+      resetCharlotteStates()
+      previousCharlotteEnabled = charlotteEnabled
+    }
+
     clampPaddlePosition('left')
     clampPaddlePosition('right')
     state.leftPaddleHeight = leftPaddleHeight
@@ -1506,6 +1539,10 @@ export function createPong(
 
   function createOutOfBodyTrailState(): OutOfBodyTrailState {
     return { points: [], sampleTimer: 0 }
+  }
+
+  function createCharlotteState(): CharlotteWebState {
+    return { anchor: null }
   }
 
   function getLaneSnapshot(side: 'left' | 'right', lane: OutOfBodyLaneKey) {
@@ -1675,6 +1712,26 @@ export function createPong(
     }
   }
 
+  function drawCharlottePaddleBase(paddle: PhysicalPaddle, opacity: number) {
+    if (opacity <= 0) return
+    ctx.save()
+    ctx.globalAlpha = opacity
+    ctx.fillStyle = CHARLOTTE_PADDLE_COLOR
+    ctx.fillRect(paddle.x, paddle.y, PADDLE_W, paddle.height)
+    ctx.fillStyle = CHARLOTTE_EDGE_COLOR
+    if (paddle.side === 'left') {
+      ctx.fillRect(paddle.x, paddle.y, PADDLE_EDGE_WIDTH, paddle.height)
+    } else {
+      ctx.fillRect(
+        paddle.x + PADDLE_W - PADDLE_EDGE_WIDTH,
+        paddle.y,
+        PADDLE_EDGE_WIDTH,
+        paddle.height,
+      )
+    }
+    ctx.restore()
+  }
+
   function updatePaddleMotion(dt: number) {
     const safeDt = Math.max(dt, 1e-6)
     for (const side of ['left', 'right'] as const) {
@@ -1772,6 +1829,7 @@ export function createPong(
 
   function getBendyOffset(paddle: PhysicalPaddle, segment: PaddleSegment) {
     if (!config.modifiers.paddle.bendy.enabled) return 0
+    if (config.modifiers.paddle.charlotte.enabled) return 0
     if (paddle.lane === 'missile') return 0
     const state = bendyStates[paddle.side]
     const amplitude = state.amplitude
@@ -2556,6 +2614,7 @@ export function createPong(
       paddleModifiers.outOfBody,
       paddleModifiers.bendy,
       paddleModifiers.chilly,
+      paddleModifiers.crabby,
       paddleModifiers.buckTooth,
       paddleModifiers.osteoWhat,
       paddleModifiers.brokePhysics,
@@ -2569,6 +2628,7 @@ export function createPong(
       paddleModifiers.missileCommander,
       paddleModifiers.frisbee,
       paddleModifiers.dundee,
+      paddleModifiers.charlotte,
     ]
     for (const modifier of paddleModifierEntries) {
       if (!modifier.enabled) continue
@@ -2577,6 +2637,22 @@ export function createPong(
         : 1
       multiplier *= value
     }
+
+    if (paddleModifiers.crabby.enabled) {
+      const rawAdvantage = Number.isFinite(paddleModifiers.crabby.clawAdvantage)
+        ? paddleModifiers.crabby.clawAdvantage
+        : 0
+      const advantage = clamp(rawAdvantage, 0, 0.9)
+      if (advantage > 0) {
+        const largerSide: 'left' | 'right' = paddleModifiers.crabby.swapSides ? 'right' : 'left'
+        if (side === largerSide) {
+          multiplier *= 1 + advantage
+        } else {
+          multiplier *= Math.max(0.2, 1 - advantage)
+        }
+      }
+    }
+
     return Math.max(0.1, multiplier)
   }
 
@@ -2934,6 +3010,11 @@ export function createPong(
       return [baseSegment]
     }
 
+    const charlotteModifier = config.modifiers.paddle.charlotte
+    if (charlotteModifier.enabled) {
+      return buildCharlotteSegments(paddle, charlotteModifier)
+    }
+
     const osteoModifier = config.modifiers.paddle.osteoWhat
     if (osteoModifier.enabled) {
       return buildOsteoSegments(paddle, osteoModifier)
@@ -2949,8 +3030,11 @@ export function createPong(
       segments = segments.flatMap(segment => splitSegmentFoosball(segment, gap))
     }
 
+    const crabbyModifier = config.modifiers.paddle.crabby
     const buckToothModifier = config.modifiers.paddle.buckTooth
-    if (buckToothModifier.enabled) {
+    if (crabbyModifier.enabled) {
+      segments = segments.flatMap(segment => splitSegmentCrabby(paddle, segment, crabbyModifier))
+    } else if (buckToothModifier.enabled) {
       const gap = Number.isFinite(buckToothModifier.gapSize)
         ? Math.max(0, buckToothModifier.gapSize)
         : 0
@@ -2969,6 +3053,49 @@ export function createPong(
 
     const topHeight = remainingHeight / 2
     const bottomHeight = remainingHeight - topHeight
+
+    return [
+      {
+        ...segment,
+        index: segment.index * 2,
+        y: segment.y,
+        height: topHeight,
+      },
+      {
+        ...segment,
+        index: segment.index * 2 + 1,
+        y: segment.y + topHeight + clampedGap,
+        height: bottomHeight,
+      },
+    ]
+  }
+
+  function splitSegmentCrabby(
+    paddle: PhysicalPaddle,
+    segment: PaddleSegment,
+    modifier: { gapSize: number; clawRatio: number; swapSides: boolean },
+  ): PaddleSegment[] {
+    const clampedGap = Math.max(0, Math.min(Number(modifier.gapSize) || 0, segment.height))
+    const available = segment.height - clampedGap
+    if (available <= 4) {
+      return [segment]
+    }
+
+    const rawRatio = Number.isFinite(modifier.clawRatio) ? modifier.clawRatio : 0.65
+    let longHeight = clamp(rawRatio, 0.5, 0.9) * available
+    longHeight = clamp(longHeight, available * 0.55, available - 2)
+    let shortHeight = available - longHeight
+    if (shortHeight < 2) {
+      shortHeight = 2
+      longHeight = available - shortHeight
+      if (longHeight <= 2) {
+        return [segment]
+      }
+    }
+
+    const topIsLong = paddle.side === 'left' ? !modifier.swapSides : modifier.swapSides
+    const topHeight = topIsLong ? longHeight : shortHeight
+    const bottomHeight = topIsLong ? shortHeight : longHeight
 
     return [
       {
@@ -3018,6 +3145,111 @@ export function createPong(
     }
 
     return segments
+  }
+
+  function getCharlotteStateForPaddle(paddle: PhysicalPaddle) {
+    return charlotteStates[paddle.side][paddle.lane]
+  }
+
+  function resetCharlotteStates() {
+    for (const side of ['left', 'right'] as const) {
+      for (const lane of ['outer', 'inner', 'missile'] as const) {
+        charlotteStates[side][lane].anchor = null
+      }
+    }
+  }
+
+  function updateCharlotteAnchors() {
+    const modifier = config.modifiers.paddle.charlotte
+    if (!modifier.enabled) {
+      resetCharlotteStates()
+      return
+    }
+
+    updateCharlotteAnchorForLane('left', 'outer', state.leftY, leftPaddleHeight)
+    updateCharlotteAnchorForLane('right', 'outer', state.rightY, rightPaddleHeight)
+
+    const doublesEnabled = Boolean(config.doubles.enabled)
+    const leftInnerHeight = doublesEnabled ? state.leftInnerPaddleHeight : leftPaddleHeight
+    const rightInnerHeight = doublesEnabled ? state.rightInnerPaddleHeight : rightPaddleHeight
+    const leftInnerY = doublesEnabled ? state.leftInnerY : state.leftY
+    const rightInnerY = doublesEnabled ? state.rightInnerY : state.rightY
+
+    updateCharlotteAnchorForLane('left', 'inner', leftInnerY, leftInnerHeight)
+    updateCharlotteAnchorForLane('right', 'inner', rightInnerY, rightInnerHeight)
+  }
+
+  function updateCharlotteAnchorForLane(
+    side: 'left' | 'right',
+    lane: PaddleLane,
+    y: number,
+    height: number,
+  ) {
+    const state = charlotteStates[side][lane]
+    const epsilon = 0.5
+    if (height <= 0) {
+      state.anchor = null
+      return
+    }
+    if (y <= epsilon) {
+      state.anchor = 'top'
+    } else if (y + height >= H - epsilon) {
+      state.anchor = 'bottom'
+    }
+  }
+
+  function getCharlotteWebWidth(modifier = config.modifiers.paddle.charlotte) {
+    const raw = Number.isFinite(modifier.webWidthMultiplier) ? modifier.webWidthMultiplier : 0.5
+    const multiplier = clamp(raw, 0.1, 1)
+    return Math.max(PADDLE_EDGE_WIDTH, Math.min(PADDLE_W, PADDLE_W * multiplier))
+  }
+
+  function getCharlotteMaxWebLength(
+    paddle: PhysicalPaddle,
+    modifier = config.modifiers.paddle.charlotte,
+  ) {
+    const raw = Number.isFinite(modifier.maxWebLengthMultiplier)
+      ? modifier.maxWebLengthMultiplier
+      : 1
+    const multiplier = Math.max(0.1, raw)
+    return Math.max(0, paddle.height * multiplier)
+  }
+
+  function buildCharlotteSegments(
+    paddle: PhysicalPaddle,
+    modifier = config.modifiers.paddle.charlotte,
+  ): PaddleSegment[] {
+    const state = getCharlotteStateForPaddle(paddle)
+    if (!state || !state.anchor) {
+      return []
+    }
+
+    const width = getCharlotteWebWidth(modifier)
+    const anchor = state.anchor
+    const slack =
+      anchor === 'top'
+        ? Math.max(0, paddle.y)
+        : Math.max(0, H - (paddle.y + paddle.height))
+    const maxLength = getCharlotteMaxWebLength(paddle, modifier)
+    const length = Math.min(slack, maxLength)
+    if (length <= MIN_CHARLOTTE_WEB_LENGTH) {
+      return []
+    }
+
+    const xOffset = paddle.side === 'left' ? PADDLE_W - width : 0
+    const x = paddle.x + xOffset
+    const y = anchor === 'top' ? 0 : H - length
+
+    return [
+      {
+        paddle,
+        index: 0,
+        x,
+        y,
+        width,
+        height: length,
+      },
+    ]
   }
 
   function buildOsteoSegments(
@@ -3167,14 +3399,18 @@ export function createPong(
     drawBallTrails()
 
     const hadronModifier = config.modifiers.paddle.hadron
+    const charlotteModifier = config.modifiers.paddle.charlotte
+    const charlotteEnabled = charlotteModifier.enabled
     const paddlesToDraw = getPhysicalPaddles()
     for (const paddle of paddlesToDraw) {
       const segments = buildPaddleSegments(paddle)
-      const baseHex = hadronModifier.enabled
-        ? hadronStatus[paddle.side]
-          ? hadronModifier.armedColor
-          : hadronModifier.disarmedColor
-        : BALL_COLOR
+      const baseHex = charlotteEnabled
+        ? BALL_COLOR
+        : hadronModifier.enabled
+          ? hadronStatus[paddle.side]
+            ? hadronModifier.armedColor
+            : hadronModifier.disarmedColor
+          : BALL_COLOR
       const baseRgb = hexToRgb(baseHex)
       const crackedRgb = mixRgb(baseRgb, WHITE_RGB, 0.35)
       const crackedColor = rgbaString(crackedRgb, 1)
@@ -3185,6 +3421,10 @@ export function createPong(
       }
 
       if (tailOpacity <= 0) continue
+
+      if (charlotteEnabled && paddle.lane !== 'missile') {
+        drawCharlottePaddleBase(paddle, tailOpacity)
+      }
 
       ctx.save()
       ctx.globalAlpha = tailOpacity

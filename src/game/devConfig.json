@@ -201,6 +201,17 @@
         "paddleSizeMultiplier": 1,
         "includeInRandom": true
       },
+      "crabby": {
+        "name": "Crabby",
+        "description": "Asymmetric split paddles with one oversized claw",
+        "enabled": false,
+        "gapSize": 12,
+        "clawRatio": 0.65,
+        "clawAdvantage": 0.3,
+        "swapSides": false,
+        "paddleSizeMultiplier": 1,
+        "includeInRandom": true
+      },
       "osteoWhat": {
         "name": "Osteo What?",
         "description": "Segmented paddles that crack then break after repeated hits",
@@ -310,6 +321,15 @@
         "baseSpeed": 220,
         "acceleration": 520,
         "maxSpeed": 560,
+        "includeInRandom": true
+      },
+      "charlotte": {
+        "name": "Charlotte",
+        "description": "Latch onto the walls and reel in a spider web return",
+        "enabled": false,
+        "paddleSizeMultiplier": 1,
+        "webWidthMultiplier": 0.5,
+        "maxWebLengthMultiplier": 1,
         "includeInRandom": true
       }
     }
