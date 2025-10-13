@@ -5,6 +5,7 @@ import { createBlackMoleModifier } from './blackMole/blackMoleEditor'
 import { createDivotsModifier } from './divots/divotsEditor'
 import { createFogOfWarModifier } from './fogOfWar/fogOfWarEditor'
 import { createGopherModifier } from './gopher/gopherEditor'
+import { createCeresModifier } from './ceres/ceresEditor'
 import { createDrinkMeModifier } from './drinkMe/drinkMeEditor'
 import { createTeaPartyModifier } from './teaParty/teaPartyEditor'
 import { createWonderlandModifier } from './wonderland/wonderlandEditor'
@@ -16,6 +17,7 @@ import { createMinesweeperModifier } from './minesweeper/minesweeperEditor'
 import { createSuperMassiveModifier } from './superMassive/superMassiveEditor'
 import { createWhiteDwarfModifier } from './whiteDwarf/whiteDwarfEditor'
 import { createMadHatterModifier } from './madHatter/madHatterEditor'
+import { createJupiterModifier } from './jupiter/jupiterEditor'
 
 type ArenaBuilderMap = {
   [K in GravityWellKey]: ModifierBuilder<ArenaModifiers[K]>
@@ -25,7 +27,9 @@ export const arenaModifierBuilders: ArenaBuilderMap = {
   blackHole: createBlackHoleModifier,
   blackMole: createBlackMoleModifier,
   gopher: createGopherModifier,
+  ceres: createCeresModifier,
   superMassive: createSuperMassiveModifier,
+  jupiter: createJupiterModifier,
   whiteDwarf: createWhiteDwarfModifier,
   divots: createDivotsModifier,
   fogOfWar: createFogOfWarModifier,

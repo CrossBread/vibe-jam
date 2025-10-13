@@ -72,6 +72,13 @@ import {
 } from './mods/arena/gopher/gopherModifier'
 import { getGopherWells } from './mods/arena/gopher/gopherView'
 import {
+  createCeresState,
+  resetCeresState,
+  updateCeresState,
+  type CeresState,
+} from './mods/arena/ceres/ceresModifier'
+import { getCeresWells } from './mods/arena/ceres/ceresView'
+import {
   clearDrinkMeState,
   createDrinkMeState,
   maintainDrinkMeState,
@@ -104,6 +111,13 @@ import {
   type WonderlandState,
 } from './mods/arena/wonderland/wonderlandModifier'
 import { drawWonderlandSnow } from './mods/arena/wonderland/wonderlandView'
+import {
+  createJupiterState,
+  resetJupiterState,
+  updateJupiterState,
+  type JupiterState,
+} from './mods/arena/jupiter/jupiterModifier'
+import { getJupiterWells } from './mods/arena/jupiter/jupiterView'
 import {
   clearSecondChancesState,
   createSecondChancesState,
@@ -785,6 +799,7 @@ export function createPong(
   const irelandState: IrelandState = createIrelandState()
   const blackMoleState: BlackMoleState = createBlackMoleState(arenaDimensions)
   const gopherState: GopherState = createGopherState(arenaDimensions)
+  const ceresState: CeresState = createCeresState(arenaDimensions)
   const fogOfWarState: FogOfWarState = createFogOfWarState()
   const wonderlandState: WonderlandState = createWonderlandState()
   const drinkMeState: DrinkMeState = createDrinkMeState()
@@ -792,6 +807,7 @@ export function createPong(
   const secondChancesState: SecondChancesState = createSecondChancesState()
   const spaceInvadersState: SpaceInvadersState = createSpaceInvadersState()
   const minesweeperState: MinesweeperState = createMinesweeperState()
+  const jupiterState: JupiterState = createJupiterState(arenaDimensions)
   let activeGravityWells: ActiveGravityWell[] = []
   let announcement: Announcement | null = null
   let lastEnabledArenaModifiers = new Set<GravityWellKey>(
@@ -955,6 +971,7 @@ export function createPong(
     rightAIEnabled = true
     resetBlackMoleState(blackMoleState, arenaDimensions)
     resetGopherState(gopherState, arenaDimensions)
+    resetCeresState(ceresState, arenaDimensions)
     clearDivots(divotsState)
     clearIrelandWells(irelandState)
     resetFogOfWarState(fogOfWarState)
@@ -964,6 +981,7 @@ export function createPong(
     clearSecondChancesState(secondChancesState)
     clearSpaceInvadersState(spaceInvadersState)
     clearMinesweeperState(minesweeperState)
+    resetJupiterState(jupiterState, arenaDimensions)
     activeGravityWells = []
     announcement = null
     lastEnabledArenaModifiers = new Set<GravityWellKey>(
@@ -1063,6 +1081,12 @@ export function createPong(
     updateGopherState(
       gopherState,
       config.modifiers.arena.gopher,
+      dt,
+      arenaDimensions,
+    )
+    updateJupiterState(
+      jupiterState,
+      config.modifiers.arena.jupiter,
       dt,
       arenaDimensions,
     )
@@ -1199,9 +1223,21 @@ export function createPong(
     )
     updateBendyState(dt)
 
+    const paddles = getPhysicalPaddles()
+    const ceresTargets = paddles
+      .filter(paddle => paddle.height > 0)
+      .map(paddle => ({ x: paddle.x, y: paddle.y, height: paddle.height }))
+    updateCeresState(
+      ceresState,
+      config.modifiers.arena.ceres,
+      dt,
+      arenaDimensions,
+      ceresTargets,
+      PADDLE_W,
+    )
+
     // Gravity well influence
     activeGravityWells = collectActiveGravityWells()
-    const paddles = getPhysicalPaddles()
     let pointAwarded: 'left' | 'right' | null = null
     const rouletteModifier = config.modifiers.arena.russianRoulette
     const rouletteEnabled = Boolean(rouletteModifier.enabled)
@@ -2977,6 +3013,7 @@ export function createPong(
       if (key === 'ireland') clearIrelandWells(irelandState)
       if (key === 'blackMole') resetBlackMoleState(blackMoleState, arenaDimensions)
       if (key === 'gopher') resetGopherState(gopherState, arenaDimensions)
+      if (key === 'ceres') resetCeresState(ceresState, arenaDimensions)
       if (key === 'fogOfWar') resetFogOfWarState(fogOfWarState)
       if (key === 'wonderland') resetWonderlandState(wonderlandState)
       if (key === 'drinkMe') clearDrinkMeState(drinkMeState)
@@ -2984,6 +3021,7 @@ export function createPong(
       if (key === 'secondChances') clearSecondChancesState(secondChancesState)
       if (key === 'spaceInvaders') clearSpaceInvadersState(spaceInvadersState)
       if (key === 'minesweeper') clearMinesweeperState(minesweeperState)
+      if (key === 'jupiter') resetJupiterState(jupiterState, arenaDimensions)
     }
 
     if (anyDisabled) {
@@ -3008,8 +3046,14 @@ export function createPong(
         case 'gopher':
           wells.push(...getGopherWells(gopherState, arena.gopher))
           break
+        case 'ceres':
+          wells.push(...getCeresWells(ceresState, arena.ceres))
+          break
         case 'superMassive':
           wells.push(...getSuperMassiveWells(arena.superMassive, arenaDimensions))
+          break
+        case 'jupiter':
+          wells.push(...getJupiterWells(jupiterState, arena.jupiter))
           break
         case 'whiteDwarf':
           wells.push(...getWhiteDwarfWells(arena.whiteDwarf, arenaDimensions))
@@ -3229,6 +3273,7 @@ export function createPong(
         if (key === 'ireland') clearIrelandWells(irelandState)
         if (key === 'blackMole') resetBlackMoleState(blackMoleState, arenaDimensions)
         if (key === 'gopher') resetGopherState(gopherState, arenaDimensions)
+        if (key === 'ceres') resetCeresState(ceresState, arenaDimensions)
         if (key === 'fogOfWar') resetFogOfWarState(fogOfWarState)
         if (key === 'wonderland') resetWonderlandState(wonderlandState)
         if (key === 'drinkMe') clearDrinkMeState(drinkMeState)
@@ -3236,6 +3281,7 @@ export function createPong(
         if (key === 'secondChances') clearSecondChancesState(secondChancesState)
         if (key === 'spaceInvaders') clearSpaceInvadersState(spaceInvadersState)
         if (key === 'minesweeper') clearMinesweeperState(minesweeperState)
+        if (key === 'jupiter') resetJupiterState(jupiterState, arenaDimensions)
       } else {
         if (key === 'secondChances') {
           const shieldModifier = getSecondChancesModifier()

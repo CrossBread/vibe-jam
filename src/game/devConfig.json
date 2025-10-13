@@ -52,6 +52,18 @@
         "negativeTint": "#fce7f3",
         "includeInRandom": true
       },
+      "ceres": {
+        "name": "Ceres",
+        "description": "Large gravity sink that ricochets around the arena",
+        "enabled": false,
+        "gravityStrength": 5600000,
+        "gravityFalloff": 128,
+        "radius": 62,
+        "wanderSpeed": 180,
+        "positiveTint": "#9ca3af",
+        "negativeTint": "#e5e7eb",
+        "includeInRandom": true
+      },
       "superMassive": {
         "name": "Super Massive",
         "description": "Large low intensity gravity sink",
@@ -72,6 +84,19 @@
         "radius": 26,
         "positiveTint": "#e2e8f0",
         "negativeTint": "#f8fafc",
+        "includeInRandom": true
+      },
+      "jupiter": {
+        "name": "Jupiter",
+        "description": "Giant gravity sink that orbits the arena core",
+        "enabled": false,
+        "gravityStrength": 6800000,
+        "gravityFalloff": 112,
+        "radius": 74,
+        "wanderWidthPercentage": 0.7,
+        "wanderSpeed": 0.55,
+        "positiveTint": "#f97316",
+        "negativeTint": "#fed7aa",
         "includeInRandom": true
       },
       "divots": {
