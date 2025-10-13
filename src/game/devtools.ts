@@ -8,6 +8,7 @@ export const GRAVITY_WELL_KEYS = [
   'whiteDwarf',
   'divots',
   'ireland',
+  'russianRoulette',
 ] as const
 
 export type GravityWellKey = (typeof GRAVITY_WELL_KEYS)[number]
@@ -54,6 +55,8 @@ export interface GravityWellModifier extends ModifierBase {
   wanderWidthPercentage?: number
   pauseDuration?: number
   wanderSpeed?: number
+  illusionFadeDistance?: number
+  illusionFadeSpeed?: number
 }
 
 export type ArenaModifiers = Record<GravityWellKey, GravityWellModifier>

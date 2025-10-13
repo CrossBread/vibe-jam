@@ -5,6 +5,7 @@ import { createBlackMoleModifier } from './blackMole/blackMoleEditor'
 import { createDivotsModifier } from './divots/divotsEditor'
 import { createGopherModifier } from './gopher/gopherEditor'
 import { createIrelandModifier } from './ireland/irelandEditor'
+import { createRussianRouletteModifier } from './russianRoulette/russianRouletteEditor'
 import { createSuperMassiveModifier } from './superMassive/superMassiveEditor'
 import { createWhiteDwarfModifier } from './whiteDwarf/whiteDwarfEditor'
 
@@ -20,4 +21,5 @@ export const arenaModifierBuilders: ArenaBuilderMap = {
   whiteDwarf: createWhiteDwarfModifier,
   divots: createDivotsModifier,
   ireland: createIrelandModifier,
+  russianRoulette: createRussianRouletteModifier,
 }

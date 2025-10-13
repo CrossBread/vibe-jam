@@ -151,6 +151,8 @@ interface BallState {
   vy: number
   radius: number
   travelDistance: number
+  isReal: boolean
+  opacity: number
 }
 
 type PaddleLane = 'outer' | 'inner' | 'missile'
@@ -612,7 +614,7 @@ export function createPong(
   let previousCharlotteEnabled = config.modifiers.paddle.charlotte.enabled
 
   const balls: BallState[] = state.balls
-  const MAX_ACTIVE_BALLS = 6
+  const MAX_ACTIVE_BALLS = 12
   const hadronStatus: Record<'left' | 'right', boolean> = { left: true, right: true }
   const osteoStates: Record<'left' | 'right', Record<PaddleLane, OsteoSegmentState[]>> = {
     left: { outer: [], inner: [], missile: [] },
@@ -752,6 +754,49 @@ export function createPong(
       vy,
       radius: BALL_R,
       travelDistance: 0,
+      isReal: true,
+      opacity: 1,
+    }
+  }
+
+  function createRussianRouletteBall(
+    angleOffset: number,
+    direction: -1 | 1,
+  ): BallState {
+    const baseSpeed = config.baseBallSpeed
+    const baseAngle = direction === 1 ? 0 : Math.PI
+    const angle = baseAngle + angleOffset
+    return {
+      x: W * 0.5,
+      y: H * 0.5,
+      vx: Math.cos(angle) * baseSpeed,
+      vy: Math.sin(angle) * baseSpeed,
+      radius: BALL_R,
+      travelDistance: 0,
+      isReal: false,
+      opacity: 1,
+    }
+  }
+
+  function spawnRussianRouletteBalls(toLeft: boolean) {
+    const angleOffsets = [-0.32, 0, 0.32] as const
+    const leftBalls = angleOffsets.map(offset => createRussianRouletteBall(offset, -1))
+    const rightBalls = angleOffsets.map(offset => createRussianRouletteBall(offset, 1))
+
+    const direction = toLeft ? -1 : 1
+    const candidates = direction === -1 ? leftBalls : rightBalls
+    const realIndex = Math.floor(Math.random() * candidates.length)
+    const realBall = candidates[realIndex]
+    realBall.isReal = true
+    realBall.opacity = 1
+
+    balls.push(realBall)
+
+    for (const ball of [...leftBalls, ...rightBalls]) {
+      if (ball === realBall) continue
+      ball.isReal = false
+      ball.opacity = 1
+      balls.push(ball)
     }
   }
 
@@ -794,7 +839,11 @@ export function createPong(
 
   function resetBall(toLeft: boolean) {
     balls.length = 0
-    balls.push(createBall(toLeft))
+    if (config.modifiers.arena.russianRoulette.enabled) {
+      spawnRussianRouletteBalls(toLeft)
+    } else {
+      balls.push(createBall(toLeft))
+    }
     pollokState.lastReturner = null
     resetBallSize()
     clearKiteTrail(kiteState)
@@ -1022,6 +1071,14 @@ export function createPong(
     activeGravityWells = collectActiveGravityWells()
     const paddles = getPhysicalPaddles()
     let pointAwarded: 'left' | 'right' | null = null
+    const rouletteModifier = config.modifiers.arena.russianRoulette
+    const rouletteEnabled = Boolean(rouletteModifier.enabled)
+    const fadeDistance = Number.isFinite(rouletteModifier.illusionFadeDistance)
+      ? Math.max(0, Number(rouletteModifier.illusionFadeDistance))
+      : 0
+    const fadeSpeed = Number.isFinite(rouletteModifier.illusionFadeSpeed)
+      ? Math.max(0, Number(rouletteModifier.illusionFadeSpeed))
+      : 0
 
     for (let i = 0; i < balls.length; i++) {
       const ball = balls[i]
@@ -1064,6 +1121,23 @@ export function createPong(
         ball.y = H - radius
         ball.vy *= -1
       }
+
+      if (!ball.isReal) {
+        if (rouletteEnabled) {
+          updateRussianRouletteOpacity(ball, paddles, fadeDistance, fadeSpeed, dt)
+        } else {
+          ball.opacity = 1
+        }
+
+        const removalBuffer = PADDLE_W + radius
+        if (ball.x < -radius - removalBuffer || ball.x > W + radius + removalBuffer) {
+          balls.splice(i, 1)
+          i -= 1
+        }
+        continue
+      }
+
+      ball.opacity = 1
 
       if (resolvePaddleCollisions(ball, paddles)) {
         radius = ball.radius
@@ -1243,6 +1317,8 @@ export function createPong(
       vy: Math.sin(secondAngle) * speed,
       radius: ball.radius,
       travelDistance: ball.travelDistance,
+      isReal: true,
+      opacity: 1,
     }
 
     balls.push(newBall)
@@ -2757,6 +2833,8 @@ export function createPong(
         case 'ireland':
           wells.push(...getIrelandWells(irelandState, arena.ireland, arenaDimensions))
           break
+        case 'russianRoulette':
+          break
       }
     }
 
@@ -3299,6 +3377,57 @@ export function createPong(
     return segments
   }
 
+  function updateRussianRouletteOpacity(
+    ball: BallState,
+    paddles: PhysicalPaddle[],
+    fadeDistance: number,
+    fadeSpeed: number,
+    dt: number,
+  ) {
+    if (fadeDistance <= 0) {
+      ball.opacity = 1
+      return
+    }
+
+    let minDistance = Infinity
+    for (const paddle of paddles) {
+      const distance = getDistanceToPaddle(ball, paddle)
+      if (distance <= 0) {
+        minDistance = 0
+        break
+      }
+      if (distance < minDistance) {
+        minDistance = distance
+      }
+    }
+
+    const targetOpacity = minDistance <= fadeDistance ? 0 : 1
+    if (fadeSpeed <= 0) {
+      ball.opacity = targetOpacity
+      return
+    }
+
+    const step = fadeSpeed * dt
+    if (targetOpacity < ball.opacity) {
+      ball.opacity = Math.max(targetOpacity, ball.opacity - step)
+    } else if (targetOpacity > ball.opacity) {
+      ball.opacity = Math.min(targetOpacity, ball.opacity + step)
+    }
+  }
+
+  function getDistanceToPaddle(ball: BallState, paddle: PhysicalPaddle): number {
+    const left = paddle.x
+    const right = paddle.x + PADDLE_W
+    const top = paddle.y
+    const bottom = paddle.y + paddle.height
+    const closestX = clamp(ball.x, left, right)
+    const closestY = clamp(ball.y, top, bottom)
+    const dx = ball.x - closestX
+    const dy = ball.y - closestY
+    const distance = Math.hypot(dx, dy) - ball.radius
+    return Math.max(0, distance)
+  }
+
   function resolvePaddleCollisions(ball: BallState, paddles: PhysicalPaddle[]) {
     for (const paddle of paddles) {
       const segments = buildPaddleSegments(paddle)
@@ -3453,9 +3582,18 @@ export function createPong(
 
     ctx.fillStyle = BALL_COLOR
     for (const ball of balls) {
+      const alpha = clamp(ball.opacity ?? 1, 0, 1)
+      if (alpha <= 0) continue
+      if (alpha < 1) {
+        ctx.save()
+        ctx.globalAlpha *= alpha
+      }
       ctx.beginPath()
       ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2)
       ctx.fill()
+      if (alpha < 1) {
+        ctx.restore()
+      }
     }
 
     const pipRadius = 6

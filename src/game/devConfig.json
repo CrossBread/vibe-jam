@@ -87,6 +87,19 @@
         "negativeTint": "#fef3c7",
         "includeInRandom": true
       },
+      "russianRoulette": {
+        "name": "Russian Roulette",
+        "description": "Six launch decoys but only one ball counts",
+        "enabled": false,
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "positiveTint": "#38bdf8",
+        "negativeTint": "#bae6fd",
+        "illusionFadeDistance": 140,
+        "illusionFadeSpeed": 6,
+        "includeInRandom": true
+      },
       "ireland": {
         "name": "Ireland",
         "description": "Rolling gravity hills and a few towering peaks",
