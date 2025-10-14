@@ -21,6 +21,7 @@ export const GRAVITY_WELL_KEYS = [
   'madHatter',
   'wormhole',
   'vortex',
+  'searchLight',
 ] as const
 
 export type GravityWellKey = (typeof GRAVITY_WELL_KEYS)[number]
@@ -90,7 +91,9 @@ export interface DrinkMeModifier extends PaddlePotionModifier {}
 
 export interface TeaPartyModifier extends PaddlePotionModifier {}
 
-export type ArenaModifiers = Record<GravityWellKey, GravityWellModifier>
+export type ArenaModifiers = {
+  [K in GravityWellKey]: K extends 'searchLight' ? SearchLightModifier : GravityWellModifier
+}
 
 export interface SecondChancesModifier extends GravityWellModifier {
   maxHits?: number
@@ -143,6 +146,13 @@ export type BallModifiers = {
   pollok: PollokModifier
   snowball: SnowballModifier
   meteor: MeteorModifier
+}
+
+export interface SearchLightModifier extends GravityWellModifier {
+  beamColor: string
+  coneLength: number
+  coneWidth: number
+  ballBrightness: number
 }
 
 export interface ChillyModifier extends ModifierBase {

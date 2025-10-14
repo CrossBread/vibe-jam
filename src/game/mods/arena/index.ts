@@ -20,6 +20,7 @@ import { createJupiterModifier } from './jupiter/jupiterEditor'
 import { createMadHatterModifier } from './madHatter/madHatterEditor'
 import { createWormholeModifier } from './wormhole/wormholeEditor'
 import { createVortexModifier } from './vortex/vortexEditor'
+import { createSearchLightModifier } from './searchLight/searchLightEditor'
 
 type ArenaBuilderMap = {
   [K in GravityWellKey]: ModifierBuilder<ArenaModifiers[K]>
@@ -46,4 +47,5 @@ export const arenaModifierBuilders: ArenaBuilderMap = {
   madHatter: createMadHatterModifier,
   wormhole: createWormholeModifier,
   vortex: createVortexModifier,
+  searchLight: createSearchLightModifier,
 }

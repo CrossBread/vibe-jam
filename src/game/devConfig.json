@@ -13,6 +13,21 @@
   },
   "modifiers": {
     "arena": {
+      "searchLight": {
+        "name": "Search Light",
+        "description": "Paddle-mounted beams light the arena and tint the ball",
+        "enabled": false,
+        "includeInRandom": true,
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "positiveTint": "#334155",
+        "negativeTint": "#e2e8f0",
+        "beamColor": "#334155",
+        "coneLength": 240,
+        "coneWidth": 220,
+        "ballBrightness": 1.35
+      },
       "blackHole": {
         "name": "Black Hole",
         "description": "Gravity sink in the center of the playing field",

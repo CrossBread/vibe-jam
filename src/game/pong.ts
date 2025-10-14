@@ -6,13 +6,14 @@ import {
   type ArenaModifiers,
   type GravityWellKey,
   type GravityWellModifier,
+  type SearchLightModifier,
   type SecondChancesModifier,
   type SpaceInvadersModifier,
   type MinesweeperModifier,
 } from './devtools'
 import { createDevOverlay, showOverlay, toggleOverlay } from './devOverlay'
 import type { RGBColor } from './mods/ball/shared'
-import { clampByte, parseColorToRgb } from './mods/ball/shared'
+import { clampByte } from './mods/ball/shared'
 import {
   clearBumShuffleTrail,
   createBumShuffleState,
@@ -40,6 +41,8 @@ import { applyMeteorShrink } from './mods/ball/meteor/meteorModifier'
 import { applySnowballGrowth } from './mods/ball/snowball/snowballModifier'
 import type { ActiveGravityWell, ArenaDimensions } from './mods/arena/shared'
 import { drawGravityWells } from './mods/arena/gravityWell/gravityWellView'
+import { drawSearchLightBeams, type SearchLightPaddleSnapshot } from './mods/arena/searchLight/searchLightView'
+import { getSearchLightBallBrightness } from './mods/arena/searchLight/searchLightModifier'
 import {
   createDivotsState,
   clearDivots,
@@ -350,7 +353,7 @@ export function createPong(
   const PIPS_PER_BITE = 8
   const ARENA_BACKGROUND = '#10172a'
   const ANNOUNCEMENT_COLOR = '#203275'
-  const BALL_COLOR = '#e7ecf3'
+  const HIGHLIGHT_COLOR = '#e7ecf3'
   const MAX_KITE_HISTORY = 240
   const MAX_BUM_SHUFFLE_HISTORY = 4000
   const MAX_POLLOK_HISTORY = 6000
@@ -1488,6 +1491,10 @@ export function createPong(
 
   function getMinesweeperModifier(): MinesweeperModifier {
     return config.modifiers.arena.minesweeper as MinesweeperModifier
+  }
+
+  function getSearchLightModifier(): SearchLightModifier {
+    return config.modifiers.arena.searchLight as SearchLightModifier
   }
 
   function showAnnouncement(lines: string[]) {
@@ -4060,21 +4067,37 @@ export function createPong(
       { backgroundRgb: ARENA_BACKGROUND_RGB },
     )
 
-    drawBallTrails()
+    const ballColorRgb = getBallColorRgb()
+    const ballColorHex = rgbToHex(ballColorRgb)
+    const ballFillColor = rgbaString(ballColorRgb, 1)
+
+    const paddlesToDraw = getPhysicalPaddles()
+    const searchLightModifier = getSearchLightModifier()
+    if (searchLightModifier.enabled) {
+      const searchLightPaddles: SearchLightPaddleSnapshot[] = paddlesToDraw.map(paddle => ({
+        side: paddle.side,
+        x: paddle.x,
+        y: paddle.y,
+        height: paddle.height,
+      }))
+      drawSearchLightBeams(ctx, searchLightPaddles, searchLightModifier, arenaDimensions, {
+        paddleWidth: PADDLE_W,
+      })
+    }
+    drawBallTrails(ballColorHex)
 
     const hadronModifier = config.modifiers.paddle.hadron
     const charlotteModifier = config.modifiers.paddle.charlotte
     const charlotteEnabled = charlotteModifier.enabled
-    const paddlesToDraw = getPhysicalPaddles()
     for (const paddle of paddlesToDraw) {
       const segments = buildPaddleSegments(paddle)
       const baseHex = charlotteEnabled
-        ? BALL_COLOR
+        ? HIGHLIGHT_COLOR
         : hadronModifier.enabled
           ? hadronStatus[paddle.side]
             ? hadronModifier.armedColor
             : hadronModifier.disarmedColor
-          : BALL_COLOR
+          : HIGHLIGHT_COLOR
       const baseRgb = hexToRgb(baseHex)
       const crackedRgb = mixRgb(baseRgb, WHITE_RGB, 0.35)
       const crackedColor = rgbaString(crackedRgb, 1)
@@ -4115,7 +4138,7 @@ export function createPong(
       ctx.restore()
     }
 
-    ctx.fillStyle = BALL_COLOR
+    ctx.fillStyle = ballFillColor
     for (const ball of balls) {
       const alpha = clamp(ball.opacity ?? 1, 0, 1)
       if (alpha <= 0) continue
@@ -4132,7 +4155,12 @@ export function createPong(
     }
 
     drawFogOfWarOverlay(ctx, fogOfWarState, config.modifiers.arena.fogOfWar, arenaDimensions)
-    drawWonderlandSnow(ctx, wonderlandState, config.modifiers.arena.wonderland, BALL_COLOR)
+    drawWonderlandSnow(
+      ctx,
+      wonderlandState,
+      config.modifiers.arena.wonderland,
+      HIGHLIGHT_COLOR,
+    )
 
     const pipRadius = 6
     const pipSpacing = 22
@@ -4148,7 +4176,7 @@ export function createPong(
       const chevronSpacing = 6
       const previousLineCap = ctx.lineCap
       const previousLineJoin = ctx.lineJoin
-      ctx.strokeStyle = '#e7ecf3'
+      ctx.strokeStyle = HIGHLIGHT_COLOR
       ctx.lineCap = 'round'
       ctx.lineJoin = 'round'
       for (let i = 0; i < state.completedBitesSinceLastPoint; i++) {
@@ -4181,7 +4209,7 @@ export function createPong(
       ctx.beginPath()
       ctx.arc(pipX, pipY, pipRadius, 0, Math.PI * 2)
       if (isFilled) {
-        ctx.fillStyle = BALL_COLOR
+        ctx.fillStyle = HIGHLIGHT_COLOR
         ctx.fill()
       } else {
         ctx.strokeStyle = 'rgba(231,236,243,0.35)'
@@ -4190,7 +4218,7 @@ export function createPong(
     }
     ctx.lineWidth = 1
 
-    ctx.fillStyle = BALL_COLOR
+    ctx.fillStyle = HIGHLIGHT_COLOR
     ctx.font =
       'bold 28px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto'
     ctx.textAlign = 'center'
@@ -4203,15 +4231,16 @@ export function createPong(
     }
   }
 
-  function drawBallTrails() {
+
+  function drawBallTrails(ballColorHex: string) {
     const ballModifiers = config.modifiers.ball
     drawBumShuffleTrail(ctx, bumShuffleState, ballModifiers.bumShuffle, {
-      baseColor: BALL_COLOR,
+      baseColor: ballColorHex,
       getBallRadius,
     })
     drawPollokTrail(ctx, pollokState, ballModifiers.pollok, { getBallRadius })
     drawKiteTrail(ctx, kiteState, ballModifiers.kite, {
-      baseColor: BALL_COLOR,
+      baseColor: ballColorHex,
       applyAlpha: applyAlphaToColor,
       getBallRadius,
     })
@@ -4255,6 +4284,26 @@ export function createPong(
     }
 
     ctx.restore()
+  }
+
+  function getBallColorRgb(): RGBColor {
+    const modifier = getSearchLightModifier()
+    if (!modifier.enabled) {
+      return hexToRgb(HIGHLIGHT_COLOR)
+    }
+    const brightness = getSearchLightBallBrightness(modifier)
+    if (brightness >= 1) {
+      return mixRgb(ARENA_BACKGROUND_RGB, WHITE_RGB, clamp01(brightness - 1))
+    }
+    return mixRgb(ARENA_BACKGROUND_RGB, BLACK_RGB, clamp01(1 - brightness))
+  }
+
+  function rgbToHex(color: RGBColor): string {
+    const r = clampByte(Math.round(color.r))
+    const g = clampByte(Math.round(color.g))
+    const b = clampByte(Math.round(color.b))
+    const toHex = (value: number) => value.toString(16).padStart(2, '0')
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`
   }
 
   function hexToRgb(hex: string): RGBColor {

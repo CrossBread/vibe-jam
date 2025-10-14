@@ -694,7 +694,6 @@ export function createDevOverlay(
         },
       ),
     )
-
     collapsibleSections.push(baseSection)
     controls.appendChild(baseSection)
 
@@ -1011,6 +1010,22 @@ function isGravityWellModifier(value: unknown): value is GravityWellModifier {
     'barricadeDistance' in candidate &&
     typeof (candidate as { barricadeDistance?: unknown }).barricadeDistance !== 'number'
   ) {
+    return false
+  }
+
+  if ('beamColor' in candidate && typeof (candidate as { beamColor?: unknown }).beamColor !== 'string') {
+    return false
+  }
+
+  if ('coneLength' in candidate && typeof (candidate as { coneLength?: unknown }).coneLength !== 'number') {
+    return false
+  }
+
+  if ('coneWidth' in candidate && typeof (candidate as { coneWidth?: unknown }).coneWidth !== 'number') {
+    return false
+  }
+
+  if ('ballBrightness' in candidate && typeof (candidate as { ballBrightness?: unknown }).ballBrightness !== 'number') {
     return false
   }
 
