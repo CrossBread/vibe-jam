@@ -255,6 +255,38 @@
         "positiveTint": "#38bdf8",
         "negativeTint": "#ef4444",
         "includeInRandom": true
+      },
+      "wormhole": {
+        "name": "Wormhole",
+        "description": "Paired portals teleport the ball while preserving momentum",
+        "enabled": false,
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "portalPairs": 2,
+        "portalRadius": 34,
+        "portalMargin": 92,
+        "portalCooldown": 0.18,
+        "positiveTint": "#38bdf8",
+        "negativeTint": "#a855f7",
+        "includeInRandom": true
+      },
+      "vortex": {
+        "name": "Vortex",
+        "description": "Spinning portals display exit direction before flinging the ball",
+        "enabled": false,
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "portalPairs": 2,
+        "portalRadius": 34,
+        "portalMargin": 96,
+        "portalCooldown": 0.18,
+        "portalRotationSpeed": 3.14,
+        "positiveTint": "#38bdf8",
+        "negativeTint": "#f472b6",
+        "arrowColor": "#f472b6",
+        "includeInRandom": true
       }
     },
     "ball": {

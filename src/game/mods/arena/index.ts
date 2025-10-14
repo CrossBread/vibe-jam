@@ -18,6 +18,8 @@ import { createSuperMassiveModifier } from './superMassive/superMassiveEditor'
 import { createWhiteDwarfModifier } from './whiteDwarf/whiteDwarfEditor'
 import { createJupiterModifier } from './jupiter/jupiterEditor'
 import { createMadHatterModifier } from './madHatter/madHatterEditor'
+import { createWormholeModifier } from './wormhole/wormholeEditor'
+import { createVortexModifier } from './vortex/vortexEditor'
 
 type ArenaBuilderMap = {
   [K in GravityWellKey]: ModifierBuilder<ArenaModifiers[K]>
@@ -42,4 +44,6 @@ export const arenaModifierBuilders: ArenaBuilderMap = {
   drinkMe: createDrinkMeModifier,
   teaParty: createTeaPartyModifier,
   madHatter: createMadHatterModifier,
+  wormhole: createWormholeModifier,
+  vortex: createVortexModifier,
 }
