@@ -224,6 +224,16 @@ export interface PongOptions {
    * Duration in seconds for an announcement fade out effect.
    */
   announcementFadeDuration?: number
+
+  /**
+   * Duration in seconds that the serve countdown should last.
+   */
+  serveCountdownDuration?: number
+
+  /**
+   * Delay in seconds before a countdown begins when revealing the active mod.
+   */
+  modRevealDelay?: number
 }
 
 type KeySet = Record<string, boolean>
@@ -343,7 +353,11 @@ export function createPong(
     autoStart = true,
     announcementHoldDuration = 3.5,
     announcementFadeDuration = 1.35,
+    serveCountdownDuration: serveCountdownDurationOption = 3,
+    modRevealDelay: modRevealDelayOption = 2,
   } = options
+  const serveCountdownDuration = Math.max(0, serveCountdownDurationOption)
+  const modRevealDelayDuration = Math.max(0, modRevealDelayOption)
   const W = canvas.width
   const H = canvas.height
   const BASE_PADDLE_H = 90
@@ -412,6 +426,10 @@ export function createPong(
   const keys: KeySet = {}
   let leftAIEnabled = true
   let rightAIEnabled = true
+  let pendingServeToLeft: boolean | null = null
+  let serveCountdownRemaining = 0
+  let preServeDelayRemaining = 0
+  let modRevealDelayPending = false
 
   interface GamepadInput {
     leftAxis: number
@@ -981,15 +999,59 @@ export function createPong(
     if (config.modifiers.arena.vortex.enabled) {
       resetVortexState(vortexState, config.modifiers.arena.vortex, arenaDimensions)
     }
+    pollokState.lastReturner = null
+    clearKiteTrail(kiteState)
+    pendingServeToLeft = toLeft
+    preServeDelayRemaining = modRevealDelayPending ? modRevealDelayDuration : 0
+    serveCountdownRemaining = serveCountdownDuration
+    modRevealDelayPending = false
+    state.ballX = W * 0.5
+    state.ballY = H * 0.5
+    state.vx = 0
+    state.vy = 0
+    state.ballRadius = BALL_R
+    syncPrimaryBallState()
+
+    if (preServeDelayRemaining <= 0 && serveCountdownRemaining <= 0) {
+      launchPendingServe()
+    }
+  }
+
+  function launchPendingServe() {
+    if (pendingServeToLeft === null) return
+
+    const toLeft = pendingServeToLeft
+    pendingServeToLeft = null
+    preServeDelayRemaining = 0
+    serveCountdownRemaining = 0
+
     if (config.modifiers.arena.russianRoulette.enabled) {
       spawnRussianRouletteBalls(toLeft)
     } else {
       balls.push(createBall(toLeft))
     }
-    pollokState.lastReturner = null
+
     resetBallSize()
-    clearKiteTrail(kiteState)
-    syncPrimaryBallState()
+  }
+
+  function updateServeTimers(dt: number) {
+    if (pendingServeToLeft === null) return
+
+    if (preServeDelayRemaining > 0) {
+      preServeDelayRemaining = Math.max(0, preServeDelayRemaining - dt)
+      if (preServeDelayRemaining > 0) {
+        return
+      }
+    }
+
+    if (serveCountdownRemaining > 0) {
+      serveCountdownRemaining = Math.max(0, serveCountdownRemaining - dt)
+      if (serveCountdownRemaining > 0) {
+        return
+      }
+    }
+
+    launchPendingServe()
   }
 
   function reset() {
@@ -1048,6 +1110,7 @@ export function createPong(
       getMinesweeperModifier(),
       arenaDimensions,
     )
+    modRevealDelayPending = true
     resetBall(Math.random() < 0.5)
   }
 
@@ -1268,6 +1331,8 @@ export function createPong(
     )
     updateBendyState(dt)
 
+    updateServeTimers(dt)
+
     const paddles = getPhysicalPaddles()
     updateCeresState(
       ceresState,
@@ -1412,18 +1477,20 @@ export function createPong(
     syncPrimaryBallState()
 
     if (pointAwarded) {
+      const nextServeToLeft = pointAwarded === 'left'
       if (pointAwarded === 'right') {
         state.rightScore++
         if (state.rightScore >= WIN_SCORE) state.winner = 'right'
-        clearDivotWells()
-        resetBall(false)
       } else {
         state.leftScore++
         if (state.leftScore >= WIN_SCORE) state.winner = 'left'
-        clearDivotWells()
-        resetBall(true)
       }
-      handlePointScored()
+      clearDivotWells()
+      const modChanged = handlePointScored()
+      if (modChanged) {
+        modRevealDelayPending = true
+      }
+      resetBall(nextServeToLeft)
       syncPrimaryBallState()
       return
     }
@@ -1603,7 +1670,8 @@ export function createPong(
     clearDivots(divotsState)
   }
 
-  function handlePointScored() {
+  function handlePointScored(): boolean {
+    let modChanged = false
     rearmHadron()
     syncOsteoState(true)
     initializePaddleHeights(true)
@@ -1613,7 +1681,9 @@ export function createPong(
       let excludeKey = previousActive
       for (let i = 0; i < completedBitesSinceLastPoint; i++) {
         const nextKey = pickRandomMod(excludeKey)
-        setActiveMod(nextKey)
+        if (setActiveMod(nextKey)) {
+          modChanged = true
+        }
         excludeKey = activeModKey
       }
       completedBitesSinceLastPoint = 0
@@ -1629,11 +1699,12 @@ export function createPong(
     if (!modifier.enabled) {
       clearIrelandWells(irelandState)
       activeGravityWells = collectActiveGravityWells()
-      return
+      return modChanged
     }
 
     rebuildIrelandWells(irelandState, modifier, arenaDimensions)
     activeGravityWells = collectActiveGravityWells()
+    return modChanged
   }
 
   function initializePaddleHeights(center: boolean) {
@@ -3317,19 +3388,28 @@ export function createPong(
     const enabledMods = GRAVITY_WELL_KEYS.filter(key => config.modifiers.arena[key].enabled)
     if (enabledMods.length === 0) {
       setActiveMod(pickRandomMod(null))
+      modRevealDelayPending = true
       return
     }
 
     if (enabledMods.length === 1) {
       activeModKey = enabledMods[0]
+      modRevealDelayPending = true
       return
     }
 
-    setActiveMod(enabledMods[0])
+    const randomIndex = Math.floor(Math.random() * enabledMods.length)
+    const randomKey = enabledMods[randomIndex]
+    if (!setActiveMod(randomKey)) {
+      activeModKey = randomKey
+    }
+    modRevealDelayPending = true
   }
 
-  function setActiveMod(nextKey: GravityWellKey) {
-    if (activeModKey === nextKey && config.modifiers.arena[nextKey].enabled) return
+  function setActiveMod(nextKey: GravityWellKey): boolean {
+    const previousKey = activeModKey
+    const previousEnabled = config.modifiers.arena[nextKey].enabled
+    if (previousKey === nextKey && previousEnabled) return false
 
     for (const key of GRAVITY_WELL_KEYS) {
       const modifier = config.modifiers.arena[key]
@@ -3407,6 +3487,7 @@ export function createPong(
     }
 
     activeGravityWells = collectActiveGravityWells()
+    return previousKey !== nextKey || !previousEnabled
   }
 
   function pickRandomMod(exclude: GravityWellKey | null) {
@@ -4020,6 +4101,7 @@ export function createPong(
     ctx.fillRect(0, 0, W, H)
 
     drawAnnouncement()
+    drawServeCountdown()
 
     ctx.strokeStyle = 'rgba(255,255,255,0.15)'
     ctx.setLineDash([6, 10])
@@ -4231,6 +4313,25 @@ export function createPong(
     }
   }
 
+
+  function drawServeCountdown() {
+    if (pendingServeToLeft === null) return
+    if (preServeDelayRemaining > 0) return
+    if (serveCountdownRemaining <= 0) return
+
+    const countdownValue = Math.ceil(serveCountdownRemaining)
+    if (countdownValue <= 0) return
+
+    ctx.save()
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    const baseSize = Math.min(W, H)
+    const fontSize = Math.max(72, Math.floor(baseSize * 0.45))
+    ctx.font = `900 ${fontSize}px 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif`
+    ctx.fillStyle = applyAlphaToColor('#ffffff', 0.08)
+    ctx.fillText(String(countdownValue), W / 2, H / 2)
+    ctx.restore()
+  }
 
   function drawBallTrails(ballColorHex: string) {
     const ballModifiers = config.modifiers.ball
