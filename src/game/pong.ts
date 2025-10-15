@@ -148,25 +148,9 @@ import {
   type MinesweeperState,
 } from './mods/arena/minesweeper/minesweeperModifier'
 import { drawMinesweeperSquares } from './mods/arena/minesweeper/minesweeperView'
-import {
-  clearWormholeState,
-  createWormholeState,
-  maintainWormholeState,
-  resetWormholeState,
-  tryResolveWormholeTeleport,
-  type WormholeState,
-} from './mods/arena/wormhole/wormholeModifier'
-import { drawWormholes } from './mods/arena/wormhole/wormholeView'
-import {
-  clearVortexState,
-  createVortexState,
-  maintainVortexState,
-  resetVortexState,
-  tryResolveVortexTeleport,
-  updateVortexState,
-  type VortexState,
-} from './mods/arena/vortex/vortexModifier'
-import { drawVortexPortals } from './mods/arena/vortex/vortexView'
+import { createVortexMod } from './mods/arena/vortex/vortexMod'
+import { createWormholeMod } from './mods/arena/wormhole/wormholeMod'
+import { ModManager } from './mods/modManager'
 import {
   createApparitionState,
   resetApparitionStates as resetApparitionStateMap,
@@ -849,8 +833,20 @@ export function createPong(
   const spaceInvadersState: SpaceInvadersState = createSpaceInvadersState()
   const minesweeperState: MinesweeperState = createMinesweeperState()
   const jupiterState: JupiterState = createJupiterState(arenaDimensions)
-  const wormholeState: WormholeState = createWormholeState()
-  const vortexState: VortexState = createVortexState()
+  const arenaModManager = new ModManager([
+    createWormholeMod({
+      getModifier: () => config.modifiers.arena.wormhole,
+      getArenaDimensions: () => arenaDimensions,
+      getContext: () => ctx,
+      getBackgroundRgb: () => ARENA_BACKGROUND_RGB,
+    }),
+    createVortexMod({
+      getModifier: () => config.modifiers.arena.vortex,
+      getArenaDimensions: () => arenaDimensions,
+      getContext: () => ctx,
+      getBackgroundRgb: () => ARENA_BACKGROUND_RGB,
+    }),
+  ])
   let activeGravityWells: ActiveGravityWell[] = []
   let announcement: Announcement | null = null
   let lastEnabledArenaModifiers = new Set<GravityWellKey>(
@@ -861,6 +857,7 @@ export function createPong(
   const bumShuffleState: BumShuffleState = createBumShuffleState()
   const pollokState: PollokState = createPollokState()
   let completedBitesSinceLastPoint = 0
+  arenaModManager.init()
   maintainSecondChancesState(secondChancesState, getSecondChancesModifier())
   maintainSpaceInvadersState(
     spaceInvadersState,
@@ -993,12 +990,7 @@ export function createPong(
     )
     resetMinesweeperState(minesweeperState, getMinesweeperModifier(), arenaDimensions)
     resetSpaceInvadersState(spaceInvadersState, getSpaceInvadersModifier(), arenaDimensions)
-    if (config.modifiers.arena.wormhole.enabled) {
-      resetWormholeState(wormholeState, config.modifiers.arena.wormhole, arenaDimensions)
-    }
-    if (config.modifiers.arena.vortex.enabled) {
-      resetVortexState(vortexState, config.modifiers.arena.vortex, arenaDimensions)
-    }
+    arenaModManager.handleBallReset(toLeft)
     pollokState.lastReturner = null
     clearKiteTrail(kiteState)
     pendingServeToLeft = toLeft
@@ -1078,8 +1070,7 @@ export function createPong(
     clearSpaceInvadersState(spaceInvadersState)
     clearMinesweeperState(minesweeperState)
     resetJupiterState(jupiterState, arenaDimensions)
-    clearWormholeState(wormholeState)
-    clearVortexState(vortexState)
+    arenaModManager.reset()
     activeGravityWells = []
     announcement = null
     lastEnabledArenaModifiers = new Set<GravityWellKey>(
@@ -1218,9 +1209,7 @@ export function createPong(
       getMinesweeperModifier(),
       arenaDimensions,
     )
-    maintainWormholeState(wormholeState, config.modifiers.arena.wormhole, arenaDimensions)
-    maintainVortexState(vortexState, config.modifiers.arena.vortex, arenaDimensions)
-    updateVortexState(vortexState, config.modifiers.arena.vortex, dt)
+    arenaModManager.tick(dt)
 
     const leftGamepadActive =
       gamepadInput.leftAxis !== 0 || gamepadInput.leftUp || gamepadInput.leftDown
@@ -1386,21 +1375,10 @@ export function createPong(
 
       applyBallSizeModifiers(ball, speed * dt)
 
-      const wormholeTeleported = tryResolveWormholeTeleport(
-        wormholeState,
-        config.modifiers.arena.wormhole,
-        arenaDimensions,
-        ball,
-      )
-      const vortexTeleported = tryResolveVortexTeleport(
-        vortexState,
-        config.modifiers.arena.vortex,
-        arenaDimensions,
-        ball,
-      )
+      const modHandledTeleport = arenaModManager.handleBallStep(ball, dt)
 
       let radius = ball.radius
-      if (wormholeTeleported || vortexTeleported) {
+      if (modHandledTeleport) {
         radius = ball.radius
       }
 
@@ -3155,12 +3133,11 @@ export function createPong(
       if (key === 'spaceInvaders') clearSpaceInvadersState(spaceInvadersState)
       if (key === 'minesweeper') clearMinesweeperState(minesweeperState)
       if (key === 'jupiter') resetJupiterState(jupiterState, arenaDimensions)
-      if (key === 'wormhole') clearWormholeState(wormholeState)
-      if (key === 'vortex') clearVortexState(vortexState)
     }
 
     if (anyDisabled) {
       activeGravityWells = collectActiveGravityWells()
+      arenaModManager.syncEnabled()
     }
 
     activeModKey = null
@@ -3180,9 +3157,6 @@ export function createPong(
           break
         case 'gopher':
           wells.push(...getGopherWells(gopherState, arena.gopher))
-          break
-        case 'ceres':
-          wells.push(...getCeresWells(ceresState, arena.ceres))
           break
         case 'ceres':
           wells.push(...getCeresWells(ceresState, arena.ceres))
@@ -3432,8 +3406,6 @@ export function createPong(
         if (key === 'spaceInvaders') clearSpaceInvadersState(spaceInvadersState)
         if (key === 'minesweeper') clearMinesweeperState(minesweeperState)
         if (key === 'jupiter') resetJupiterState(jupiterState, arenaDimensions)
-        if (key === 'wormhole') clearWormholeState(wormholeState)
-        if (key === 'vortex') clearVortexState(vortexState)
       } else {
         if (key === 'secondChances') {
           const shieldModifier = getSecondChancesModifier()
@@ -3461,18 +3433,12 @@ export function createPong(
           maintainMinesweeperState(minesweeperState, minesweeperModifier, arenaDimensions)
           resetMinesweeperState(minesweeperState, minesweeperModifier, arenaDimensions)
         }
-        if (key === 'wormhole') {
-          maintainWormholeState(wormholeState, modifier, arenaDimensions)
-          resetWormholeState(wormholeState, modifier, arenaDimensions)
-        }
-        if (key === 'vortex') {
-          maintainVortexState(vortexState, modifier, arenaDimensions)
-          resetVortexState(vortexState, modifier, arenaDimensions)
-        }
       }
     }
 
     activeModKey = nextKey
+
+    arenaModManager.syncEnabled()
 
     if (nextKey === 'ireland') {
       markIrelandNeedsRegeneration(irelandState)
@@ -4118,12 +4084,7 @@ export function createPong(
       maxVisualStrength: MAX_GRAVITY_VISUAL_STRENGTH,
     })
 
-    drawWormholes(ctx, wormholeState, config.modifiers.arena.wormhole, {
-      backgroundRgb: ARENA_BACKGROUND_RGB,
-    })
-    drawVortexPortals(ctx, vortexState, config.modifiers.arena.vortex, {
-      backgroundRgb: ARENA_BACKGROUND_RGB,
-    })
+    arenaModManager.draw()
 
     drawPotionObjects(
       getDrinkMeObjects(drinkMeState, config.modifiers.arena.drinkMe),
