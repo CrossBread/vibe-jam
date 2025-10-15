@@ -151,7 +151,7 @@ import { drawMinesweeperSquares } from './mods/arena/minesweeper/minesweeperView
 import { createVortexMod } from './mods/arena/vortex/vortexMod'
 import { createWormholeMod } from './mods/arena/wormhole/wormholeMod'
 import { ModManager } from './mods/modManager'
-import type { ManagedMod } from './mods/modManager'
+import type { BallLike, ManagedMod } from './mods/modManager'
 import {
   createApparitionState,
   resetApparitionStates as resetApparitionStateMap,
@@ -1129,6 +1129,124 @@ export function createPong(
     },
   }
 
+  const kiteState: KiteState = createKiteState()
+  const bumShuffleState: BumShuffleState = createBumShuffleState()
+  const pollokState: PollokState = createPollokState()
+  let ballTrailColorHex = '#ffffff'
+
+  const kiteMod: ManagedMod = {
+    key: 'kite',
+    isEnabled: () => Boolean(config.modifiers.ball.kite.enabled),
+    onTick(_dt: number) {
+      const modifier = config.modifiers.ball.kite
+      updateKiteTrail(kiteState, modifier, state.ballX, state.ballY, getBallRadius())
+    },
+    onDisabled() {
+      clearKiteTrail(kiteState)
+    },
+    onReset() {
+      clearKiteTrail(kiteState)
+    },
+    onDraw() {
+      drawKiteTrail(ctx, kiteState, config.modifiers.ball.kite, {
+        baseColor: ballTrailColorHex,
+        applyAlpha: applyAlphaToColor,
+        getBallRadius,
+      })
+    },
+  }
+
+  const bumShuffleMod: ManagedMod = {
+    key: 'bumShuffle',
+    isEnabled: () => Boolean(config.modifiers.ball.bumShuffle.enabled),
+    onTick(_dt: number) {
+      const modifier = config.modifiers.ball.bumShuffle
+      updateBumShuffleTrail(
+        bumShuffleState,
+        modifier,
+        state.ballX,
+        state.ballY,
+        getBallRadius(),
+      )
+    },
+    onDisabled() {
+      clearBumShuffleTrail(bumShuffleState)
+    },
+    onReset() {
+      clearBumShuffleTrail(bumShuffleState)
+    },
+    onDraw() {
+      drawBumShuffleTrail(ctx, bumShuffleState, config.modifiers.ball.bumShuffle, {
+        baseColor: ballTrailColorHex,
+        getBallRadius,
+      })
+    },
+  }
+
+  const pollokMod: ManagedMod = {
+    key: 'pollok',
+    isEnabled: () => Boolean(config.modifiers.ball.pollok.enabled),
+    onTick(_dt: number) {
+      const modifier = config.modifiers.ball.pollok
+      updatePollokTrail(
+        pollokState,
+        modifier,
+        state.ballX,
+        state.ballY,
+        getBallRadius(),
+        getPollokColor(pollokState, modifier),
+      )
+    },
+    onBallReset() {
+      pollokState.lastReturner = null
+    },
+    onDisabled() {
+      clearPollokTrail(pollokState)
+    },
+    onReset() {
+      clearPollokTrail(pollokState)
+    },
+    onDraw() {
+      drawPollokTrail(ctx, pollokState, config.modifiers.ball.pollok, {
+        getBallRadius,
+      })
+    },
+  }
+
+  const snowballMod: ManagedMod = {
+    key: 'snowball',
+    isEnabled: () => Boolean(config.modifiers.ball.snowball.enabled),
+    onBallStep(ball: BallLike) {
+      ball.radius = applySnowballGrowth(
+        config.modifiers.ball.snowball,
+        ball.travelDistance,
+        BALL_R,
+      )
+      return true
+    },
+  }
+
+  const meteorMod: ManagedMod = {
+    key: 'meteor',
+    isEnabled: () => Boolean(config.modifiers.ball.meteor.enabled),
+    onBallStep(ball: BallLike) {
+      ball.radius = applyMeteorShrink(
+        config.modifiers.ball.meteor,
+        ball.travelDistance,
+        BALL_R,
+      )
+      return true
+    },
+  }
+
+  const ballModManager = new ModManager([
+    kiteMod,
+    bumShuffleMod,
+    pollokMod,
+    snowballMod,
+    meteorMod,
+  ])
+
   const arenaModManager = new ModManager([
     blackMoleMod,
     gopherMod,
@@ -1151,10 +1269,8 @@ export function createPong(
     getEnabledArenaModifierKeys(config.modifiers.arena),
   )
   let activeModKey: GravityWellKey | null = null
-  const kiteState: KiteState = createKiteState()
-  const bumShuffleState: BumShuffleState = createBumShuffleState()
-  const pollokState: PollokState = createPollokState()
   let completedBitesSinceLastPoint = 0
+  ballModManager.init()
   arenaModManager.init()
   initializeActiveModState()
   resetBallSize()
@@ -1276,8 +1392,9 @@ export function createPong(
     )
     resetMinesweeperState(minesweeperState, getMinesweeperModifier(), arenaDimensions)
     resetSpaceInvadersState(spaceInvadersState, getSpaceInvadersModifier(), arenaDimensions)
+    ballModManager.syncEnabled()
+    ballModManager.handleBallReset(toLeft)
     arenaModManager.handleBallReset(toLeft)
-    pollokState.lastReturner = null
     clearKiteTrail(kiteState)
     pendingServeToLeft = toLeft
     preServeDelayRemaining = modRevealDelayPending ? modRevealDelayDuration : 0
@@ -1343,15 +1460,13 @@ export function createPong(
     completedBitesSinceLastPoint = 0
     leftAIEnabled = true
     rightAIEnabled = true
+    ballModManager.reset()
     arenaModManager.reset()
     activeGravityWells = []
     announcement = null
     lastEnabledArenaModifiers = new Set<GravityWellKey>(
       getEnabledArenaModifierKeys(config.modifiers.arena),
     )
-    clearKiteTrail(kiteState)
-    clearBumShuffleTrail(bumShuffleState)
-    clearPollokTrail(pollokState)
     rearmHadron()
     syncOsteoState(true)
     initializePaddleHeights(true)
@@ -1556,6 +1671,8 @@ export function createPong(
       ? Math.max(0, Number(rouletteModifier.illusionFadeSpeed))
       : 0
 
+    ballModManager.syncEnabled()
+
     for (let i = 0; i < balls.length; i++) {
       const ball = balls[i]
       const prevVx = ball.vx
@@ -1587,7 +1704,7 @@ export function createPong(
       ball.x += ball.vx * dt
       ball.y += ball.vy * dt
 
-      applyBallSizeModifiers(ball, speed * dt)
+      applyBallModifiers(ball, speed * dt, dt)
 
       const modHandledTeleport = arenaModManager.handleBallStep(ball, dt)
 
@@ -1687,7 +1804,7 @@ export function createPong(
       return
     }
 
-    updateBallTrails()
+    updateBallTrails(dt)
   }
 
   function isRestartInputActive(gamepadInput: GamepadInput): boolean {
@@ -3408,60 +3525,36 @@ export function createPong(
   }
 
   function resetBallSize(target?: BallState) {
+    ballModManager.syncEnabled()
+
     if (target) {
       target.travelDistance = 0
-      applyBallSizeModifiers(target, 0)
-      if (balls[0] === target) {
-        state.ballRadius = target.radius
-      }
+      applyBallModifiers(target, 0)
       return
     }
 
     for (const ball of balls) {
       ball.travelDistance = 0
-      applyBallSizeModifiers(ball, 0)
+      applyBallModifiers(ball, 0)
     }
     syncPrimaryBallState()
   }
 
-  function applyBallSizeModifiers(ball: BallState, distanceDelta: number) {
+  function applyBallModifiers(ball: BallState, distanceDelta: number, dt = 0) {
     if (Number.isFinite(distanceDelta) && distanceDelta > 0) {
       ball.travelDistance += distanceDelta
     }
 
-    const { snowball, meteor } = config.modifiers.ball
-    let radius = BALL_R
+    ball.radius = BALL_R
+    ballModManager.handleBallStep(ball, dt)
 
-    if (snowball.enabled) {
-      radius = applySnowballGrowth(snowball, ball.travelDistance, BALL_R)
-    }
-
-    if (meteor.enabled) {
-      radius = applyMeteorShrink(meteor, ball.travelDistance, BALL_R)
-    }
-
-    ball.radius = radius
     if (balls[0] === ball) {
-      state.ballRadius = radius
+      state.ballRadius = ball.radius
     }
   }
 
-  function updateBallTrails() {
-    const { ball } = config.modifiers
-    const x = state.ballX
-    const y = state.ballY
-    const radius = getBallRadius()
-
-    updateKiteTrail(kiteState, ball.kite, x, y, radius)
-    updateBumShuffleTrail(bumShuffleState, ball.bumShuffle, x, y, radius)
-    updatePollokTrail(
-      pollokState,
-      ball.pollok,
-      x,
-      y,
-      radius,
-      getPollokColor(pollokState, ball.pollok),
-    )
+  function updateBallTrails(dt: number) {
+    ballModManager.tick(dt)
   }
 
   function spawnDivotWell() {
@@ -4440,17 +4533,8 @@ export function createPong(
   }
 
   function drawBallTrails(ballColorHex: string) {
-    const ballModifiers = config.modifiers.ball
-    drawBumShuffleTrail(ctx, bumShuffleState, ballModifiers.bumShuffle, {
-      baseColor: ballColorHex,
-      getBallRadius,
-    })
-    drawPollokTrail(ctx, pollokState, ballModifiers.pollok, { getBallRadius })
-    drawKiteTrail(ctx, kiteState, ballModifiers.kite, {
-      baseColor: ballColorHex,
-      applyAlpha: applyAlphaToColor,
-      getBallRadius,
-    })
+    ballTrailColorHex = ballColorHex
+    ballModManager.draw()
   }
 
   function drawAnnouncement() {

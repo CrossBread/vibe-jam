@@ -4,6 +4,7 @@
   vx: number
   vy: number
   radius: number
+  travelDistance: number
   portalCooldown?: number
 }
 
