@@ -1,4 +1,8 @@
-﻿import type { ManagedMod } from '../../modManager'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { ManagedMod } from '../../modManager'
 import type { KiteModifier } from '../../../devtools'
 import { addTrailPoint, clampTrailLength, type TrailPoint } from '../shared'
 import { drawKiteTrail } from './kiteView'

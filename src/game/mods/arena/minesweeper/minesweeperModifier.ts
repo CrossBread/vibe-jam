@@ -1,4 +1,8 @@
-﻿import type { MinesweeperModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { MinesweeperModifier } from '../../../devtools'
 import type { ManagedMod, BallLike } from '../../modManager'
 import type { ArenaDimensions } from '../shared'
 import { clamp } from '../shared'

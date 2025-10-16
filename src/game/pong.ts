@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
 import {
   GRAVITY_WELL_KEYS,
   createDevConfig,

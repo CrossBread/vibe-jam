@@ -1,4 +1,8 @@
-﻿import type { SearchLightModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { SearchLightModifier } from '../../../devtools'
 
 const DEFAULT_BEAM_COLOR = '#334155'
 const DEFAULT_CONE_LENGTH = 240

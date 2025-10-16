@@ -1,4 +1,8 @@
-﻿import type { SecondChancesModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { SecondChancesModifier } from '../../../devtools'
 import type { ModifierBuilder } from '../../shared'
 import { createColorControl, createSliderControl } from '../../shared'
 

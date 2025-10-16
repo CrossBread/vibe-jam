@@ -1,4 +1,8 @@
-﻿import type { CrabbyModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { CrabbyModifier } from '../../../devtools'
 import type { ModifierBuilder } from '../../shared'
 import { createSliderControl, createToggleControl } from '../../shared'
 

@@ -1,4 +1,8 @@
-﻿import type { PollokModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { PollokModifier } from '../../../devtools'
 import type { PollokState } from './pollokModifier'
 
 interface DrawOptions {

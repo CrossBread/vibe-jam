@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
 import { createPong } from './game/pong'
 
 const BASE_WIDTH = 800

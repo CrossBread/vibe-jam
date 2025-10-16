@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
 import { test, expect } from '@playwright/test'
 
 test('loads and shows canvas', async ({ page }) => {

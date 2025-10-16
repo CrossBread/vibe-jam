@@ -1,4 +1,8 @@
-﻿import {
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import {
   BALL_MODIFIER_KEYS,
   GRAVITY_WELL_KEYS,
   PADDLE_MODIFIER_KEYS,

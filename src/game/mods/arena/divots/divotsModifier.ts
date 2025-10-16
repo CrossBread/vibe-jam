@@ -1,4 +1,8 @@
-﻿import { randomRange, toGravityFalloffValue } from '../shared'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import { randomRange, toGravityFalloffValue } from '../shared'
 import { getDivotsWells } from './divotsView'
 import type { GravityWellModifier } from '../../../devtools'
 import type { ManagedMod } from '../../modManager'

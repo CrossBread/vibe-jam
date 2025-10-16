@@ -1,4 +1,8 @@
-﻿import defaultDevConfig from './devConfig.json'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import defaultDevConfig from './devConfig.json'
 
 export const GRAVITY_WELL_KEYS = [
   'blackHole',

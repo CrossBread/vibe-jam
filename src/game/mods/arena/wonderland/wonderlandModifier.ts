@@ -1,4 +1,8 @@
-﻿import type { GravityWellModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { GravityWellModifier } from '../../../devtools'
 import type { ManagedMod } from '../../modManager'
 import type { ArenaDimensions } from '../shared'
 import { clamp } from '../shared'

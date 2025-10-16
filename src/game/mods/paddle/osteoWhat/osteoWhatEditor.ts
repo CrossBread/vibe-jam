@@ -1,4 +1,8 @@
-﻿import type { OsteoWhatModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { OsteoWhatModifier } from '../../../devtools'
 import type { ModifierBuilder } from '../../shared'
 import { createSliderControl } from '../../shared'
 

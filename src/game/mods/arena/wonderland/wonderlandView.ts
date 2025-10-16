@@ -1,4 +1,8 @@
-﻿import type { GravityWellModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { GravityWellModifier } from '../../../devtools'
 import { getSnowOpacity, type WonderlandState } from './wonderlandModifier'
 
 export function drawWonderlandSnow(

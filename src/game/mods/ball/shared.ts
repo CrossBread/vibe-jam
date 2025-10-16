@@ -1,4 +1,8 @@
-﻿export interface TrailPoint {
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+export interface TrailPoint {
   x: number
   y: number
   radius?: number

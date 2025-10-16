@@ -1,4 +1,8 @@
-﻿import type { MeteorModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { MeteorModifier } from '../../../devtools'
 
 export function applyMeteorShrink(
   modifier: MeteorModifier,

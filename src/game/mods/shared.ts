@@ -1,4 +1,8 @@
-﻿import type { ModifierBase } from '../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { ModifierBase } from '../devtools'
 
 export function radiansToDegrees(value: number) {
   return (value * 180) / Math.PI

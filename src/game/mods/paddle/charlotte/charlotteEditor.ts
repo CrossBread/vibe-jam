@@ -1,4 +1,8 @@
-﻿import type { CharlotteModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { CharlotteModifier } from '../../../devtools'
 import type { ModifierBuilder } from '../../shared'
 import { createSliderControl } from '../../shared'
 

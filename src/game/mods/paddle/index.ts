@@ -1,4 +1,8 @@
-﻿import type { PaddleModifierKey, PaddleModifiers } from '../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { PaddleModifierKey, PaddleModifiers } from '../../devtools'
 import type { ModifierBuilder } from '../shared'
 import { createAngryModifier } from './angry/angryEditor'
 import { createApparitionModifier } from './apparition/apparitionEditor'

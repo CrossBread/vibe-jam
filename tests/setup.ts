@@ -1,4 +1,8 @@
-﻿import { beforeAll } from 'vitest'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import { beforeAll } from 'vitest'
 
 beforeAll(() => {
   if (typeof globalThis.requestAnimationFrame !== 'function') {

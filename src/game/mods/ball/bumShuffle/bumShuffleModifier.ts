@@ -1,4 +1,8 @@
-﻿import type { BumShuffleModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { BumShuffleModifier } from '../../../devtools'
 import type { ManagedMod } from '../../modManager'
 import { addTrailPoint, clampTrailLength, type TrailPoint } from '../shared'
 import { drawBumShuffleTrail } from './bumShuffleView'

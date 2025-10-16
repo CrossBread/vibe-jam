@@ -1,4 +1,8 @@
-﻿import type { SnowballModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { SnowballModifier } from '../../../devtools'
 
 export function applySnowballGrowth(
   modifier: SnowballModifier,

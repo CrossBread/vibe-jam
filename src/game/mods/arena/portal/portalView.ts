@@ -1,4 +1,8 @@
-﻿import type { GravityWellModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { GravityWellModifier } from '../../../devtools'
 import type { RGBColor } from '../../ball/shared'
 import { clampByte, parseColorToRgb } from '../../ball/shared'
 import type { PortalState } from './portalModifier'

@@ -1,4 +1,8 @@
-﻿import type { SpaceInvadersModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { SpaceInvadersModifier } from '../../../devtools'
 import type { ModifierBuilder } from '../../shared'
 import { createColorControl, createSliderControl } from '../../shared'
 

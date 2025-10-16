@@ -1,4 +1,8 @@
-﻿import type { BallModifierKey, BallModifiers } from '../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { BallModifierKey, BallModifiers } from '../../devtools'
 import type { ModifierBuilder } from '../shared'
 import { createBumShuffleModifier } from './bumShuffle/bumShuffleEditor'
 import { createKiteModifier } from './kite/kiteEditor'

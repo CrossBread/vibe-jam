@@ -1,4 +1,8 @@
-﻿import type { KiteModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { KiteModifier } from '../../../devtools'
 import type { KiteState } from './kiteModifier'
 
 interface DrawOptions {

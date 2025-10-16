@@ -1,4 +1,8 @@
-﻿import type { ArenaModifiers, GravityWellKey } from '../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { ArenaModifiers, GravityWellKey } from '../../devtools'
 import type { ModifierBuilder } from '../shared'
 import { createBlackHoleModifier } from './blackHole/blackHoleEditor'
 import { createBlackMoleModifier } from './blackMole/blackMoleEditor'

@@ -1,4 +1,8 @@
-﻿import type { BrokePhysicsModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { BrokePhysicsModifier } from '../../../devtools'
 import type { ModifierBuilder } from '../../shared'
 import { createSliderControl, degreesToRadians, radiansToDegrees } from '../../shared'
 

@@ -1,4 +1,8 @@
-﻿import type { SecondChancesModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { SecondChancesModifier } from '../../../devtools'
 import type { RGBColor } from '../../ball/shared'
 import type { ManagedMod, BallLike } from '../../modManager'
 import type { ArenaDimensions } from '../shared'

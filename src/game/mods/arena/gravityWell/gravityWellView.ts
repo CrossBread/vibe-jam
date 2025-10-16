@@ -1,4 +1,8 @@
-﻿import type { RGBColor } from '../../ball/shared'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { RGBColor } from '../../ball/shared'
 import type { ActiveGravityWell } from '../shared'
 import { clampByte, parseColorToRgb } from '../../ball/shared'
 

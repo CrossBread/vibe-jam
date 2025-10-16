@@ -1,4 +1,8 @@
-﻿import type { SearchLightModifier } from '../../../devtools'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import type { SearchLightModifier } from '../../../devtools'
 import type { ArenaDimensions } from '../shared'
 import { clamp } from '../shared'
 import { clampByte, parseColorToRgb, type RGBColor } from '../../ball/shared'

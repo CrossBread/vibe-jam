@@ -1,4 +1,8 @@
-﻿export interface BallLike {
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+export interface BallLike {
   x: number
   y: number
   vx: number

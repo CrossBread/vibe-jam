@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
 import { createPong } from '../src/game/pong'
 import { describe, it, expect, vi } from 'vitest'
 

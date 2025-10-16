@@ -1,4 +1,8 @@
-﻿import { clamp } from '../shared'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import { clamp } from '../shared'
 import { getJupiterWells } from './jupiterView'
 import type { GravityWellModifier } from '../../../devtools'
 import type { ManagedMod } from '../../modManager'
