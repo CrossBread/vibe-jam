@@ -14,140 +14,31 @@ import {
 import { createDevOverlay, showOverlay, toggleOverlay } from './devOverlay'
 import type { RGBColor } from './mods/ball/shared'
 import { clampByte } from './mods/ball/shared'
-import {
-  clearBumShuffleTrail,
-  createBumShuffleState,
-  type BumShuffleState,
-  updateBumShuffleTrail,
-} from './mods/ball/bumShuffle/bumShuffleModifier'
-import { drawBumShuffleTrail } from './mods/ball/bumShuffle/bumShuffleView'
-import {
-  clearKiteTrail,
-  createKiteState,
-  type KiteState,
-  updateKiteTrail,
-} from './mods/ball/kite/kiteModifier'
-import { drawKiteTrail } from './mods/ball/kite/kiteView'
-import {
-  clearPollokTrail,
-  createPollokState,
-  getPollokColor,
-  registerPollokReturn,
-  type PollokState,
-  updatePollokTrail,
-} from './mods/ball/pollok/pollokModifier'
-import { drawPollokTrail } from './mods/ball/pollok/pollokView'
+import { createBumShuffleMod, type BumShuffleMod } from './mods/ball/bumShuffle/bumShuffleMod'
+import { createKiteMod, type KiteMod } from './mods/ball/kite/kiteMod'
+import { createPollokMod, type PollokMod } from './mods/ball/pollok/pollokMod'
 import { applyMeteorShrink } from './mods/ball/meteor/meteorModifier'
 import { applySnowballGrowth } from './mods/ball/snowball/snowballModifier'
 import type { ActiveGravityWell, ArenaDimensions } from './mods/arena/shared'
 import { drawGravityWells } from './mods/arena/gravityWell/gravityWellView'
 import { drawSearchLightBeams, type SearchLightPaddleSnapshot } from './mods/arena/searchLight/searchLightView'
 import { getSearchLightBallBrightness } from './mods/arena/searchLight/searchLightModifier'
-import {
-  createDivotsState,
-  clearDivots,
-  spawnDivotWell as addDivotWell,
-  updateDivotsState as maintainDivotsState,
-  type DivotsState,
-} from './mods/arena/divots/divotsModifier'
-import { getDivotsWells } from './mods/arena/divots/divotsView'
-import {
-  createIrelandState,
-  clearIrelandWells,
-  ensureIrelandWells,
-  markIrelandNeedsRegeneration,
-  regenerateIrelandWells as rebuildIrelandWells,
-  type IrelandState,
-} from './mods/arena/ireland/irelandModifier'
-import { getIrelandWells } from './mods/arena/ireland/irelandView'
-import {
-  createBlackMoleState,
-  resetBlackMoleState,
-  updateBlackMoleState,
-  type BlackMoleState,
-} from './mods/arena/blackMole/blackMoleModifier'
-import { getBlackMoleWells } from './mods/arena/blackMole/blackMoleView'
-import {
-  createGopherState,
-  resetGopherState,
-  updateGopherState,
-  type GopherState,
-} from './mods/arena/gopher/gopherModifier'
-import { getGopherWells } from './mods/arena/gopher/gopherView'
-import {
-  createCeresState,
-  resetCeresState,
-  updateCeresState,
-  type CeresState,
-} from './mods/arena/ceres/ceresModifier'
-import { getCeresWells } from './mods/arena/ceres/ceresView'
-import {
-  clearDrinkMeState,
-  createDrinkMeState,
-  maintainDrinkMeState,
-  respawnDrinkMeObject,
-  type DrinkMeState,
-} from './mods/arena/drinkMe/drinkMeModifier'
-import { getDrinkMeObjects } from './mods/arena/drinkMe/drinkMeView'
-import {
-  clearTeaPartyState,
-  createTeaPartyState,
-  maintainTeaPartyState,
-  respawnTeaPartyObject,
-  type TeaPartyState,
-} from './mods/arena/teaParty/teaPartyModifier'
-import { getTeaPartyObjects } from './mods/arena/teaParty/teaPartyView'
+import { createDivotsMod, type DivotsMod } from './mods/arena/divots/divotsMod'
+import { createIrelandMod, type IrelandMod } from './mods/arena/ireland/irelandMod'
+import { createBlackMoleMod, type BlackMoleMod } from './mods/arena/blackMole/blackMoleMod'
+import { createGopherMod, type GopherMod } from './mods/arena/gopher/gopherMod'
+import { createCeresMod, type CeresMod } from './mods/arena/ceres/ceresMod'
+import { createDrinkMeMod, type DrinkMeMod } from './mods/arena/drinkMe/drinkMeMod'
+import { createTeaPartyMod, type TeaPartyMod } from './mods/arena/teaParty/teaPartyMod'
 import { getBlackHoleWells } from './mods/arena/blackHole/blackHoleView'
 import { getSuperMassiveWells } from './mods/arena/superMassive/superMassiveView'
 import { getWhiteDwarfWells } from './mods/arena/whiteDwarf/whiteDwarfView'
-import {
-  createFogOfWarState,
-  resetFogOfWarState,
-  updateFogOfWarState,
-  type FogOfWarState,
-} from './mods/arena/fogOfWar/fogOfWarModifier'
-import { drawFogOfWarOverlay } from './mods/arena/fogOfWar/fogOfWarView'
-import {
-  createWonderlandState,
-  resetWonderlandState,
-  updateWonderlandState,
-  type WonderlandState,
-} from './mods/arena/wonderland/wonderlandModifier'
-import { drawWonderlandSnow } from './mods/arena/wonderland/wonderlandView'
-import {
-  createJupiterState,
-  resetJupiterState,
-  updateJupiterState,
-  type JupiterState,
-} from './mods/arena/jupiter/jupiterModifier'
-import { getJupiterWells } from './mods/arena/jupiter/jupiterView'
-import {
-  clearSecondChancesState,
-  createSecondChancesState,
-  maintainSecondChancesState,
-  reflectBallWithSecondChanceShields,
-  resetSecondChancesShields,
-  type SecondChancesState,
-} from './mods/arena/secondChances/secondChancesModifier'
-import { drawSecondChanceShields } from './mods/arena/secondChances/secondChancesView'
-import {
-  clearSpaceInvadersState,
-  createSpaceInvadersState,
-  maintainSpaceInvadersState,
-  resetSpaceInvadersState,
-  resolveSpaceInvadersCollision,
-  type SpaceInvadersState,
-} from './mods/arena/spaceInvaders/spaceInvadersModifier'
-import { drawSpaceInvadersBarricades } from './mods/arena/spaceInvaders/spaceInvadersView'
-import {
-  clearMinesweeperState,
-  createMinesweeperState,
-  maintainMinesweeperState,
-  resetMinesweeperState,
-  resolveMinesweeperCollision,
-  type MinesweeperState,
-} from './mods/arena/minesweeper/minesweeperModifier'
-import { drawMinesweeperSquares } from './mods/arena/minesweeper/minesweeperView'
+import { createFogOfWarMod, type FogOfWarMod } from './mods/arena/fogOfWar/fogOfWarMod'
+import { createWonderlandMod, type WonderlandMod } from './mods/arena/wonderland/wonderlandMod'
+import { createJupiterMod, type JupiterMod } from './mods/arena/jupiter/jupiterMod'
+import { createSecondChancesMod, type SecondChancesMod } from './mods/arena/secondChances/secondChancesMod'
+import { createSpaceInvadersMod, type SpaceInvadersMod } from './mods/arena/spaceInvaders/spaceInvadersMod'
+import { createMinesweeperMod, type MinesweeperMod } from './mods/arena/minesweeper/minesweeperMod'
 import { createVortexMod } from './mods/arena/vortex/vortexMod'
 import { createWormholeMod } from './mods/arena/wormhole/wormholeMod'
 import { ModManager } from './mods/modManager'
@@ -1093,19 +984,6 @@ export function createPong(
   ])
 
   const arenaDimensions: ArenaDimensions = { width: W, height: H }
-  const divotsState: DivotsState = createDivotsState()
-  const irelandState: IrelandState = createIrelandState()
-  const blackMoleState: BlackMoleState = createBlackMoleState(arenaDimensions)
-  const gopherState: GopherState = createGopherState(arenaDimensions)
-  const ceresState: CeresState = createCeresState(arenaDimensions)
-  const fogOfWarState: FogOfWarState = createFogOfWarState()
-  const wonderlandState: WonderlandState = createWonderlandState()
-  const drinkMeState: DrinkMeState = createDrinkMeState()
-  const teaPartyState: TeaPartyState = createTeaPartyState()
-  const secondChancesState: SecondChancesState = createSecondChancesState()
-  const spaceInvadersState: SpaceInvadersState = createSpaceInvadersState()
-  const minesweeperState: MinesweeperState = createMinesweeperState()
-  const jupiterState: JupiterState = createJupiterState(arenaDimensions)
   let activeGravityWells: ActiveGravityWell[] = []
 
   const wormholeMod = createWormholeMod({
@@ -1122,368 +1000,106 @@ export function createPong(
     getBackgroundRgb: () => ARENA_BACKGROUND_RGB,
   })
 
-  const blackMoleMod: ManagedMod = {
-    key: 'blackMole',
-    isEnabled: () => Boolean(config.modifiers.arena.blackMole.enabled),
-    onEnabled() {
-      resetBlackMoleState(blackMoleState, arenaDimensions)
-    },
-    onTick(dt: number) {
-      updateBlackMoleState(
-        blackMoleState,
-        config.modifiers.arena.blackMole,
-        dt,
-        arenaDimensions,
-      )
-    },
-    onDisabled() {
-      resetBlackMoleState(blackMoleState, arenaDimensions)
-    },
-    onReset() {
-      resetBlackMoleState(blackMoleState, arenaDimensions)
-    },
-  }
+  const blackMoleMod: BlackMoleMod = createBlackMoleMod({
+    getModifier: () => config.modifiers.arena.blackMole,
+    getArenaDimensions: () => arenaDimensions,
+  })
 
-  const gopherMod: ManagedMod = {
-    key: 'gopher',
-    isEnabled: () => Boolean(config.modifiers.arena.gopher.enabled),
-    onEnabled() {
-      resetGopherState(gopherState, arenaDimensions)
-    },
-    onTick(dt: number) {
-      updateGopherState(
-        gopherState,
-        config.modifiers.arena.gopher,
-        dt,
-        arenaDimensions,
-      )
-    },
-    onDisabled() {
-      resetGopherState(gopherState, arenaDimensions)
-    },
-    onReset() {
-      resetGopherState(gopherState, arenaDimensions)
-    },
-  }
+  const gopherMod: GopherMod = createGopherMod({
+    getModifier: () => config.modifiers.arena.gopher,
+    getArenaDimensions: () => arenaDimensions,
+  })
 
-  const ceresMod: ManagedMod = {
-    key: 'ceres',
-    isEnabled: () => Boolean(config.modifiers.arena.ceres.enabled),
-    onEnabled() {
-      resetCeresState(ceresState, arenaDimensions)
-    },
-    onTick(dt: number) {
-      updateCeresState(
-        ceresState,
-        config.modifiers.arena.ceres,
-        dt,
-        arenaDimensions,
-      )
-    },
-    onDisabled() {
-      resetCeresState(ceresState, arenaDimensions)
-    },
-    onReset() {
-      resetCeresState(ceresState, arenaDimensions)
-    },
-  }
+  const ceresMod: CeresMod = createCeresMod({
+    getModifier: () => config.modifiers.arena.ceres,
+    getArenaDimensions: () => arenaDimensions,
+  })
 
-  const jupiterMod: ManagedMod = {
-    key: 'jupiter',
-    isEnabled: () => Boolean(config.modifiers.arena.jupiter.enabled),
-    onEnabled() {
-      resetJupiterState(jupiterState, arenaDimensions)
-    },
-    onTick(dt: number) {
-      updateJupiterState(
-        jupiterState,
-        config.modifiers.arena.jupiter,
-        dt,
-        arenaDimensions,
-      )
-    },
-    onDisabled() {
-      resetJupiterState(jupiterState, arenaDimensions)
-    },
-    onReset() {
-      resetJupiterState(jupiterState, arenaDimensions)
-    },
-  }
+  const jupiterMod: JupiterMod = createJupiterMod({
+    getModifier: () => config.modifiers.arena.jupiter,
+    getArenaDimensions: () => arenaDimensions,
+  })
 
-  const divotsMod: ManagedMod = {
-    key: 'divots',
-    isEnabled: () => Boolean(config.modifiers.arena.divots.enabled),
-    onEnabled() {
-      maintainDivotsState(divotsState, config.modifiers.arena.divots)
-    },
-    onTick(_dt: number) {
-      maintainDivotsState(divotsState, config.modifiers.arena.divots)
-    },
-    onDisabled() {
-      clearDivots(divotsState)
-    },
-    onReset() {
-      clearDivots(divotsState)
-    },
-  }
+  const divotsMod: DivotsMod = createDivotsMod({
+    getModifier: () => config.modifiers.arena.divots,
+    getArenaDimensions: () => arenaDimensions,
+  })
 
-  const irelandMod: ManagedMod = {
-    key: 'ireland',
-    isEnabled: () => Boolean(config.modifiers.arena.ireland.enabled),
-    onEnabled() {
-      rebuildIrelandWells(irelandState, config.modifiers.arena.ireland, arenaDimensions)
-    },
-    onTick(_dt: number) {
-      ensureIrelandWells(irelandState, config.modifiers.arena.ireland, arenaDimensions)
-    },
-    onDisabled() {
-      clearIrelandWells(irelandState)
-    },
-    onReset() {
-      clearIrelandWells(irelandState)
-    },
-  }
+  const irelandMod: IrelandMod = createIrelandMod({
+    getModifier: () => config.modifiers.arena.ireland,
+    getArenaDimensions: () => arenaDimensions,
+  })
 
-  const drinkMeMod: ManagedMod = {
-    key: 'drinkMe',
-    isEnabled: () => Boolean(config.modifiers.arena.drinkMe.enabled),
-    onEnabled() {
-      maintainDrinkMeState(drinkMeState, config.modifiers.arena.drinkMe, arenaDimensions)
-    },
-    onTick(_dt: number) {
-      maintainDrinkMeState(drinkMeState, config.modifiers.arena.drinkMe, arenaDimensions)
-    },
-    onDisabled() {
-      clearDrinkMeState(drinkMeState)
-    },
-    onReset() {
-      clearDrinkMeState(drinkMeState)
-    },
-  }
+  const drinkMeMod: DrinkMeMod = createDrinkMeMod({
+    getModifier: () => config.modifiers.arena.drinkMe,
+    getArenaDimensions: () => arenaDimensions,
+  })
 
-  const teaPartyMod: ManagedMod = {
-    key: 'teaParty',
-    isEnabled: () => Boolean(config.modifiers.arena.teaParty.enabled),
-    onEnabled() {
-      maintainTeaPartyState(teaPartyState, config.modifiers.arena.teaParty, arenaDimensions)
-    },
-    onTick(_dt: number) {
-      maintainTeaPartyState(teaPartyState, config.modifiers.arena.teaParty, arenaDimensions)
-    },
-    onDisabled() {
-      clearTeaPartyState(teaPartyState)
-    },
-    onReset() {
-      clearTeaPartyState(teaPartyState)
-    },
-  }
+  const teaPartyMod: TeaPartyMod = createTeaPartyMod({
+    getModifier: () => config.modifiers.arena.teaParty,
+    getArenaDimensions: () => arenaDimensions,
+  })
 
-  const fogOfWarMod: ManagedMod = {
-    key: 'fogOfWar',
-    isEnabled: () => Boolean(config.modifiers.arena.fogOfWar.enabled),
-    onEnabled() {
-      resetFogOfWarState(fogOfWarState)
-    },
-    onTick(dt: number) {
-      updateFogOfWarState(
-        fogOfWarState,
-        config.modifiers.arena.fogOfWar,
-        dt,
-        arenaDimensions,
-      )
-    },
-    onDisabled() {
-      resetFogOfWarState(fogOfWarState)
-    },
-    onReset() {
-      resetFogOfWarState(fogOfWarState)
-    },
-  }
+  const fogOfWarMod: FogOfWarMod = createFogOfWarMod({
+    getModifier: () => config.modifiers.arena.fogOfWar,
+    getArenaDimensions: () => arenaDimensions,
+    getContext: () => ctx,
+  })
 
-  const wonderlandMod: ManagedMod = {
-    key: 'wonderland',
-    isEnabled: () => Boolean(config.modifiers.arena.wonderland.enabled),
-    onEnabled() {
-      resetWonderlandState(wonderlandState)
-    },
-    onTick(dt: number) {
-      updateWonderlandState(
-        wonderlandState,
-        config.modifiers.arena.wonderland,
-        dt,
-        arenaDimensions,
-      )
-    },
-    onDisabled() {
-      resetWonderlandState(wonderlandState)
-    },
-    onReset() {
-      resetWonderlandState(wonderlandState)
-    },
-  }
+  const wonderlandMod: WonderlandMod = createWonderlandMod({
+    getModifier: () => config.modifiers.arena.wonderland,
+    getArenaDimensions: () => arenaDimensions,
+    getContext: () => ctx,
+    getSnowColor: () => HIGHLIGHT_COLOR,
+  })
 
-  const secondChancesMod: ManagedMod = {
-    key: 'secondChances',
-    isEnabled: () => Boolean(getSecondChancesModifier().enabled),
-    onEnabled() {
-      const modifier = getSecondChancesModifier()
-      maintainSecondChancesState(secondChancesState, modifier)
-      resetSecondChancesShields(secondChancesState, modifier)
-    },
-    onTick(_dt: number) {
-      maintainSecondChancesState(secondChancesState, getSecondChancesModifier())
-    },
-    onBallReset(_serveToLeft: boolean) {
-      const modifier = getSecondChancesModifier()
-      maintainSecondChancesState(secondChancesState, modifier)
-      resetSecondChancesShields(secondChancesState, modifier)
-    },
-    onDisabled() {
-      clearSecondChancesState(secondChancesState)
-    },
-    onReset() {
-      clearSecondChancesState(secondChancesState)
-    },
-  }
+  const secondChancesMod: SecondChancesMod = createSecondChancesMod({
+    getModifier: () => getSecondChancesModifier(),
+    getArenaDimensions: () => arenaDimensions,
+    getContext: () => ctx,
+    getBackgroundRgb: () => ARENA_BACKGROUND_RGB,
+    getAreSidesSwapped: () => areSidesSwapped(),
+  })
 
-  const spaceInvadersMod: ManagedMod = {
-    key: 'spaceInvaders',
-    isEnabled: () => Boolean(getSpaceInvadersModifier().enabled),
-    onEnabled() {
-      const modifier = getSpaceInvadersModifier()
-      const swapSides = areSidesSwapped()
-      maintainSpaceInvadersState(spaceInvadersState, modifier, arenaDimensions, swapSides)
-      resetSpaceInvadersState(spaceInvadersState, modifier, arenaDimensions, swapSides)
-    },
-    onTick(_dt: number) {
-      maintainSpaceInvadersState(
-        spaceInvadersState,
-        getSpaceInvadersModifier(),
-        arenaDimensions,
-        areSidesSwapped(),
-      )
-    },
-    onBallReset(_serveToLeft: boolean) {
-      const modifier = getSpaceInvadersModifier()
-      const swapSides = areSidesSwapped()
-      maintainSpaceInvadersState(spaceInvadersState, modifier, arenaDimensions, swapSides)
-      resetSpaceInvadersState(spaceInvadersState, modifier, arenaDimensions, swapSides)
-    },
-    onDisabled() {
-      clearSpaceInvadersState(spaceInvadersState)
-    },
-    onReset() {
-      clearSpaceInvadersState(spaceInvadersState)
-    },
-  }
+  const spaceInvadersMod: SpaceInvadersMod = createSpaceInvadersMod({
+    getModifier: () => getSpaceInvadersModifier(),
+    getArenaDimensions: () => arenaDimensions,
+    getContext: () => ctx,
+    getBackgroundRgb: () => ARENA_BACKGROUND_RGB,
+    getAreSidesSwapped: () => areSidesSwapped(),
+  })
 
-  const minesweeperMod: ManagedMod = {
-    key: 'minesweeper',
-    isEnabled: () => Boolean(getMinesweeperModifier().enabled),
-    onEnabled() {
-      const modifier = getMinesweeperModifier()
-      maintainMinesweeperState(minesweeperState, modifier, arenaDimensions)
-      resetMinesweeperState(minesweeperState, modifier, arenaDimensions)
-    },
-    onTick(_dt: number) {
-      maintainMinesweeperState(minesweeperState, getMinesweeperModifier(), arenaDimensions)
-    },
-    onBallReset(_serveToLeft: boolean) {
-      const modifier = getMinesweeperModifier()
-      maintainMinesweeperState(minesweeperState, modifier, arenaDimensions)
-      resetMinesweeperState(minesweeperState, modifier, arenaDimensions)
-    },
-    onDisabled() {
-      clearMinesweeperState(minesweeperState)
-    },
-    onReset() {
-      clearMinesweeperState(minesweeperState)
-    },
-  }
+  const minesweeperMod: MinesweeperMod = createMinesweeperMod({
+    getModifier: () => getMinesweeperModifier(),
+    getArenaDimensions: () => arenaDimensions,
+    getContext: () => ctx,
+  })
 
-  const kiteState: KiteState = createKiteState()
-  const bumShuffleState: BumShuffleState = createBumShuffleState()
-  const pollokState: PollokState = createPollokState()
   let ballTrailColorHex = '#ffffff'
 
-  const kiteMod: ManagedMod = {
-    key: 'kite',
-    isEnabled: () => Boolean(config.modifiers.ball.kite.enabled),
-    onTick(_dt: number) {
-      const modifier = config.modifiers.ball.kite
-      updateKiteTrail(kiteState, modifier, state.ballX, state.ballY, getBallRadius())
-    },
-    onDisabled() {
-      clearKiteTrail(kiteState)
-    },
-    onReset() {
-      clearKiteTrail(kiteState)
-    },
-    onDraw() {
-      drawKiteTrail(ctx, kiteState, config.modifiers.ball.kite, {
-        baseColor: ballTrailColorHex,
-        applyAlpha: applyAlphaToColor,
-        getBallRadius,
-      })
-    },
-  }
+  const kiteMod: KiteMod = createKiteMod({
+    getModifier: () => config.modifiers.ball.kite,
+    getContext: () => ctx,
+    getBallPosition: () => ({ x: state.ballX, y: state.ballY }),
+    getBallRadius,
+    getTrailColor: () => ballTrailColorHex,
+    applyAlpha: (color, alpha) => applyAlphaToColor(color, alpha),
+  })
 
-  const bumShuffleMod: ManagedMod = {
-    key: 'bumShuffle',
-    isEnabled: () => Boolean(config.modifiers.ball.bumShuffle.enabled),
-    onTick(_dt: number) {
-      const modifier = config.modifiers.ball.bumShuffle
-      updateBumShuffleTrail(
-        bumShuffleState,
-        modifier,
-        state.ballX,
-        state.ballY,
-        getBallRadius(),
-      )
-    },
-    onDisabled() {
-      clearBumShuffleTrail(bumShuffleState)
-    },
-    onReset() {
-      clearBumShuffleTrail(bumShuffleState)
-    },
-    onDraw() {
-      drawBumShuffleTrail(ctx, bumShuffleState, config.modifiers.ball.bumShuffle, {
-        baseColor: ballTrailColorHex,
-        getBallRadius,
-      })
-    },
-  }
+  const bumShuffleMod: BumShuffleMod = createBumShuffleMod({
+    getModifier: () => config.modifiers.ball.bumShuffle,
+    getContext: () => ctx,
+    getBallPosition: () => ({ x: state.ballX, y: state.ballY }),
+    getBallRadius,
+    getTrailColor: () => ballTrailColorHex,
+  })
 
-  const pollokMod: ManagedMod = {
-    key: 'pollok',
-    isEnabled: () => Boolean(config.modifiers.ball.pollok.enabled),
-    onTick(_dt: number) {
-      const modifier = config.modifiers.ball.pollok
-      updatePollokTrail(
-        pollokState,
-        modifier,
-        state.ballX,
-        state.ballY,
-        getBallRadius(),
-        getPollokColor(pollokState, modifier),
-      )
-    },
-    onBallReset() {
-      pollokState.lastReturner = null
-    },
-    onDisabled() {
-      clearPollokTrail(pollokState)
-    },
-    onReset() {
-      clearPollokTrail(pollokState)
-    },
-    onDraw() {
-      drawPollokTrail(ctx, pollokState, config.modifiers.ball.pollok, {
-        getBallRadius,
-      })
-    },
-  }
+  const pollokMod: PollokMod = createPollokMod({
+    getModifier: () => config.modifiers.ball.pollok,
+    getContext: () => ctx,
+    getBallPosition: () => ({ x: state.ballX, y: state.ballY }),
+    getBallRadius,
+  })
 
   const snowballMod: ManagedMod = {
     key: 'snowball',
@@ -1650,19 +1266,13 @@ export function createPong(
 
   function resetBall(toLeft: boolean) {
     balls.length = 0
-    resetSecondChancesShields(secondChancesState, getSecondChancesModifier())
-    resetSpaceInvadersState(
-      spaceInvadersState,
-      getSpaceInvadersModifier(),
-      arenaDimensions,
-      areSidesSwapped(),
-    )
-    resetMinesweeperState(minesweeperState, getMinesweeperModifier(), arenaDimensions)
-    resetSpaceInvadersState(spaceInvadersState, getSpaceInvadersModifier(), arenaDimensions)
+    secondChancesMod.resetShields()
+    spaceInvadersMod.resetBarricades()
+    minesweeperMod.resetBoard()
     ballModManager.syncEnabled()
     ballModManager.handleBallReset(toLeft)
     arenaModManager.handleBallReset(toLeft)
-    clearKiteTrail(kiteState)
+    kiteMod.clearTrail()
     pendingServeToLeft = toLeft
     preServeDelayRemaining = modRevealDelayPending ? modRevealDelayDuration : 0
     serveCountdownRemaining = serveCountdownDuration
@@ -1734,9 +1344,9 @@ export function createPong(
     lastEnabledArenaModifiers = new Set<GravityWellKey>(
       getEnabledArenaModifierKeys(config.modifiers.arena),
     )
-    clearKiteTrail(kiteState)
-    clearBumShuffleTrail(bumShuffleState)
-    clearPollokTrail(pollokState)
+    kiteMod.clearTrail()
+    bumShuffleMod.clearTrail()
+    pollokMod.clearTrail()
     rearmHadron()
     syncOsteoState(true)
     initializePaddleHeights(true)
@@ -1915,12 +1525,6 @@ export function createPong(
     updateServeTimers(dt)
 
     const paddles = getPhysicalPaddles()
-    updateCeresState(
-      ceresState,
-      config.modifiers.arena.ceres,
-      dt,
-      arenaDimensions,
-    )
 
     // Gravity well influence
     activeGravityWells = collectActiveGravityWells()
@@ -2003,31 +1607,17 @@ export function createPong(
 
       handlePotionCollisions(ball)
 
-      const minesweeperResult = resolveMinesweeperCollision(
-        minesweeperState,
-        getMinesweeperModifier(),
-        ball,
-      )
+      const minesweeperResult = minesweeperMod.resolveCollision(ball)
       if (minesweeperResult) {
         radius = ball.radius
       }
 
-      const hitBarricade = resolveSpaceInvadersCollision(
-        spaceInvadersState,
-        getSpaceInvadersModifier(),
-        ball,
-      )
+      const hitBarricade = spaceInvadersMod.resolveCollision(ball)
       if (hitBarricade) {
         radius = ball.radius
       }
 
-      const shieldSide = reflectBallWithSecondChanceShields(
-        secondChancesState,
-        getSecondChancesModifier(),
-        ball,
-        arenaDimensions.width,
-        areSidesSwapped(),
-      )
+      const shieldSide = secondChancesMod.reflectBall(ball)
       if (shieldSide) {
         radius = ball.radius
       }
@@ -2164,7 +1754,7 @@ export function createPong(
 
   function handlePaddleReturn(side: 'left' | 'right', ball: BallState) {
     ball.lastPaddleHit = side
-    registerPollokReturn(pollokState, side)
+    pollokMod.registerReturn(side)
     registerPipReturn()
     resetBallSize(ball)
     spawnDivotWell()
@@ -2239,7 +1829,7 @@ export function createPong(
   }
 
   function clearDivotWells() {
-    clearDivots(divotsState)
+    divotsMod.clearWells()
   }
 
   function handlePointScored(): boolean {
@@ -2262,19 +1852,19 @@ export function createPong(
       state.completedBitesSinceLastPoint = 0
     }
 
-    markIrelandNeedsRegeneration(irelandState)
-    clearBumShuffleTrail(bumShuffleState)
-    resetFogOfWarState(fogOfWarState)
-    resetWonderlandState(wonderlandState)
+    irelandMod.markNeedsRegeneration()
+    bumShuffleMod.clearTrail()
+    fogOfWarMod.resetState()
+    wonderlandMod.resetState()
 
     const modifier = config.modifiers.arena.ireland
     if (!modifier.enabled) {
-      clearIrelandWells(irelandState)
+      irelandMod.clearWells()
       activeGravityWells = collectActiveGravityWells()
       return modChanged
     }
 
-    rebuildIrelandWells(irelandState, modifier, arenaDimensions)
+    irelandMod.rebuildWells()
     activeGravityWells = collectActiveGravityWells()
     return modChanged
   }
@@ -3594,25 +3184,25 @@ export function createPong(
           wells.push(...getBlackHoleWells(arena.blackHole, arenaDimensions))
           break
         case 'blackMole':
-          wells.push(...getBlackMoleWells(blackMoleState, arena.blackMole))
+          wells.push(...blackMoleMod.getActiveWells())
           break
         case 'gopher':
-          wells.push(...getGopherWells(gopherState, arena.gopher))
+          wells.push(...gopherMod.getActiveWells())
           break
         case 'ceres':
-          wells.push(...getCeresWells(ceresState, arena.ceres))
+          wells.push(...ceresMod.getActiveWells())
           break
         case 'superMassive':
           wells.push(...getSuperMassiveWells(arena.superMassive, arenaDimensions))
           break
         case 'jupiter':
-          wells.push(...getJupiterWells(jupiterState, arena.jupiter))
+          wells.push(...jupiterMod.getActiveWells())
           break
         case 'whiteDwarf':
           wells.push(...getWhiteDwarfWells(arena.whiteDwarf, arenaDimensions))
           break
         case 'divots':
-          wells.push(...getDivotsWells(divotsState, arena.divots))
+          wells.push(...divotsMod.getActiveWells())
           break
         case 'fogOfWar':
         case 'wonderland':
@@ -3624,7 +3214,7 @@ export function createPong(
         case 'minesweeper':
           break
         case 'ireland':
-          wells.push(...getIrelandWells(irelandState, arena.ireland, arenaDimensions))
+          wells.push(...irelandMod.getActiveWells())
           break
         case 'russianRoulette':
           break
@@ -3682,8 +3272,7 @@ export function createPong(
   }
 
   function spawnDivotWell() {
-    const modifier = config.modifiers.arena.divots
-    addDivotWell(divotsState, modifier, arenaDimensions)
+    divotsMod.spawnWell()
   }
 
   function handlePotionCollisions(ball: BallState) {
@@ -3693,13 +3282,13 @@ export function createPong(
     const opponent: 'left' | 'right' = lastHit === 'left' ? 'right' : 'left'
     const drinkMeModifier = config.modifiers.arena.drinkMe
     if (drinkMeModifier.enabled) {
-      const index = findPotionCollision(drinkMeState, drinkMeModifier, ball)
+      const index = findPotionCollision(drinkMeMod.getObjects(), drinkMeModifier, ball)
       if (index !== -1) {
         const shrinkAmount = getPotionShrinkAmount(drinkMeModifier)
         if (shrinkAmount > 0) {
           modifyPaddleHeight(opponent, -shrinkAmount)
         }
-        respawnDrinkMeObject(drinkMeState, index, drinkMeModifier, arenaDimensions, {
+        drinkMeMod.respawnObject(index, {
           x: ball.x,
           y: ball.y,
           radius: ball.radius,
@@ -3709,7 +3298,7 @@ export function createPong(
 
     const teaPartyModifier = config.modifiers.arena.teaParty
     if (teaPartyModifier.enabled) {
-      const index = findPotionCollision(teaPartyState, teaPartyModifier, ball)
+      const index = findPotionCollision(teaPartyMod.getObjects(), teaPartyModifier, ball)
       if (index !== -1) {
         const shrinkAmount = getPotionShrinkAmount(teaPartyModifier)
         if (shrinkAmount > 0) {
@@ -3719,7 +3308,7 @@ export function createPong(
         if (growAmount > 0) {
           modifyPaddleHeight(lastHit, growAmount)
         }
-        respawnTeaPartyObject(teaPartyState, index, teaPartyModifier, arenaDimensions, {
+        teaPartyMod.respawnObject(index, {
           x: ball.x,
           y: ball.y,
           radius: ball.radius,
@@ -3729,13 +3318,13 @@ export function createPong(
   }
 
   function findPotionCollision(
-    state: DrinkMeState | TeaPartyState,
+    objects: { x: number; y: number; radius: number }[],
     modifier: GravityWellModifier & { objectRadius?: number },
     ball: BallState,
   ): number {
-    if (!modifier.enabled || state.objects.length === 0) return -1
-    for (let i = 0; i < state.objects.length; i++) {
-      const object = state.objects[i]
+    if (!modifier.enabled || objects.length === 0) return -1
+    for (let i = 0; i < objects.length; i++) {
+      const object = objects[i]
       const combinedRadius = object.radius + ball.radius
       const dx = ball.x - object.x
       const dy = ball.y - object.y
@@ -4448,29 +4037,8 @@ export function createPong(
 
     arenaModManager.draw()
 
-    drawPotionObjects(
-      getDrinkMeObjects(drinkMeState, config.modifiers.arena.drinkMe),
-      config.modifiers.arena.drinkMe,
-    )
-    drawPotionObjects(
-      getTeaPartyObjects(teaPartyState, config.modifiers.arena.teaParty),
-      config.modifiers.arena.teaParty,
-    )
-
-    drawMinesweeperSquares(ctx, minesweeperState, getMinesweeperModifier())
-
-    drawSecondChanceShields(ctx, secondChancesState, getSecondChancesModifier(), {
-      arenaWidth: W,
-      arenaHeight: H,
-      backgroundRgb: ARENA_BACKGROUND_RGB,
-      swapSides: areSidesSwapped(),
-    })
-    drawSpaceInvadersBarricades(
-      ctx,
-      spaceInvadersState,
-      getSpaceInvadersModifier(),
-      { backgroundRgb: ARENA_BACKGROUND_RGB },
-    )
+    drawPotionObjects(drinkMeMod.getObjects(), config.modifiers.arena.drinkMe)
+    drawPotionObjects(teaPartyMod.getObjects(), config.modifiers.arena.teaParty)
 
     const ballColorRgb = getBallColorRgb()
     const ballColorHex = rgbToHex(ballColorRgb)
@@ -4558,14 +4126,6 @@ export function createPong(
         ctx.restore()
       }
     }
-
-    drawFogOfWarOverlay(ctx, fogOfWarState, config.modifiers.arena.fogOfWar, arenaDimensions)
-    drawWonderlandSnow(
-      ctx,
-      wonderlandState,
-      config.modifiers.arena.wonderland,
-      HIGHLIGHT_COLOR,
-    )
 
     const pipRadius = 6
     const pipSpacing = 22
