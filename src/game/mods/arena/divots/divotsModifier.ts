@@ -1,14 +1,16 @@
-﻿import type { GravityWellModifier } from '../../../devtools'
-import type { ArenaDimensions, StoredWell } from '../shared'
-import { randomRange, toGravityFalloffValue } from '../shared'
-
-export interface DivotsState {
-  wells: StoredWell[]
-}
+﻿import { randomRange, toGravityFalloffValue } from '../shared'
+import { getDivotsWells } from './divotsView'
+import type { GravityWellModifier } from '../../../devtools'
+import type { ManagedMod } from '../../modManager'
+import type { ActiveGravityWell, ArenaDimensions, StoredWell } from '../shared'
 
 type DivotsModifierConfig = GravityWellModifier & {
   maxDivots?: number
   spawnMargin?: number
+}
+
+export interface DivotsState {
+  wells: StoredWell[]
 }
 
 export function createDivotsState(): DivotsState {
@@ -59,5 +61,57 @@ export function spawnDivotWell(
 
   if (state.wells.length > maxDivots) {
     state.wells.splice(0, state.wells.length - maxDivots)
+  }
+}
+
+interface DivotsModParams {
+  getModifier(): DivotsModifierConfig
+  getArenaDimensions(): ArenaDimensions
+}
+
+export interface DivotsMod extends ManagedMod {
+  spawnWell(): void
+  clearWells(): void
+  getActiveWells(): ActiveGravityWell[]
+}
+
+export function createDivotsMod(params: DivotsModParams): DivotsMod {
+  const state: DivotsState = createDivotsState()
+
+  const getModifier = () => params.getModifier()
+  const getDimensions = () => params.getArenaDimensions()
+
+  const maintainState = () => {
+    updateDivotsState(state, getModifier())
+  }
+
+  const clearState = () => {
+    clearDivots(state)
+  }
+
+  return {
+    key: 'divots',
+    isEnabled: () => Boolean(getModifier().enabled),
+    onEnabled() {
+      maintainState()
+    },
+    onTick() {
+      maintainState()
+    },
+    onDisabled() {
+      clearState()
+    },
+    onReset() {
+      clearState()
+    },
+    spawnWell() {
+      spawnDivotWell(state, getModifier(), getDimensions())
+    },
+    clearWells() {
+      clearState()
+    },
+    getActiveWells() {
+      return getDivotsWells(state, getModifier())
+    },
   }
 }

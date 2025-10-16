@@ -1,6 +1,8 @@
 ﻿import type { GravityWellModifier } from '../../../devtools'
-import type { ArenaDimensions } from '../shared'
+import type { ManagedMod } from '../../modManager'
+import type { ActiveGravityWell, ArenaDimensions } from '../shared'
 import { clamp } from '../shared'
+import { getCeresWells } from './ceresView'
 
 export interface CeresState {
   x: number
@@ -111,4 +113,44 @@ export function updateCeresState(
   const scale = speed / currentSpeed
   state.vx *= scale
   state.vy *= scale
+}
+
+interface CeresModParams {
+  getModifier(): GravityWellModifier
+  getArenaDimensions(): ArenaDimensions
+}
+
+export interface CeresMod extends ManagedMod {
+  getActiveWells(): ActiveGravityWell[]
+}
+
+export function createCeresMod(params: CeresModParams): CeresMod {
+  const state: CeresState = createCeresState(params.getArenaDimensions())
+
+  const getModifier = () => params.getModifier()
+  const getDimensions = () => params.getArenaDimensions()
+
+  const resetState = () => {
+    resetCeresState(state, getDimensions())
+  }
+
+  return {
+    key: 'ceres',
+    isEnabled: () => Boolean(getModifier().enabled),
+    onEnabled() {
+      resetState()
+    },
+    onTick(dt: number) {
+      updateCeresState(state, getModifier(), dt, getDimensions())
+    },
+    onDisabled() {
+      resetState()
+    },
+    onReset() {
+      resetState()
+    },
+    getActiveWells() {
+      return getCeresWells(state, getModifier())
+    },
+  }
 }

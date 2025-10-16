@@ -1,7 +1,8 @@
 ﻿import type { GravityWellModifier } from '../../../devtools'
 import type { ArenaDimensions } from '../shared'
 import { clamp } from '../shared'
-
+import { drawFogOfWarOverlay } from './fogOfWarView'
+import type { ManagedMod } from '../../modManager'
 export interface FogOfWarState {
   radius: number
 }
@@ -54,4 +55,46 @@ export function updateFogOfWarState(
   if (speed <= 0) return
 
   state.radius = Math.min(maxRadius, state.radius + speed * dt)
+}
+
+interface FogOfWarModParams {
+  getModifier(): GravityWellModifier
+  getArenaDimensions(): ArenaDimensions
+  getContext(): CanvasRenderingContext2D
+}
+
+export interface FogOfWarMod extends ManagedMod {
+  resetState(): void
+}
+
+export function createFogOfWarMod(params: FogOfWarModParams): FogOfWarMod {
+  const state: FogOfWarState = createFogOfWarState()
+
+  const getModifier = () => params.getModifier()
+  const getDimensions = () => params.getArenaDimensions()
+
+  const resetState = () => {
+    resetFogOfWarState(state)
+  }
+
+  return {
+    key: 'fogOfWar',
+    isEnabled: () => Boolean(getModifier().enabled),
+    onEnabled() {
+      resetState()
+    },
+    onTick(dt: number) {
+      updateFogOfWarState(state, getModifier(), dt, getDimensions())
+    },
+    onDisabled() {
+      resetState()
+    },
+    onReset() {
+      resetState()
+    },
+    onDraw() {
+      drawFogOfWarOverlay(params.getContext(), state, getModifier(), getDimensions())
+    },
+    resetState,
+  }
 }

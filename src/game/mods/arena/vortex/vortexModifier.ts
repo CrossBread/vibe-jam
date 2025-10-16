@@ -1,4 +1,6 @@
 ﻿import type { GravityWellModifier } from '../../../devtools'
+import type { RGBColor } from '../../ball/shared'
+import type { ManagedMod, BallLike } from '../../modManager'
 import type { ArenaDimensions } from '../shared'
 import {
   clearPortalState,
@@ -10,6 +12,7 @@ import {
   type PortalConfigDefaults,
   type PortalState,
 } from '../portal/portalModifier'
+import { drawVortexPortals } from './vortexView'
 
 const VORTEX_DEFAULTS: PortalConfigDefaults = {
   pairCount: 2,
@@ -48,8 +51,63 @@ export function tryResolveVortexTeleport(
   state: VortexState,
   modifier: GravityWellModifier,
   dimensions: ArenaDimensions,
-  ball: { x: number; y: number; vx: number; vy: number; radius: number; portalCooldown?: number },
+  ball: BallLike,
 ): boolean {
   return tryResolvePortalTeleport(state, modifier, dimensions, ball, VORTEX_DEFAULTS)
 }
 
+interface VortexModParams {
+  getModifier(): GravityWellModifier
+  getArenaDimensions(): ArenaDimensions
+  getContext(): CanvasRenderingContext2D
+  getBackgroundRgb(): RGBColor
+}
+
+export function createVortexMod(params: VortexModParams): ManagedMod {
+  const state: VortexState = createVortexState()
+
+  const getModifier = () => params.getModifier()
+  const getDimensions = () => params.getArenaDimensions()
+
+  const maintainState = () => {
+    maintainVortexState(state, getModifier(), getDimensions())
+  }
+
+  const resetState = () => {
+    resetVortexState(state, getModifier(), getDimensions())
+  }
+
+  return {
+    key: 'vortex',
+    isEnabled: () => Boolean(getModifier().enabled),
+    onInit() {
+      maintainState()
+    },
+    onEnabled() {
+      maintainState()
+      resetState()
+    },
+    onDisabled() {
+      clearVortexState(state)
+    },
+    onReset() {
+      clearVortexState(state)
+    },
+    onTick(dt) {
+      maintainState()
+      updateVortexState(state, getModifier(), dt)
+    },
+    onBallReset() {
+      maintainState()
+      resetState()
+    },
+    onBallStep(ball: BallLike) {
+      return tryResolveVortexTeleport(state, getModifier(), getDimensions(), ball)
+    },
+    onDraw() {
+      drawVortexPortals(params.getContext(), state, getModifier(), {
+        backgroundRgb: params.getBackgroundRgb(),
+      })
+    },
+  }
+}
