@@ -314,6 +314,17 @@ export function createPong(
   let serveCountdownRemaining = 0
   let preServeDelayRemaining = 0
   let modRevealDelayPending = false
+  type ModVoteSelection = 'up' | 'down' | 'neutral'
+
+  interface ModVoteState {
+    options: [GravityWellKey, GravityWellKey]
+    leftSelection: ModVoteSelection
+    rightSelection: ModVoteSelection
+  }
+
+  let pendingModVoteCount = 0
+  let nextModVoteExclude: GravityWellKey | null = null
+  let modVote: ModVoteState | null = null
 
   interface GamepadInput {
     leftAxis: number
@@ -1337,6 +1348,12 @@ export function createPong(
       }
     }
 
+    if (modVote) {
+      if (resolveActiveModVote()) {
+        return
+      }
+    }
+
     launchPendingServe()
   }
 
@@ -1349,6 +1366,9 @@ export function createPong(
     state.totalBites = 0
     state.completedBitesSinceLastPoint = 0
     completedBitesSinceLastPoint = 0
+    pendingModVoteCount = 0
+    nextModVoteExclude = null
+    modVote = null
     leftAIEnabled = true
     rightAIEnabled = true
     ballModManager.reset()
@@ -1443,73 +1463,77 @@ export function createPong(
     const leftPaddleSpeed = config.paddleSpeed * getPaddleSpeedMultiplier('left')
     const rightPaddleSpeed = config.paddleSpeed * getPaddleSpeedMultiplier('right')
 
-    if (leftAIEnabled) {
-      const target = state.ballY - leftPaddleHeight / 2
-      const maxStep = leftPaddleSpeed * dt
-      const delta = clamp(target - state.leftY, -maxStep, maxStep)
-      state.leftY += delta
-      if (doublesEnabled) {
-        const innerDelta = clamp(target - state.leftInnerY, -maxStep, maxStep)
-        state.leftInnerY += innerDelta
-      } else {
-        state.leftInnerY = state.leftY
-      }
+    if (modVote) {
+      handleModVoteInput(gamepadInput)
     } else {
-      const control = getPaddleControlState('left', doublesEnabled, gamepadInput)
-      handleManualPaddle('left', dt, leftPaddleSpeed, control)
-
-      if (doublesEnabled) {
-        if (config.modifiers.paddle.missileCommander.enabled) {
-          const target = clamp(
-            H * 0.5 - state.leftInnerPaddleHeight / 2,
-            0,
-            H - state.leftInnerPaddleHeight,
-          )
-          state.leftInnerY = target
+      if (leftAIEnabled) {
+        const target = state.ballY - leftPaddleHeight / 2
+        const maxStep = leftPaddleSpeed * dt
+        const delta = clamp(target - state.leftY, -maxStep, maxStep)
+        state.leftY += delta
+        if (doublesEnabled) {
+          const innerDelta = clamp(target - state.leftInnerY, -maxStep, maxStep)
+          state.leftInnerY += innerDelta
         } else {
-          let innerGamepad = 0
-          if (gamepadInput.rightAxis)
-            innerGamepad += gamepadInput.rightAxis * config.paddleSpeed * dt
-          if (gamepadInput.rightUp) innerGamepad -= config.paddleSpeed * dt
-          if (gamepadInput.rightDown) innerGamepad += config.paddleSpeed * dt
-          const innerDirection = clamp(innerGamepad, -1, 1)
-          state.leftInnerY += innerDirection * config.paddleSpeed * dt
+          state.leftInnerY = state.leftY
         }
       } else {
-        state.leftInnerY = state.leftY
-      }
-    }
+        const control = getPaddleControlState('left', doublesEnabled, gamepadInput)
+        handleManualPaddle('left', dt, leftPaddleSpeed, control)
 
-    if (rightAIEnabled) {
-      const target = state.ballY - rightPaddleHeight / 2
-      const maxStep = rightPaddleSpeed * dt
-      const delta = clamp(target - state.rightY, -maxStep, maxStep)
-      state.rightY += delta
-      if (doublesEnabled) {
-        const innerDelta = clamp(target - state.rightInnerY, -maxStep, maxStep)
-        state.rightInnerY += innerDelta
-      } else {
-        state.rightInnerY = state.rightY
-      }
-    } else {
-      const control = getPaddleControlState('right', doublesEnabled, gamepadInput)
-      handleManualPaddle('right', dt, rightPaddleSpeed, control)
-
-      if (doublesEnabled) {
-        if (config.modifiers.paddle.missileCommander.enabled) {
-          const target = clamp(
-            H * 0.5 - state.rightInnerPaddleHeight / 2,
-            0,
-            H - state.rightInnerPaddleHeight,
-          )
-          state.rightInnerY = target
+        if (doublesEnabled) {
+          if (config.modifiers.paddle.missileCommander.enabled) {
+            const target = clamp(
+              H * 0.5 - state.leftInnerPaddleHeight / 2,
+              0,
+              H - state.leftInnerPaddleHeight,
+            )
+            state.leftInnerY = target
+          } else {
+            let innerGamepad = 0
+            if (gamepadInput.rightAxis)
+              innerGamepad += gamepadInput.rightAxis * config.paddleSpeed * dt
+            if (gamepadInput.rightUp) innerGamepad -= config.paddleSpeed * dt
+            if (gamepadInput.rightDown) innerGamepad += config.paddleSpeed * dt
+            const innerDirection = clamp(innerGamepad, -1, 1)
+            state.leftInnerY += innerDirection * config.paddleSpeed * dt
+          }
         } else {
-          const innerKeyDirection = (keys['w'] ? -1 : 0) + (keys['s'] ? 1 : 0)
-          const innerDirection = clamp(innerKeyDirection, -1, 1)
-          state.rightInnerY += innerDirection * config.paddleSpeed * dt
+          state.leftInnerY = state.leftY
+        }
+      }
+
+      if (rightAIEnabled) {
+        const target = state.ballY - rightPaddleHeight / 2
+        const maxStep = rightPaddleSpeed * dt
+        const delta = clamp(target - state.rightY, -maxStep, maxStep)
+        state.rightY += delta
+        if (doublesEnabled) {
+          const innerDelta = clamp(target - state.rightInnerY, -maxStep, maxStep)
+          state.rightInnerY += innerDelta
+        } else {
+          state.rightInnerY = state.rightY
         }
       } else {
-        state.rightInnerY = state.rightY
+        const control = getPaddleControlState('right', doublesEnabled, gamepadInput)
+        handleManualPaddle('right', dt, rightPaddleSpeed, control)
+
+        if (doublesEnabled) {
+          if (config.modifiers.paddle.missileCommander.enabled) {
+            const target = clamp(
+              H * 0.5 - state.rightInnerPaddleHeight / 2,
+              0,
+              H - state.rightInnerPaddleHeight,
+            )
+            state.rightInnerY = target
+          } else {
+            const innerKeyDirection = (keys['w'] ? -1 : 0) + (keys['s'] ? 1 : 0)
+            const innerDirection = clamp(innerKeyDirection, -1, 1)
+            state.rightInnerY += innerDirection * config.paddleSpeed * dt
+          }
+        } else {
+          state.rightInnerY = state.rightY
+        }
       }
     }
 
@@ -1854,14 +1878,8 @@ export function createPong(
     if (completedBitesSinceLastPoint > 0) {
       const previousActive = activeModKey
       disableAllMods()
-      let excludeKey = previousActive
-      for (let i = 0; i < completedBitesSinceLastPoint; i++) {
-        const nextKey = pickRandomMod(excludeKey)
-        if (setActiveMod(nextKey)) {
-          modChanged = true
-        }
-        excludeKey = activeModKey
-      }
+      queueModVotes(completedBitesSinceLastPoint, previousActive)
+      modChanged = true
       completedBitesSinceLastPoint = 0
       state.completedBitesSinceLastPoint = 0
     }
@@ -1881,6 +1899,101 @@ export function createPong(
     irelandMod.rebuildWells()
     activeGravityWells = collectActiveGravityWells()
     return modChanged
+  }
+
+  function queueModVotes(count: number, initialExclude: GravityWellKey | null) {
+    if (count <= 0) return
+
+    const wasIdle = pendingModVoteCount <= 0 && !modVote
+    pendingModVoteCount += count
+
+    if (wasIdle) {
+      nextModVoteExclude = initialExclude ?? null
+      startNextModVote()
+    }
+  }
+
+  function startNextModVote() {
+    if (pendingModVoteCount <= 0) return
+
+    const exclude = nextModVoteExclude ?? null
+
+    const [firstOption, secondOption] = pickRandomModPair(exclude)
+    modVote = {
+      options: [firstOption, secondOption],
+      leftSelection: 'neutral',
+      rightSelection: 'neutral',
+    }
+
+    pendingModVoteCount -= 1
+    nextModVoteExclude = null
+
+    centerPaddle('left')
+    centerPaddle('right')
+    state.leftInnerY = state.leftY
+    state.rightInnerY = state.rightY
+
+    modRevealDelayPending = true
+    preServeDelayRemaining = Math.max(preServeDelayRemaining, modRevealDelayDuration)
+    serveCountdownRemaining = Math.max(serveCountdownRemaining, serveCountdownDuration)
+  }
+
+  function handleModVoteInput(gamepadInput: GamepadInput) {
+    if (!modVote) return
+
+    const doublesEnabled = Boolean(config.doubles.enabled)
+    const leftControl = getPaddleControlState('left', doublesEnabled, gamepadInput)
+    const rightControl = getPaddleControlState('right', doublesEnabled, gamepadInput)
+
+    const toSelection = (control: PaddleControlState): ModVoteSelection => {
+      const up = control.upRequested
+      const down = control.downRequested
+      if (up && !down) return 'up'
+      if (down && !up) return 'down'
+      return 'neutral'
+    }
+
+    modVote.leftSelection = toSelection(leftControl)
+    modVote.rightSelection = toSelection(rightControl)
+
+    centerPaddle('left')
+    centerPaddle('right')
+    state.leftInnerY = state.leftY
+    state.rightInnerY = state.rightY
+  }
+
+  function resolveActiveModVote(): boolean {
+    if (!modVote) return false
+
+    const [topKey, bottomKey] = modVote.options
+    let topVotes = 0
+    let bottomVotes = 0
+
+    if (modVote.leftSelection === 'up') topVotes += 1
+    if (modVote.leftSelection === 'down') bottomVotes += 1
+    if (modVote.rightSelection === 'up') topVotes += 1
+    if (modVote.rightSelection === 'down') bottomVotes += 1
+
+    const selectedKey =
+      topVotes > bottomVotes
+        ? topKey
+        : bottomVotes > topVotes
+          ? bottomKey
+          : modVote.options[Math.floor(Math.random() * modVote.options.length)]
+
+    setActiveMod(selectedKey)
+    modRevealDelayPending = true
+    preServeDelayRemaining = Math.max(preServeDelayRemaining, modRevealDelayDuration)
+    serveCountdownRemaining = Math.max(serveCountdownRemaining, serveCountdownDuration)
+
+    modVote = null
+    nextModVoteExclude = activeModKey
+
+    if (pendingModVoteCount > 0) {
+      startNextModVote()
+    }
+
+    return true
   }
 
   function initializePaddleHeights(center: boolean) {
@@ -3425,17 +3538,39 @@ export function createPong(
   }
 
   function pickRandomMod(exclude: GravityWellKey | null) {
-    const eligible = GRAVITY_WELL_KEYS.filter(
-      key => key !== exclude && config.modifiers.arena[key].includeInRandom,
-    )
-    const fallback = GRAVITY_WELL_KEYS.filter(key => key !== exclude)
-    const pool =
-      eligible.length > 0
-        ? eligible
-        : fallback.length > 0
-          ? fallback
-          : GRAVITY_WELL_KEYS
+    const pool = buildRandomModPool(exclude ? [exclude] : [])
     return pool[Math.floor(Math.random() * pool.length)]
+  }
+
+  function pickRandomModPair(exclude: GravityWellKey | null): [GravityWellKey, GravityWellKey] {
+    const firstPool = buildRandomModPool(exclude ? [exclude] : [])
+    const first = firstPool[Math.floor(Math.random() * firstPool.length)]
+    const secondPool = buildRandomModPool(
+      [exclude, first].filter((key): key is GravityWellKey => Boolean(key)),
+    )
+    const second = secondPool[Math.floor(Math.random() * secondPool.length)]
+    return [first, second]
+  }
+
+  function buildRandomModPool(excludes: GravityWellKey[]): GravityWellKey[] {
+    const excludeSet = new Set(excludes)
+    const eligible = GRAVITY_WELL_KEYS.filter(
+      key => !excludeSet.has(key) && config.modifiers.arena[key].includeInRandom,
+    )
+    if (eligible.length > 0) return eligible
+
+    const fallback = GRAVITY_WELL_KEYS.filter(key => !excludeSet.has(key))
+    if (fallback.length > 0) return fallback
+
+    return [...GRAVITY_WELL_KEYS]
+  }
+
+  function getModDisplayName(key: GravityWellKey): string {
+    const modifier = config.modifiers.arena[key]
+    if (modifier && typeof modifier.name === 'string' && modifier.name.trim().length > 0) {
+      return modifier.name
+    }
+    return key
   }
 
   function areSidesSwapped(): boolean {
@@ -4200,6 +4335,8 @@ export function createPong(
     }
     ctx.lineWidth = 1
 
+    drawModVotePrompt()
+
     ctx.fillStyle = HIGHLIGHT_COLOR
     ctx.font =
       'bold 28px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto'
@@ -4236,6 +4373,105 @@ export function createPong(
   function drawBallTrails(ballColorHex: string) {
     ballTrailColorHex = ballColorHex
     ballModManager.draw()
+  }
+
+  function drawModVotePrompt() {
+    if (!modVote) return
+
+    const [topKey, bottomKey] = modVote.options
+    const topLabel = getModDisplayName(topKey)
+    const bottomLabel = getModDisplayName(bottomKey)
+
+    const optionFontSize = 48
+    const randomFontSize = 60
+    const optionFont =
+      `800 ${optionFontSize}px 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif`
+    const randomFont =
+      `900 ${randomFontSize}px 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif`
+
+    const centerX = W / 2
+    const centerY = H / 2
+    const spacing = 96
+    const paddingX = 32
+    const paddingY = 18
+    const indicatorSpacing = 42
+    const indicatorRadius = 12
+
+    const entries = [
+      {
+        label: topLabel,
+        y: centerY - spacing,
+        font: optionFont,
+        fontSize: optionFontSize,
+        leftSelected: modVote.leftSelection === 'up',
+        rightSelected: modVote.rightSelection === 'up',
+      },
+      {
+        label: 'Random',
+        y: centerY,
+        font: randomFont,
+        fontSize: randomFontSize,
+        leftSelected: modVote.leftSelection === 'neutral',
+        rightSelected: modVote.rightSelection === 'neutral',
+      },
+      {
+        label: bottomLabel,
+        y: centerY + spacing,
+        font: optionFont,
+        fontSize: optionFontSize,
+        leftSelected: modVote.leftSelection === 'down',
+        rightSelected: modVote.rightSelection === 'down',
+      },
+    ]
+
+    ctx.save()
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+
+    let maxBoxWidth = 0
+    for (const entry of entries) {
+      ctx.font = entry.font
+      const textWidth = ctx.measureText(entry.label).width
+      maxBoxWidth = Math.max(maxBoxWidth, textWidth + paddingX * 2)
+    }
+
+    const baseBackground = 'rgba(15,23,42,0.72)'
+    const highlightBackground = 'rgba(148,163,184,0.28)'
+
+    for (const entry of entries) {
+      ctx.font = entry.font
+      const textWidth = ctx.measureText(entry.label).width
+      const boxWidth = Math.max(maxBoxWidth, textWidth + paddingX * 2)
+      const boxHeight = entry.fontSize + paddingY * 2
+      const boxX = centerX - boxWidth / 2
+      const boxY = entry.y - boxHeight / 2
+      const highlighted = entry.leftSelected || entry.rightSelected
+
+      ctx.fillStyle = highlighted ? highlightBackground : baseBackground
+      ctx.fillRect(boxX, boxY, boxWidth, boxHeight)
+
+      const leftIndicatorX = boxX - indicatorSpacing
+      const rightIndicatorX = boxX + boxWidth + indicatorSpacing
+
+      ctx.beginPath()
+      ctx.fillStyle = entry.leftSelected
+        ? LEFT_PADDLE_EDGE_COLOR
+        : applyAlphaToColor(LEFT_PADDLE_EDGE_COLOR, 0.22)
+      ctx.arc(leftIndicatorX, entry.y, indicatorRadius, 0, Math.PI * 2)
+      ctx.fill()
+
+      ctx.beginPath()
+      ctx.fillStyle = entry.rightSelected
+        ? RIGHT_PADDLE_EDGE_COLOR
+        : applyAlphaToColor(RIGHT_PADDLE_EDGE_COLOR, 0.22)
+      ctx.arc(rightIndicatorX, entry.y, indicatorRadius, 0, Math.PI * 2)
+      ctx.fill()
+
+      ctx.fillStyle = HIGHLIGHT_COLOR
+      ctx.fillText(entry.label, centerX, entry.y)
+    }
+
+    ctx.restore()
   }
 
   function drawAnnouncement() {
