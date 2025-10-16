@@ -14,6 +14,7 @@ export interface ManagedMod {
   onInit?(): void
   onEnabled?(): void
   onDisabled?(): void
+  onAlwaysTick?(dt: number): void
   onTick?(dt: number): void
   onBallStep?(ball: BallLike, dt: number): boolean | void
   onDraw?(): void
@@ -56,6 +57,7 @@ export class ModManager {
   tick(dt: number) {
     this.syncEnabled()
     for (const mod of this.mods) {
+      mod.onAlwaysTick?.(dt)
       if (!this.isModEnabled(mod)) continue
       mod.onTick?.(dt)
     }

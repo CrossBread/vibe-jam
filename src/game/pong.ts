@@ -707,14 +707,10 @@ export function createPong(
 
   let leftPaddleHeight = state.leftPaddleHeight
   let rightPaddleHeight = state.rightPaddleHeight
-  let previousChillyEnabled = config.modifiers.paddle.chilly.enabled
-  let previousApparitionEnabled = config.modifiers.paddle.apparition.enabled
-  let previousOutOfBodyEnabled = config.modifiers.paddle.outOfBody.enabled
-  let previousBendyEnabled = config.modifiers.paddle.bendy.enabled
   let previousLeftSizeMultiplier = getPaddleSizeMultiplier('left')
   let previousRightSizeMultiplier = getPaddleSizeMultiplier('right')
   let previousDoublesEnabled = config.doubles.enabled
-  let previousCharlotteEnabled = config.modifiers.paddle.charlotte.enabled
+  let paddleHeightResetOptions: PaddleHeightOptions = { preserveCenter: true }
 
   const balls: BallState[] = state.balls
   const MAX_ACTIVE_BALLS = 12
@@ -813,12 +809,288 @@ export function createPong(
       slinkyDirection: 0,
     },
   }
-  let previousMissileEnabled = config.modifiers.paddle.missileCommander.enabled
-  let previousFrisbeeEnabled = config.modifiers.paddle.frisbee.enabled
-  let previousDundeeEnabled = config.modifiers.paddle.dundee.enabled
-  let previousAngryEnabled = config.modifiers.paddle.angry.enabled
-  let previousInchwormEnabled = config.modifiers.paddle.inchworm.enabled
-  let previousSlinkyEnabled = config.modifiers.paddle.slinky.enabled
+  const applyDundeeBaseVelocity = () => {
+    const modifier = config.modifiers.paddle.dundee
+    const base = clamp(
+      Number.isFinite(modifier.baseSpeed) ? modifier.baseSpeed : 0,
+      -Math.abs(modifier.maxSpeed || 0),
+      Math.abs(modifier.maxSpeed || 0),
+    )
+    paddleDynamics.left.velocity = base
+    paddleDynamics.right.velocity = base
+  }
+
+  const applyChillyHeights = (
+    modifier = config.modifiers.paddle.chilly,
+    { useResetOptions = false }: { useResetOptions?: boolean } = {},
+  ) => {
+    const leftSettings = getChillySettingsForSide('left', modifier)
+    const rightSettings = getChillySettingsForSide('right', modifier)
+    const options = useResetOptions ? paddleHeightResetOptions : { preserveCenter: true }
+    setPaddleHeight('left', leftSettings.startingHeight, options)
+    setPaddleHeight('right', rightSettings.startingHeight, options)
+  }
+
+  const restoreBasePaddleHeights = ({
+    useResetOptions = false,
+  }: { useResetOptions?: boolean } = {}) => {
+    const options = useResetOptions ? paddleHeightResetOptions : { preserveCenter: true }
+    setPaddleHeight('left', getBasePaddleHeight('left'), options)
+    setPaddleHeight('right', getBasePaddleHeight('right'), options)
+  }
+
+  const clampChillyHeights = (modifier = config.modifiers.paddle.chilly) => {
+    const leftSettings = getChillySettingsForSide('left', modifier)
+    const rightSettings = getChillySettingsForSide('right', modifier)
+    const clampedLeft = clamp(
+      leftPaddleHeight,
+      leftSettings.minimumHeight,
+      leftSettings.startingHeight,
+    )
+    const clampedRight = clamp(
+      rightPaddleHeight,
+      rightSettings.minimumHeight,
+      rightSettings.startingHeight,
+    )
+    if (clampedLeft !== leftPaddleHeight) {
+      setPaddleHeight('left', clampedLeft, { preserveCenter: true })
+    }
+    if (clampedRight !== rightPaddleHeight) {
+      setPaddleHeight('right', clampedRight, { preserveCenter: true })
+    }
+  }
+
+  const paddleModManager = new ModManager([
+    {
+      key: 'chilly',
+      isEnabled: () => Boolean(config.modifiers.paddle.chilly.enabled),
+      onInit() {
+        previousLeftSizeMultiplier = getPaddleSizeMultiplier('left')
+        previousRightSizeMultiplier = getPaddleSizeMultiplier('right')
+      },
+      onEnabled() {
+        applyChillyHeights()
+      },
+      onDisabled() {
+        restoreBasePaddleHeights()
+      },
+      onReset() {
+        previousLeftSizeMultiplier = getPaddleSizeMultiplier('left')
+        previousRightSizeMultiplier = getPaddleSizeMultiplier('right')
+        if (config.modifiers.paddle.chilly.enabled) {
+          applyChillyHeights(undefined, { useResetOptions: true })
+        } else {
+          restoreBasePaddleHeights({ useResetOptions: true })
+        }
+      },
+      onAlwaysTick() {
+        const leftMultiplier = getPaddleSizeMultiplier('left')
+        const rightMultiplier = getPaddleSizeMultiplier('right')
+        const multiplierChanged =
+          leftMultiplier !== previousLeftSizeMultiplier ||
+          rightMultiplier !== previousRightSizeMultiplier
+        const modifier = config.modifiers.paddle.chilly
+        if (modifier.enabled) {
+          if (multiplierChanged) {
+            applyChillyHeights()
+          }
+        } else if (multiplierChanged) {
+          restoreBasePaddleHeights()
+        }
+        previousLeftSizeMultiplier = leftMultiplier
+        previousRightSizeMultiplier = rightMultiplier
+      },
+      onTick() {
+        clampChillyHeights()
+      },
+    },
+    {
+      key: 'missileCommander',
+      isEnabled: () => Boolean(config.modifiers.paddle.missileCommander.enabled),
+      onInit() {
+        resetMissilePaddles()
+      },
+      onEnabled() {
+        resetMissilePaddles()
+        resetPaddleDynamics()
+        centerPaddle('left')
+        centerPaddle('right')
+      },
+      onDisabled() {
+        resetMissilePaddles()
+        resetPaddleDynamics()
+      },
+      onReset() {
+        resetMissilePaddles()
+        resetPaddleDynamics()
+        if (config.modifiers.paddle.missileCommander.enabled) {
+          centerPaddle('left')
+          centerPaddle('right')
+        }
+      },
+    },
+    {
+      key: 'frisbee',
+      isEnabled: () => Boolean(config.modifiers.paddle.frisbee.enabled),
+      onEnabled() {
+        resetPaddleDynamics()
+      },
+      onDisabled() {
+        resetPaddleDynamics()
+      },
+      onReset() {
+        resetPaddleDynamics()
+      },
+    },
+    {
+      key: 'dundee',
+      isEnabled: () => Boolean(config.modifiers.paddle.dundee.enabled),
+      onEnabled() {
+        resetPaddleDynamics()
+        applyDundeeBaseVelocity()
+      },
+      onDisabled() {
+        resetPaddleDynamics()
+      },
+      onReset() {
+        resetPaddleDynamics()
+        if (config.modifiers.paddle.dundee.enabled) {
+          applyDundeeBaseVelocity()
+        }
+      },
+    },
+    {
+      key: 'apparition',
+      isEnabled: () => Boolean(config.modifiers.paddle.apparition.enabled),
+      onEnabled() {
+        resetApparitionStateMap(paddleApparitionStates, config.modifiers.paddle.apparition, {
+          randomize: true,
+        })
+      },
+      onDisabled() {
+        resetApparitionStateMap(paddleApparitionStates, config.modifiers.paddle.apparition, {
+          randomize: false,
+        })
+      },
+      onReset() {
+        resetApparitionStateMap(paddleApparitionStates, config.modifiers.paddle.apparition, {
+          randomize: Boolean(config.modifiers.paddle.apparition.enabled),
+        })
+      },
+    },
+    {
+      key: 'outOfBody',
+      isEnabled: () => Boolean(config.modifiers.paddle.outOfBody.enabled),
+      onEnabled() {
+        resetOutOfBodyTrails(true)
+      },
+      onDisabled() {
+        resetOutOfBodyTrails(true)
+      },
+      onReset() {
+        resetOutOfBodyTrails(true)
+      },
+    },
+    {
+      key: 'bendy',
+      isEnabled: () => Boolean(config.modifiers.paddle.bendy.enabled),
+      onEnabled() {
+        resetBendyState(true)
+      },
+      onDisabled() {
+        resetBendyState(false)
+      },
+      onReset() {
+        resetBendyState(Boolean(config.modifiers.paddle.bendy.enabled))
+      },
+    },
+    {
+      key: 'angry',
+      isEnabled: () => Boolean(config.modifiers.paddle.angry.enabled),
+      onEnabled() {
+        resetAngryState()
+      },
+      onDisabled() {
+        resetAngryState()
+      },
+      onReset() {
+        resetAngryState()
+      },
+    },
+    {
+      key: 'inchworm',
+      isEnabled: () => Boolean(config.modifiers.paddle.inchworm.enabled),
+      onEnabled() {
+        resetInchwormState()
+      },
+      onDisabled() {
+        resetInchwormState({
+          restoreHeight: !config.modifiers.paddle.chilly.enabled,
+        })
+      },
+      onReset() {
+        resetInchwormState()
+      },
+    },
+    {
+      key: 'slinky',
+      isEnabled: () => Boolean(config.modifiers.paddle.slinky.enabled),
+      onEnabled() {
+        resetSlinkyState()
+      },
+      onDisabled() {
+        resetSlinkyState()
+      },
+      onReset() {
+        resetSlinkyState()
+      },
+    },
+    {
+      key: 'charlotte',
+      isEnabled: () => Boolean(config.modifiers.paddle.charlotte.enabled),
+      onEnabled() {
+        resetCharlotteStates()
+      },
+      onDisabled() {
+        resetCharlotteStates()
+      },
+      onReset() {
+        resetCharlotteStates()
+      },
+    },
+    {
+      key: 'osteoWhat',
+      isEnabled: () => Boolean(config.modifiers.paddle.osteoWhat.enabled),
+      onInit() {
+        syncOsteoState(true)
+      },
+      onEnabled() {
+        syncOsteoState(true)
+      },
+      onDisabled() {
+        syncOsteoState(true)
+      },
+      onReset() {
+        syncOsteoState(true)
+      },
+      onTick() {
+        syncOsteoState()
+      },
+    },
+    {
+      key: 'hadron',
+      isEnabled: () => Boolean(config.modifiers.paddle.hadron.enabled),
+      onEnabled() {
+        rearmHadron()
+      },
+      onDisabled() {
+        rearmHadron()
+      },
+      onReset() {
+        rearmHadron()
+      },
+    },
+  ])
 
   const arenaDimensions: ArenaDimensions = { width: W, height: H }
   const divotsState: DivotsState = createDivotsState()
@@ -1272,15 +1544,10 @@ export function createPong(
   let completedBitesSinceLastPoint = 0
   ballModManager.init()
   arenaModManager.init()
+  paddleModManager.init()
   initializeActiveModState()
   resetBallSize()
   initializePaddleHeights(true)
-  resetApparitionStateMap(paddleApparitionStates, config.modifiers.paddle.apparition, {
-    randomize: true,
-  })
-  resetOutOfBodyTrails(true)
-  resetBendyState(config.modifiers.paddle.bendy.enabled)
-  syncPaddleMotionState()
   resetBall(Math.random() < 0.5)
 
   function createBall(toLeft: boolean): BallState {
@@ -1467,16 +1734,12 @@ export function createPong(
     lastEnabledArenaModifiers = new Set<GravityWellKey>(
       getEnabledArenaModifierKeys(config.modifiers.arena),
     )
+    clearKiteTrail(kiteState)
+    clearBumShuffleTrail(bumShuffleState)
+    clearPollokTrail(pollokState)
     rearmHadron()
     syncOsteoState(true)
     initializePaddleHeights(true)
-    resetApparitionStateMap(paddleApparitionStates, config.modifiers.paddle.apparition, {
-      randomize: true,
-    })
-    resetCharlotteStates()
-    resetOutOfBodyTrails(true)
-    resetBendyState(config.modifiers.paddle.bendy.enabled)
-    syncPaddleMotionState()
     modRevealDelayPending = true
     resetBall(Math.random() < 0.5)
   }
@@ -1519,7 +1782,7 @@ export function createPong(
   function tick(dt: number) {
     updateAnnouncement(dt)
     checkModifierAnnouncements()
-    updatePaddleModifierState()
+    updatePaddleModifierState(dt)
 
     const gamepadInput = getGamepadInput()
     const doublesEnabled = Boolean(config.doubles.enabled)
@@ -2017,30 +2280,21 @@ export function createPong(
   }
 
   function initializePaddleHeights(center: boolean) {
-    const { chilly } = config.modifiers.paddle
-    const options: PaddleHeightOptions = { center }
-    if (chilly.enabled) {
-      const leftSettings = getChillySettingsForSide('left', chilly)
-      const rightSettings = getChillySettingsForSide('right', chilly)
-      setPaddleHeight('left', leftSettings.startingHeight, options)
-      setPaddleHeight('right', rightSettings.startingHeight, options)
-      previousChillyEnabled = true
-    } else {
-      setPaddleHeight('left', getBasePaddleHeight('left'), options)
-      setPaddleHeight('right', getBasePaddleHeight('right'), options)
-      previousChillyEnabled = false
-    }
-    previousLeftSizeMultiplier = getPaddleSizeMultiplier('left')
-    previousRightSizeMultiplier = getPaddleSizeMultiplier('right')
+    paddleHeightResetOptions = center ? { center: true } : { preserveCenter: true }
+    restoreBasePaddleHeights({ useResetOptions: true })
+    paddleModManager.reset()
     clampPaddlePosition('left')
     clampPaddlePosition('right')
     state.leftInnerPaddleHeight = state.leftPaddleHeight
     state.rightInnerPaddleHeight = state.rightPaddleHeight
-    state.leftInnerY = state.leftY
-    state.rightInnerY = state.rightY
-    resetMissilePaddles()
-    resetPaddleDynamics()
-    resetCharlotteStates()
+    if (config.doubles.enabled) {
+      state.leftInnerY = clamp(state.leftInnerY, 0, H - state.leftInnerPaddleHeight)
+      state.rightInnerY = clamp(state.rightInnerY, 0, H - state.rightInnerPaddleHeight)
+    } else {
+      state.leftInnerY = state.leftY
+      state.rightInnerY = state.rightY
+    }
+    syncPaddleMotionState()
   }
 
   function syncDoublesState(enabled: boolean) {
@@ -2056,132 +2310,8 @@ export function createPong(
     updateCharlotteAnchors()
   }
 
-  function updatePaddleModifierState() {
-    const modifier = config.modifiers.paddle.chilly
-    const leftMultiplier = getPaddleSizeMultiplier('left')
-    const rightMultiplier = getPaddleSizeMultiplier('right')
-    const multiplierChanged =
-      leftMultiplier !== previousLeftSizeMultiplier || rightMultiplier !== previousRightSizeMultiplier
-
-    if (modifier.enabled) {
-      const leftSettings = getChillySettingsForSide('left', modifier)
-      const rightSettings = getChillySettingsForSide('right', modifier)
-      if (!previousChillyEnabled || multiplierChanged) {
-        setPaddleHeight('left', leftSettings.startingHeight, { preserveCenter: true })
-        setPaddleHeight('right', rightSettings.startingHeight, { preserveCenter: true })
-      } else {
-        const clampedLeft = clamp(
-          leftPaddleHeight,
-          leftSettings.minimumHeight,
-          leftSettings.startingHeight,
-        )
-        const clampedRight = clamp(
-          rightPaddleHeight,
-          rightSettings.minimumHeight,
-          rightSettings.startingHeight,
-        )
-        if (clampedLeft !== leftPaddleHeight) {
-          setPaddleHeight('left', clampedLeft, { preserveCenter: true })
-        }
-        if (clampedRight !== rightPaddleHeight) {
-          setPaddleHeight('right', clampedRight, { preserveCenter: true })
-        }
-      }
-      previousChillyEnabled = true
-    } else {
-      const leftBase = getBasePaddleHeight('left')
-      const rightBase = getBasePaddleHeight('right')
-      if (previousChillyEnabled || leftPaddleHeight !== leftBase || multiplierChanged) {
-        setPaddleHeight('left', leftBase, { preserveCenter: true })
-      }
-      if (previousChillyEnabled || rightPaddleHeight !== rightBase || multiplierChanged) {
-        setPaddleHeight('right', rightBase, { preserveCenter: true })
-      }
-      previousChillyEnabled = false
-    }
-
-    previousLeftSizeMultiplier = leftMultiplier
-    previousRightSizeMultiplier = rightMultiplier
-
-    const missileEnabled = config.modifiers.paddle.missileCommander.enabled
-    if (missileEnabled !== previousMissileEnabled) {
-      resetMissilePaddles()
-      resetPaddleDynamics()
-      if (missileEnabled) {
-        centerPaddle('left')
-        centerPaddle('right')
-      }
-      previousMissileEnabled = missileEnabled
-    }
-
-    const frisbeeEnabled = config.modifiers.paddle.frisbee.enabled
-    if (frisbeeEnabled !== previousFrisbeeEnabled) {
-      resetPaddleDynamics()
-      previousFrisbeeEnabled = frisbeeEnabled
-    }
-
-    const dundeeModifier = config.modifiers.paddle.dundee
-    const dundeeEnabled = dundeeModifier.enabled
-    if (dundeeEnabled !== previousDundeeEnabled) {
-      resetPaddleDynamics()
-      if (dundeeEnabled) {
-        const base = clamp(
-          Number.isFinite(dundeeModifier.baseSpeed) ? dundeeModifier.baseSpeed : 0,
-          -Math.abs(dundeeModifier.maxSpeed || 0),
-          Math.abs(dundeeModifier.maxSpeed || 0),
-        )
-        paddleDynamics.left.velocity = base
-        paddleDynamics.right.velocity = base
-      }
-      previousDundeeEnabled = dundeeEnabled
-    }
-
-    const apparitionEnabled = config.modifiers.paddle.apparition.enabled
-    if (apparitionEnabled !== previousApparitionEnabled) {
-      resetApparitionStateMap(paddleApparitionStates, config.modifiers.paddle.apparition, {
-        randomize: apparitionEnabled,
-      })
-      previousApparitionEnabled = apparitionEnabled
-    }
-
-    const outOfBodyEnabled = config.modifiers.paddle.outOfBody.enabled
-    if (outOfBodyEnabled !== previousOutOfBodyEnabled) {
-      resetOutOfBodyTrails(true)
-      previousOutOfBodyEnabled = outOfBodyEnabled
-    }
-
-    const bendyEnabled = config.modifiers.paddle.bendy.enabled
-    if (bendyEnabled !== previousBendyEnabled) {
-      resetBendyState(bendyEnabled)
-      previousBendyEnabled = bendyEnabled
-    }
-
-    const angryEnabled = config.modifiers.paddle.angry.enabled
-    if (angryEnabled !== previousAngryEnabled) {
-      resetAngryState()
-      previousAngryEnabled = angryEnabled
-    }
-
-    const inchwormEnabled = config.modifiers.paddle.inchworm.enabled
-    if (inchwormEnabled !== previousInchwormEnabled) {
-      resetInchwormState({
-        restoreHeight:
-          !inchwormEnabled && !config.modifiers.paddle.chilly.enabled,
-      })
-      previousInchwormEnabled = inchwormEnabled
-    }
-
-    const slinkyEnabled = config.modifiers.paddle.slinky.enabled
-    if (slinkyEnabled !== previousSlinkyEnabled) {
-      resetSlinkyState()
-      previousSlinkyEnabled = slinkyEnabled
-    }
-
-    const charlotteEnabled = config.modifiers.paddle.charlotte.enabled
-    if (charlotteEnabled !== previousCharlotteEnabled) {
-      resetCharlotteStates()
-      previousCharlotteEnabled = charlotteEnabled
-    }
+  function updatePaddleModifierState(dt: number) {
+    paddleModManager.tick(dt)
 
     clampPaddlePosition('left')
     clampPaddlePosition('right')
@@ -2195,12 +2325,6 @@ export function createPong(
     } else {
       state.leftInnerY = state.leftY
       state.rightInnerY = state.rightY
-    }
-
-    syncOsteoState()
-
-    if (!config.modifiers.paddle.hadron.enabled) {
-      rearmHadron()
     }
   }
 
