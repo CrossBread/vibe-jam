@@ -21,6 +21,7 @@ import { createMinesweeperModifier } from './minesweeper/minesweeperEditor'
 import { createSuperMassiveModifier } from './superMassive/superMassiveEditor'
 import { createWhiteDwarfModifier } from './whiteDwarf/whiteDwarfEditor'
 import { createJupiterModifier } from './jupiter/jupiterEditor'
+import { createThreeBodyProblemModifier } from './threeBodyProblem/threeBodyProblemEditor'
 import { createMadHatterModifier } from './madHatter/madHatterEditor'
 import { createWormholeModifier } from './wormhole/wormholeEditor'
 import { createVortexModifier } from './vortex/vortexEditor'
@@ -37,6 +38,7 @@ export const arenaModifierBuilders: ArenaBuilderMap = {
   ceres: createCeresModifier,
   superMassive: createSuperMassiveModifier,
   jupiter: createJupiterModifier,
+  threeBodyProblem: createThreeBodyProblemModifier,
   whiteDwarf: createWhiteDwarfModifier,
   divots: createDivotsModifier,
   fogOfWar: createFogOfWarModifier,

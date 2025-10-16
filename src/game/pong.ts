@@ -40,6 +40,10 @@ import { getWhiteDwarfWells } from './mods/arena/whiteDwarf/whiteDwarfView'
 import { createFogOfWarMod, type FogOfWarMod } from './mods/arena/fogOfWar/fogOfWarModifier'
 import { createWonderlandMod, type WonderlandMod } from './mods/arena/wonderland/wonderlandModifier'
 import { createJupiterMod, type JupiterMod } from './mods/arena/jupiter/jupiterModifier'
+import {
+  createThreeBodyProblemMod,
+  type ThreeBodyProblemMod,
+} from './mods/arena/threeBodyProblem/threeBodyProblemModifier'
 import { createSecondChancesMod, type SecondChancesMod } from './mods/arena/secondChances/secondChancesModifier'
 import { createSpaceInvadersMod, type SpaceInvadersMod } from './mods/arena/spaceInvaders/spaceInvadersModifier'
 import { createMinesweeperMod, type MinesweeperMod } from './mods/arena/minesweeper/minesweeperModifier'
@@ -1024,6 +1028,11 @@ export function createPong(
     getArenaDimensions: () => arenaDimensions,
   })
 
+  const threeBodyProblemMod: ThreeBodyProblemMod = createThreeBodyProblemMod({
+    getModifier: () => config.modifiers.arena.threeBodyProblem,
+    getArenaDimensions: () => arenaDimensions,
+  })
+
   const divotsMod: DivotsMod = createDivotsMod({
     getModifier: () => config.modifiers.arena.divots,
     getArenaDimensions: () => arenaDimensions,
@@ -1144,6 +1153,7 @@ export function createPong(
     gopherMod,
     ceresMod,
     jupiterMod,
+    threeBodyProblemMod,
     divotsMod,
     irelandMod,
     drinkMeMod,
@@ -3201,6 +3211,9 @@ export function createPong(
           break
         case 'jupiter':
           wells.push(...jupiterMod.getActiveWells())
+          break
+        case 'threeBodyProblem':
+          wells.push(...threeBodyProblemMod.getActiveWells())
           break
         case 'whiteDwarf':
           wells.push(...getWhiteDwarfWells(arena.whiteDwarf, arenaDimensions))

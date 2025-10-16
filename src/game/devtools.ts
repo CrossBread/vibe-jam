@@ -11,6 +11,7 @@ export const GRAVITY_WELL_KEYS = [
   'ceres',
   'superMassive',
   'jupiter',
+  'threeBodyProblem',
   'whiteDwarf',
   'divots',
   'fogOfWar',
@@ -83,6 +84,16 @@ export interface GravityWellModifier extends ModifierBase {
   snowOpacity?: number
 }
 
+export interface ThreeBodyProblemModifier extends GravityWellModifier {
+  orbitGravityStrength: number
+  orbitGravityFalloff: number
+  orbitRadius: number
+  orbitDistance: number
+  orbitSpeed: number
+  orbitPositiveTint: string
+  orbitNegativeTint: string
+}
+
 export interface PaddlePotionModifier extends GravityWellModifier {
   objectRadius?: number
   spawnCount?: number
@@ -96,7 +107,11 @@ export interface DrinkMeModifier extends PaddlePotionModifier {}
 export interface TeaPartyModifier extends PaddlePotionModifier {}
 
 export type ArenaModifiers = {
-  [K in GravityWellKey]: K extends 'searchLight' ? SearchLightModifier : GravityWellModifier
+  [K in GravityWellKey]: K extends 'searchLight'
+    ? SearchLightModifier
+    : K extends 'threeBodyProblem'
+      ? ThreeBodyProblemModifier
+      : GravityWellModifier
 }
 
 export interface SecondChancesModifier extends GravityWellModifier {

@@ -114,6 +114,24 @@
         "negativeTint": "#fed7aa",
         "includeInRandom": true
       },
+      "threeBodyProblem": {
+        "name": "Three Body Problem",
+        "description": "Solar core with an orbiting planetary gravity sink",
+        "enabled": false,
+        "includeInRandom": true,
+        "gravityStrength": 6200000,
+        "gravityFalloff": 126,
+        "radius": 72,
+        "positiveTint": "#facc15",
+        "negativeTint": "#fde047",
+        "orbitGravityStrength": 4200000,
+        "orbitGravityFalloff": 94,
+        "orbitRadius": 38,
+        "orbitDistance": 180,
+        "orbitSpeed": 0.9,
+        "orbitPositiveTint": "#38bdf8",
+        "orbitNegativeTint": "#bae6fd"
+      },
       "divots": {
         "name": "Divots",
         "description": "A fresh crater spawns with every paddle return",
