@@ -65,6 +65,16 @@ import {
   type ApparitionState,
 } from './mods/paddle/apparition/apparitionModifier'
 import { getApparitionOpacity } from './mods/paddle/apparition/apparitionView'
+import {
+  applyOsteoDamageFromSegment,
+  buildOsteoSegments as buildOsteoWhatSegments,
+  createOsteoRuntimeState,
+  getOsteoColorPalette,
+  getOsteoSegmentFillColor,
+  syncOsteoRuntimeState,
+  type OsteoColorPalette,
+  type OsteoLane,
+} from './mods/paddle/osteoWhat/osteoWhatView'
 
 export interface PongState {
   leftScore: number
@@ -154,7 +164,7 @@ interface BallState {
   portalCooldown: number
 }
 
-type PaddleLane = 'outer' | 'inner' | 'missile'
+type PaddleLane = OsteoLane
 
 interface PhysicalPaddle {
   side: 'left' | 'right'
@@ -175,6 +185,7 @@ interface PaddleSegment {
   osteoIndex?: number
   cracked?: boolean
   broken?: boolean
+  osteoDamageRatio?: number
 }
 
 type CharlotteAnchor = 'top' | 'bottom' | null
@@ -208,11 +219,6 @@ interface BendyState {
   intensity: number
   amplitude: number
   wave: number
-}
-
-interface OsteoSegmentState {
-  hits: number
-  broken: boolean
 }
 
 interface ActiveMissilePaddle {
@@ -660,10 +666,7 @@ export function createPong(
   const balls: BallState[] = state.balls
   const MAX_ACTIVE_BALLS = 12
   const hadronStatus: Record<'left' | 'right', boolean> = { left: true, right: true }
-  const osteoStates: Record<'left' | 'right', Record<PaddleLane, OsteoSegmentState[]>> = {
-    left: { outer: [], inner: [], missile: [] },
-    right: { outer: [], inner: [], missile: [] },
-  }
+  const osteoRuntime = createOsteoRuntimeState()
   const charlotteStates: Record<'left' | 'right', Record<PaddleLane, CharlotteWebState>> = {
     left: {
       outer: createCharlotteState(),
@@ -676,7 +679,6 @@ export function createPong(
       missile: createCharlotteState(),
     },
   }
-  let previousOsteoSignature: string | null = null
   const missilePaddles: ActiveMissilePaddle[] = []
   const missileCooldowns: Record<'left' | 'right', number> = { left: 0, right: 0 }
   type InchwormPhase = 'idle' | 'contracting' | 'contracted' | 'extending'
@@ -1862,26 +1864,6 @@ export function createPong(
     handleHadronSplit(side, ball)
   }
 
-  function applyOsteoDamage(segment: PaddleSegment) {
-    const modifier = config.modifiers.paddle.osteoWhat
-    if (!modifier.enabled) return
-    if (segment.osteoIndex === undefined) return
-
-    const states = osteoStates[segment.paddle.side][segment.paddle.lane]
-    const state = states[segment.osteoIndex]
-    if (!state || state.broken) return
-
-    const rawThreshold = Number.isFinite(modifier.hitsBeforeBreak)
-      ? Math.floor(modifier.hitsBeforeBreak)
-      : 2
-    const threshold = Math.max(1, rawThreshold)
-
-    state.hits += 1
-    if (state.hits >= threshold) {
-      state.broken = true
-    }
-  }
-
   function handleHadronSplit(side: 'left' | 'right', ball: BallState) {
     const modifier = config.modifiers.paddle.hadron
     if (!modifier.enabled) return
@@ -2311,6 +2293,7 @@ export function createPong(
     baseHex: string,
     crackedColor: string,
     tailOpacity: number,
+    osteoColors: OsteoColorPalette,
   ) {
     const modifier = config.modifiers.paddle.outOfBody
     if (!modifier.enabled) return
@@ -2347,7 +2330,8 @@ export function createPong(
       ctx.globalAlpha = alpha
       for (const segment of segments) {
         if (segment.height <= 0 || segment.broken) continue
-        const fillColor = segment.cracked ? crackedColor : baseHex
+        const osteoFill = getOsteoSegmentFillColor(segment, osteoColors)
+        const fillColor = osteoFill ?? (segment.cracked ? crackedColor : baseHex)
         const offset = getBendyOffset(segment.paddle, segment)
         const rectX = segment.x + offset
         ctx.fillStyle = fillColor
@@ -3134,56 +3118,8 @@ export function createPong(
     hadronStatus.right = true
   }
 
-  function ensureOsteoArrayLength(target: OsteoSegmentState[], length: number) {
-    if (target.length > length) {
-      target.length = length
-      return
-    }
-    while (target.length < length) {
-      target.push({ hits: 0, broken: false })
-    }
-  }
-
   function syncOsteoState(forceReset = false) {
-    const modifier = config.modifiers.paddle.osteoWhat
-    if (!modifier.enabled) {
-      osteoStates.left.outer = []
-      osteoStates.left.inner = []
-      osteoStates.left.missile = []
-      osteoStates.right.outer = []
-      osteoStates.right.inner = []
-      osteoStates.right.missile = []
-      previousOsteoSignature = null
-      return
-    }
-
-    const rawCount = Number.isFinite(modifier.segmentCount)
-      ? Math.floor(modifier.segmentCount)
-      : 6
-    const segmentCount = Math.max(1, rawCount)
-    const rawHits = Number.isFinite(modifier.hitsBeforeBreak)
-      ? Math.floor(modifier.hitsBeforeBreak)
-      : 2
-    const hitsBeforeBreak = Math.max(1, rawHits)
-    const signature = `${segmentCount}:${hitsBeforeBreak}`
-
-    if (forceReset || signature !== previousOsteoSignature) {
-      previousOsteoSignature = signature
-      const createSegments = () =>
-        Array.from({ length: segmentCount }, () => ({ hits: 0, broken: false }))
-      osteoStates.left.outer = createSegments()
-      osteoStates.left.inner = createSegments()
-      osteoStates.left.missile = []
-      osteoStates.right.outer = createSegments()
-      osteoStates.right.inner = createSegments()
-      osteoStates.right.missile = []
-      return
-    }
-
-    ensureOsteoArrayLength(osteoStates.left.outer, segmentCount)
-    ensureOsteoArrayLength(osteoStates.left.inner, segmentCount)
-    ensureOsteoArrayLength(osteoStates.right.outer, segmentCount)
-    ensureOsteoArrayLength(osteoStates.right.inner, segmentCount)
+    syncOsteoRuntimeState(osteoRuntime, config.modifiers.paddle.osteoWhat, forceReset)
   }
 
   function setPaddleHeight(
@@ -3818,7 +3754,7 @@ export function createPong(
 
     const osteoModifier = config.modifiers.paddle.osteoWhat
     if (osteoModifier.enabled) {
-      return buildOsteoSegments(paddle, osteoModifier)
+      return buildOsteoWhatSegments(osteoRuntime, paddle, osteoModifier, PADDLE_W)
     }
 
     let segments: PaddleSegment[] = [baseSegment]
@@ -4053,53 +3989,6 @@ export function createPong(
     ]
   }
 
-  function buildOsteoSegments(
-    paddle: PhysicalPaddle,
-    modifier: { segmentCount: number; gapSize: number },
-  ): PaddleSegment[] {
-    const rawCount = Number.isFinite(modifier.segmentCount)
-      ? Math.floor(modifier.segmentCount)
-      : 6
-    const segmentCount = Math.max(1, rawCount)
-    const gap = Number.isFinite(modifier.gapSize) ? Math.max(0, modifier.gapSize) : 0
-    const states = osteoStates[paddle.side][paddle.lane]
-    ensureOsteoArrayLength(states, segmentCount)
-
-    const segments: PaddleSegment[] = []
-    let y = paddle.y
-
-    for (let i = 0; i < segmentCount; i++) {
-      const remainingSegments = segmentCount - i
-      const remainingHeight = Math.max(paddle.y + paddle.height - y, 0)
-      const gapSpace = i < segmentCount - 1 ? gap : 0
-      const height = remainingSegments > 0
-        ? Math.max(0, (remainingHeight - gapSpace * (remainingSegments - 1)) / remainingSegments)
-        : 0
-
-      if (height <= 0) {
-        y += gap
-        continue
-      }
-
-      const state = states[i]
-      segments.push({
-        paddle,
-        index: i,
-        x: paddle.x,
-        y,
-        width: PADDLE_W,
-        height,
-        osteoIndex: i,
-        cracked: !state?.broken && (state?.hits ?? 0) > 0,
-        broken: Boolean(state?.broken),
-      })
-
-      y += height + gap
-    }
-
-    return segments
-  }
-
   function updateRussianRouletteOpacity(
     ball: BallState,
     paddles: PhysicalPaddle[],
@@ -4200,7 +4089,7 @@ export function createPong(
     }
 
     if (segment.osteoIndex !== undefined) {
-      applyOsteoDamage(segment)
+      applyOsteoDamageFromSegment(osteoRuntime, segment, config.modifiers.paddle.osteoWhat)
     }
 
     handlePaddleReturn(segment.paddle.side, ball)
@@ -4306,6 +4195,8 @@ export function createPong(
     const hadronModifier = config.modifiers.paddle.hadron
     const charlotteModifier = config.modifiers.paddle.charlotte
     const charlotteEnabled = charlotteModifier.enabled
+    const osteoModifier = config.modifiers.paddle.osteoWhat
+    const osteoColors = getOsteoColorPalette(osteoModifier)
     for (const paddle of paddlesToDraw) {
       const segments = buildPaddleSegments(paddle)
       const baseHex = charlotteEnabled
@@ -4321,7 +4212,7 @@ export function createPong(
 
       const tailOpacity = getPaddleOpacity(paddle)
       if (config.modifiers.paddle.outOfBody.enabled && paddle.lane !== 'missile') {
-        drawOutOfBodyTrail(paddle, baseHex, crackedColor, tailOpacity)
+        drawOutOfBodyTrail(paddle, baseHex, crackedColor, tailOpacity, osteoColors)
       }
 
       if (tailOpacity <= 0) continue
@@ -4334,7 +4225,8 @@ export function createPong(
       ctx.globalAlpha = tailOpacity
       for (const segment of segments) {
         if (segment.height <= 0 || segment.broken) continue
-        const fillColor = segment.cracked ? crackedColor : baseHex
+        const osteoFill = getOsteoSegmentFillColor(segment, osteoColors)
+        const fillColor = osteoFill ?? (segment.cracked ? crackedColor : baseHex)
         const offset = getBendyOffset(paddle, segment)
         const rectX = segment.x + offset
         ctx.fillStyle = fillColor

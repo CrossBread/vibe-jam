@@ -436,6 +436,8 @@
         "gapSize": 6,
         "hitsBeforeBreak": 2,
         "paddleSizeMultiplier": 1,
+        "strongColor": "#f1f5f9",
+        "weakColor": "#475569",
         "includeInRandom": true
       },
       "brokePhysics": {

@@ -222,6 +222,8 @@ export interface OsteoWhatModifier extends ModifierBase {
   gapSize: number
   hitsBeforeBreak: number
   paddleSizeMultiplier: number
+  strongColor: string
+  weakColor: string
 }
 
 export interface BrokePhysicsModifier extends ModifierBase {

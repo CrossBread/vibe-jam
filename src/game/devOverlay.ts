@@ -1503,7 +1503,9 @@ function isOsteoWhatModifier(value: unknown): value is OsteoWhatModifier {
     typeof candidate.segmentCount === 'number' &&
     typeof candidate.gapSize === 'number' &&
     typeof candidate.hitsBeforeBreak === 'number' &&
-    typeof candidate.paddleSizeMultiplier === 'number'
+    typeof candidate.paddleSizeMultiplier === 'number' &&
+    typeof candidate.strongColor === 'string' &&
+    typeof candidate.weakColor === 'string'
   )
 }
 

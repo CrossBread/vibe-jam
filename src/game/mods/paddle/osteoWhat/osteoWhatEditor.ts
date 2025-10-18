@@ -4,7 +4,7 @@
 
 import type { OsteoWhatModifier } from '../../../devtools'
 import type { ModifierBuilder } from '../../shared'
-import { createSliderControl } from '../../shared'
+import { createColorControl, createSliderControl } from '../../shared'
 
 export const createOsteoWhatModifier: ModifierBuilder<OsteoWhatModifier> = ({
   modifier,
@@ -48,6 +48,18 @@ export const createOsteoWhatModifier: ModifierBuilder<OsteoWhatModifier> = ({
         step: 1,
         format: v => `${Math.round(v)} hits`,
         onInput: v => (modifier.hitsBeforeBreak = v),
+      }),
+    )
+
+    body.appendChild(
+      createColorControl('Strong Segment Color', modifier.strongColor, value => {
+        modifier.strongColor = value
+      }),
+    )
+
+    body.appendChild(
+      createColorControl('Weak Segment Color', modifier.weakColor, value => {
+        modifier.weakColor = value
       }),
     )
   })
