@@ -4058,7 +4058,9 @@ export function createPong(
     const top = segment.y
     const bottom = segment.y + segment.height
     const radius = ball.radius
-    const cushion = PADDLE_COLLISION_CUSHION
+    const cushion = shouldApplyEdgeHitCushion(segment.paddle)
+      ? PADDLE_COLLISION_CUSHION
+      : 0
     const ballTop = ball.y - radius
     const ballBottom = ball.y + radius
     if (ballBottom <= top - cushion || ballTop >= bottom + cushion) return false
@@ -4094,6 +4096,14 @@ export function createPong(
 
     handlePaddleReturn(segment.paddle.side, ball)
     return true
+  }
+
+  function shouldApplyEdgeHitCushion(paddle: PhysicalPaddle): boolean {
+    return isHumanControlledTeam(paddle.side)
+  }
+
+  function isHumanControlledTeam(side: 'left' | 'right'): boolean {
+    return side === 'left' ? !leftAIEnabled : !rightAIEnabled
   }
 
   function computeDeflectionAngle(
