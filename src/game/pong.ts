@@ -15,9 +15,16 @@ import {
   type SpaceInvadersModifier,
   type MinesweeperModifier,
 } from './devtools'
-import { createDevOverlay, showOverlay, toggleOverlay } from './devOverlay'
+import {
+  DEV_OVERLAY_STATS_TOGGLE_EVENT,
+  createDevOverlay,
+  showOverlay,
+  toggleOverlay,
+  type DevOverlayStatsToggleDetail,
+} from './devOverlay'
 import type { RGBColor } from './mods/ball/shared'
 import { clampByte } from './mods/ball/shared'
+import { createPerformanceStatsTracker } from './performanceStats'
 import { createBumShuffleMod, type BumShuffleMod } from './mods/ball/bumShuffle/bumShuffleModifier'
 import { createKiteMod, type KiteMod } from './mods/ball/kite/kiteModifier'
 import { createPollokMod, type PollokMod } from './mods/ball/pollok/pollokModifier'
@@ -280,6 +287,14 @@ export function createPong(
   const overlay = createDevOverlay(config, defaults, {
     onDockChange: () => syncOverlayLayout(),
   })
+
+  const performanceTracker = createPerformanceStatsTracker({ overlay })
+
+  overlay.addEventListener(DEV_OVERLAY_STATS_TOGGLE_EVENT, event => {
+    const detail = (event as CustomEvent<DevOverlayStatsToggleDetail>).detail
+    performanceTracker.setEnabled(Boolean(detail?.enabled))
+  })
+
   container?.appendChild(overlay)
   syncOverlayLayout()
 
@@ -1432,8 +1447,10 @@ export function createPong(
   let last = performance.now()
 
   function loop(now: number) {
-    const dt = Math.min(1 / 30, (now - last) / 1000)
+    const frameDurationMs = Math.max(0, now - last)
+    const dt = Math.min(1 / 30, frameDurationMs / 1000)
     last = now
+    performanceTracker.recordFrame(frameDurationMs, now)
     tick(dt)
     draw()
     requestAnimationFrame(loop)

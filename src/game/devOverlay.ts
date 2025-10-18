@@ -46,6 +46,31 @@ import {
   type CreateModifierDetails,
 } from './mods/shared'
 
+export const DEV_OVERLAY_STATS_TOGGLE_EVENT = 'devtools:stats-toggle'
+
+export interface DevOverlayStatsToggleDetail {
+  enabled: boolean
+}
+
+export interface DevOverlayStatsSnapshot {
+  averageFps: number
+  averageFrameTime: number
+  onePercentLowFps: number
+  longFrameShare: number
+  longFrameThresholdMs: number
+  worstFrameTime: number
+  sampleCount: number
+}
+
+export interface DevOverlayApi {
+  setStatsEnabled(enabled: boolean): void
+  updateStats(stats: DevOverlayStatsSnapshot | null): void
+}
+
+export type DevOverlayElement = HTMLDivElement & {
+  __devtools?: DevOverlayApi
+}
+
 let devOverlayStylesInjected = false
 
 interface DevOverlayOptions {
@@ -215,6 +240,97 @@ function ensureDevOverlayStyles() {
     .dev-overlay__value {
       font-variant-numeric: tabular-nums;
       color: rgba(226, 232, 240, 0.85);
+    }
+    .dev-overlay__card {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 14px;
+      border-radius: 12px;
+      background: rgba(30, 41, 59, 0.55);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+    }
+    .dev-overlay__card--active {
+      border-color: rgba(96, 165, 250, 0.55);
+      box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.15);
+    }
+    .dev-overlay__card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .dev-overlay__card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(226, 232, 240, 0.92);
+    }
+    .dev-overlay__card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .dev-overlay__card-empty {
+      margin: 0;
+      font-size: 12px;
+      color: rgba(226, 232, 240, 0.75);
+    }
+    .dev-overlay__card-meta {
+      font-size: 11px;
+      color: rgba(148, 163, 184, 0.9);
+    }
+    .dev-overlay__card-hint {
+      font-size: 11px;
+      color: rgba(148, 163, 184, 0.75);
+    }
+    .dev-overlay__metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .dev-overlay__metric {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.55);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+    }
+    .dev-overlay__metric-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(148, 163, 184, 0.85);
+    }
+    .dev-overlay__metric-value {
+      font-size: 18px;
+      font-weight: 600;
+      color: rgba(226, 232, 240, 0.95);
+      font-variant-numeric: tabular-nums;
+    }
+    .dev-overlay__metric-description {
+      font-size: 11px;
+      color: rgba(148, 163, 184, 0.8);
+    }
+    .dev-overlay__toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: rgba(226, 232, 240, 0.85);
+      cursor: pointer;
+    }
+    .dev-overlay__toggle-input {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+    .dev-overlay__toggle-status {
+      font-weight: 600;
+      color: rgba(96, 165, 250, 0.9);
+      font-variant-numeric: tabular-nums;
     }
     .dev-overlay__section {
       display: flex;
@@ -413,10 +529,10 @@ export function createDevOverlay(
   config: DevConfig,
   defaults: DevConfig,
   options: DevOverlayOptions = {},
-): HTMLDivElement {
+): DevOverlayElement {
   ensureDevOverlayStyles()
 
-  const overlay = document.createElement('div')
+  const overlay = document.createElement('div') as DevOverlayElement
   overlay.className = 'dev-overlay'
   overlay.setAttribute('aria-hidden', 'true')
 
@@ -470,6 +586,241 @@ export function createDevOverlay(
 
   const content = document.createElement('div')
   content.className = 'dev-overlay__content'
+
+  type MetricKey =
+    | 'averageFps'
+    | 'averageFrameTime'
+    | 'onePercentLowFps'
+    | 'longFrameShare'
+
+  const statsCard = document.createElement('section')
+  statsCard.className = 'dev-overlay__card'
+
+  const statsHeader = document.createElement('div')
+  statsHeader.className = 'dev-overlay__card-header'
+
+  const statsTitle = document.createElement('div')
+  statsTitle.className = 'dev-overlay__card-title'
+  statsTitle.textContent = 'Performance Stats'
+
+  const statsToggle = document.createElement('label')
+  statsToggle.className = 'dev-overlay__toggle'
+
+  const statsToggleInput = document.createElement('input')
+  statsToggleInput.type = 'checkbox'
+  statsToggleInput.className = 'dev-overlay__toggle-input'
+  statsToggleInput.title = 'Enable performance stats'
+  statsToggleInput.setAttribute('aria-label', 'Enable performance stats')
+
+  const statsToggleLabel = document.createElement('span')
+  statsToggleLabel.textContent = 'Show stats'
+
+  const statsToggleStatus = document.createElement('span')
+  statsToggleStatus.className = 'dev-overlay__toggle-status'
+
+  statsToggle.appendChild(statsToggleInput)
+  statsToggle.appendChild(statsToggleLabel)
+  statsToggle.appendChild(statsToggleStatus)
+
+  statsHeader.appendChild(statsTitle)
+  statsHeader.appendChild(statsToggle)
+
+  const statsBody = document.createElement('div')
+  statsBody.className = 'dev-overlay__card-body'
+
+  const statsMetrics = document.createElement('div')
+  statsMetrics.className = 'dev-overlay__metrics'
+  statsMetrics.hidden = true
+
+  const metricValueElements = {} as Record<MetricKey, HTMLSpanElement>
+  let longFrameLabelEl: HTMLSpanElement | null = null
+
+  const metricsConfig: Array<{
+    key: MetricKey
+    label: string
+    description: string
+  }> = [
+    {
+      key: 'averageFps',
+      label: 'Average FPS',
+      description: 'Rolling window',
+    },
+    {
+      key: 'averageFrameTime',
+      label: 'Avg Frame Time',
+      description: 'Milliseconds',
+    },
+    {
+      key: 'onePercentLowFps',
+      label: '1% Low FPS',
+      description: '99th percentile',
+    },
+    {
+      key: 'longFrameShare',
+      label: 'Long Frames (> 20 ms)',
+      description: 'Share of slow frames',
+    },
+  ]
+
+  for (const metric of metricsConfig) {
+    const metricEl = document.createElement('div')
+    metricEl.className = 'dev-overlay__metric'
+
+    const metricLabel = document.createElement('span')
+    metricLabel.className = 'dev-overlay__metric-label'
+    metricLabel.textContent = metric.label
+    if (metric.key === 'longFrameShare') {
+      longFrameLabelEl = metricLabel
+    }
+
+    const metricValue = document.createElement('span')
+    metricValue.className = 'dev-overlay__metric-value'
+    metricValue.textContent = '–'
+
+    const metricDescription = document.createElement('span')
+    metricDescription.className = 'dev-overlay__metric-description'
+    metricDescription.textContent = metric.description
+
+    metricEl.appendChild(metricLabel)
+    metricEl.appendChild(metricValue)
+    metricEl.appendChild(metricDescription)
+    statsMetrics.appendChild(metricEl)
+
+    metricValueElements[metric.key] = metricValue
+  }
+
+  const statsEmpty = document.createElement('p')
+  statsEmpty.className = 'dev-overlay__card-empty'
+  statsEmpty.textContent = 'Performance stats are disabled.'
+
+  const statsMeta = document.createElement('div')
+  statsMeta.className = 'dev-overlay__card-meta'
+  statsMeta.hidden = true
+
+  const statsHint = document.createElement('div')
+  statsHint.className = 'dev-overlay__card-hint'
+  statsHint.textContent =
+    'Rolling window: last 240 frames (~4s). Frame budget (60fps): 16.7 ms.'
+
+  statsBody.appendChild(statsMetrics)
+  statsBody.appendChild(statsEmpty)
+  statsBody.appendChild(statsMeta)
+  statsBody.appendChild(statsHint)
+
+  statsCard.appendChild(statsHeader)
+  statsCard.appendChild(statsBody)
+
+  let statsEnabled = false
+  let hasStatsData = false
+
+  function formatNumber(value: number, fractionDigits: number) {
+    if (!Number.isFinite(value)) return '–'
+    return value.toFixed(fractionDigits)
+  }
+
+  function renderStats(stats: DevOverlayStatsSnapshot | null) {
+    if (!statsEnabled) {
+      hasStatsData = false
+      statsMetrics.hidden = true
+      statsMeta.hidden = true
+      statsMeta.textContent = ''
+      statsEmpty.hidden = false
+      statsEmpty.textContent = 'Performance stats are disabled.'
+      return
+    }
+
+    if (!stats) {
+      hasStatsData = false
+      statsMetrics.hidden = true
+      statsMeta.hidden = true
+      statsMeta.textContent = ''
+      statsEmpty.hidden = false
+      statsEmpty.textContent = 'Collecting samples…'
+      return
+    }
+
+    hasStatsData = true
+    statsMetrics.hidden = false
+    statsEmpty.hidden = true
+    statsMeta.hidden = false
+
+    metricValueElements.averageFps.textContent = formatNumber(stats.averageFps, 1)
+    metricValueElements.averageFrameTime.textContent = `${formatNumber(stats.averageFrameTime, 1)} ms`
+    metricValueElements.onePercentLowFps.textContent = formatNumber(
+      stats.onePercentLowFps,
+      1,
+    )
+    metricValueElements.longFrameShare.textContent = `${formatNumber(
+      stats.longFrameShare,
+      1,
+    )}%`
+
+    if (longFrameLabelEl) {
+      longFrameLabelEl.textContent = `Long Frames (> ${formatNumber(
+        stats.longFrameThresholdMs,
+        1,
+      )} ms)`
+    }
+
+    statsMeta.textContent = `Samples: ${stats.sampleCount} • Worst: ${formatNumber(
+      stats.worstFrameTime,
+      1,
+    )} ms`
+  }
+
+  function setStatsEnabled(
+    next: boolean,
+    { emitEvent = false }: { emitEvent?: boolean } = {},
+  ) {
+    const stateChanged = statsEnabled !== next
+    statsEnabled = next
+    statsToggleInput.checked = next
+    statsToggleStatus.textContent = next ? 'On' : 'Off'
+    statsCard.classList.toggle('dev-overlay__card--active', next)
+
+    if (!next) {
+      hasStatsData = false
+      statsMetrics.hidden = true
+      statsMeta.hidden = true
+      statsMeta.textContent = ''
+      statsEmpty.hidden = false
+      statsEmpty.textContent = 'Performance stats are disabled.'
+    } else if (!hasStatsData) {
+      statsMetrics.hidden = true
+      statsMeta.hidden = true
+      statsMeta.textContent = ''
+      statsEmpty.hidden = false
+      statsEmpty.textContent = 'Collecting samples…'
+    }
+
+    if (emitEvent && stateChanged) {
+      overlay.dispatchEvent(
+        new CustomEvent<DevOverlayStatsToggleDetail>(
+          DEV_OVERLAY_STATS_TOGGLE_EVENT,
+          {
+            detail: { enabled: next },
+            bubbles: true,
+          },
+        ),
+      )
+    }
+  }
+
+  statsToggleInput.addEventListener('change', () => {
+    setStatsEnabled(statsToggleInput.checked, { emitEvent: true })
+  })
+
+  const devtoolsApi: DevOverlayApi = {
+    setStatsEnabled: value => setStatsEnabled(value),
+    updateStats: stats => renderStats(stats),
+  }
+
+  overlay.__devtools = devtoolsApi
+
+  setStatsEnabled(false)
+  renderStats(null)
+
+  content.appendChild(statsCard)
 
   const controls = document.createElement('div')
   controls.className = 'dev-overlay__controls'
