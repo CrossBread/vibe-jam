@@ -258,6 +258,8 @@ export function createPong(
   const BUM_SHUFFLE_DISTANCE_SQ = 4
   const POLLOK_DISTANCE_SQ = 9
   const MAX_GRAVITY_VISUAL_STRENGTH = 8_000_000
+  const GOAL_ZONE_INDICATOR_COLOR = '#f97316'
+  const GOAL_ZONE_INDICATOR_WIDTH = 4
   const ARENA_BACKGROUND_RGB = hexToRgb(ARENA_BACKGROUND)
   const BLACK_RGB: RGBColor = { r: 0, g: 0, b: 0 }
   const WHITE_RGB: RGBColor = { r: 255, g: 255, b: 255 }
@@ -325,6 +327,23 @@ export function createPong(
   let pendingModVoteCount = 0
   let nextModVoteExclude: GravityWellKey | null = null
   let modVote: ModVoteState | null = null
+
+  interface ModVoteInputState {
+    upRequested: boolean
+    downRequested: boolean
+  }
+
+  const modVoteInputStates: Record<'left' | 'right', ModVoteInputState> = {
+    left: { upRequested: false, downRequested: false },
+    right: { upRequested: false, downRequested: false },
+  }
+
+  function resetModVoteInputState() {
+    modVoteInputStates.left.upRequested = false
+    modVoteInputStates.left.downRequested = false
+    modVoteInputStates.right.upRequested = false
+    modVoteInputStates.right.downRequested = false
+  }
 
   interface GamepadInput {
     leftAxis: number
@@ -1578,6 +1597,11 @@ export function createPong(
 
     ballModManager.syncEnabled()
 
+    let realBallsRemaining = 0
+    for (const ball of balls) {
+      if (ball.isReal) realBallsRemaining += 1
+    }
+
     for (let i = 0; i < balls.length; i++) {
       const ball = balls[i]
       const prevVx = ball.vx
@@ -1634,6 +1658,12 @@ export function createPong(
         }
 
         const removalBuffer = PADDLE_W + radius
+        if (ball.x < -radius || ball.x > W + radius) {
+          balls.splice(i, 1)
+          i -= 1
+          continue
+        }
+
         if (ball.x < -radius - removalBuffer || ball.x > W + radius + removalBuffer) {
           balls.splice(i, 1)
           i -= 1
@@ -1665,12 +1695,26 @@ export function createPong(
       }
 
       if (ball.x < -radius) {
-        pointAwarded = getPointAwardedForExit('left')
-        break
+        const shouldAwardPoint = realBallsRemaining === 1
+        if (realBallsRemaining > 0) realBallsRemaining -= 1
+        balls.splice(i, 1)
+        if (shouldAwardPoint) {
+          pointAwarded = getPointAwardedForExit('left')
+          break
+        }
+        i -= 1
+        continue
       }
       if (ball.x > W + radius) {
-        pointAwarded = getPointAwardedForExit('right')
-        break
+        const shouldAwardPoint = realBallsRemaining === 1
+        if (realBallsRemaining > 0) realBallsRemaining -= 1
+        balls.splice(i, 1)
+        if (shouldAwardPoint) {
+          pointAwarded = getPointAwardedForExit('right')
+          break
+        }
+        i -= 1
+        continue
       }
     }
 
@@ -1925,6 +1969,8 @@ export function createPong(
       rightSelection: 'neutral',
     }
 
+    resetModVoteInputState()
+
     pendingModVoteCount -= 1
     nextModVoteExclude = null
 
@@ -1945,16 +1991,30 @@ export function createPong(
     const leftControl = getPaddleControlState('left', doublesEnabled, gamepadInput)
     const rightControl = getPaddleControlState('right', doublesEnabled, gamepadInput)
 
-    const toSelection = (control: PaddleControlState): ModVoteSelection => {
-      const up = control.upRequested
-      const down = control.downRequested
-      if (up && !down) return 'up'
-      if (down && !up) return 'down'
-      return 'neutral'
+    const updateSelection = (
+      side: 'left' | 'right',
+      control: PaddleControlState,
+      current: ModVoteSelection,
+    ): ModVoteSelection => {
+      const inputState = modVoteInputStates[side]
+      const upJustPressed = control.upRequested && !inputState.upRequested
+      const downJustPressed = control.downRequested && !inputState.downRequested
+
+      let next = current
+      if (upJustPressed && !downJustPressed) {
+        next = current === 'down' ? 'neutral' : 'up'
+      } else if (downJustPressed && !upJustPressed) {
+        next = current === 'up' ? 'neutral' : 'down'
+      }
+
+      inputState.upRequested = control.upRequested
+      inputState.downRequested = control.downRequested
+
+      return next
     }
 
-    modVote.leftSelection = toSelection(leftControl)
-    modVote.rightSelection = toSelection(rightControl)
+    modVote.leftSelection = updateSelection('left', leftControl, modVote.leftSelection)
+    modVote.rightSelection = updateSelection('right', rightControl, modVote.rightSelection)
 
     centerPaddle('left')
     centerPaddle('right')
@@ -4168,6 +4228,14 @@ export function createPong(
   function draw() {
     ctx.fillStyle = ARENA_BACKGROUND
     ctx.fillRect(0, 0, W, H)
+
+    if (balls.length > 1) {
+      ctx.save()
+      ctx.fillStyle = GOAL_ZONE_INDICATOR_COLOR
+      ctx.fillRect(0, 0, GOAL_ZONE_INDICATOR_WIDTH, H)
+      ctx.fillRect(W - GOAL_ZONE_INDICATOR_WIDTH, 0, GOAL_ZONE_INDICATOR_WIDTH, H)
+      ctx.restore()
+    }
 
     drawAnnouncement()
     drawServeCountdown()

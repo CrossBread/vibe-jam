@@ -6,7 +6,7 @@ import { createPong } from '../src/game/pong'
 import { describe, it, expect, vi } from 'vitest'
 
 describe('Pong core', () => {
-  it('increments left score when ball exits right edge', () => {
+  function createTestGame() {
     const canvas = Object.assign(document.createElement('canvas'), { width: 800, height: 480 })
     const gradient = { addColorStop: vi.fn() }
     const ctx = {
@@ -23,7 +23,9 @@ describe('Pong core', () => {
       createRadialGradient: vi.fn(() => gradient),
       arc: vi.fn(),
       fill: vi.fn(),
-      fillText: vi.fn()
+      fillText: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
     }
     canvas.getContext = vi.fn().mockReturnValue(ctx) as any
 
@@ -32,6 +34,12 @@ describe('Pong core', () => {
       serveCountdownDuration: 0,
       modRevealDelay: 0,
     })
+
+    return { canvas, ctx, game }
+  }
+
+  it('increments left score when ball exits right edge', () => {
+    const { canvas, game } = createTestGame()
     const primaryBall = game.state.balls[0]
     expect(primaryBall).toBeDefined()
     const ball = primaryBall!
@@ -43,5 +51,37 @@ describe('Pong core', () => {
     const before = game.state.leftScore
     game.tick(0.016)
     expect(game.state.leftScore).toBe(before + 1)
+  })
+
+  it('only awards a point when the final real ball exits a goal zone', () => {
+    const { canvas, game } = createTestGame()
+    const primaryBall = game.state.balls[0]
+    expect(primaryBall).toBeDefined()
+    const ball = primaryBall!
+
+    const exitMargin = ball.radius + 5
+    game.state.ballX = canvas.width + exitMargin
+    game.state.vx = 0
+
+    game.state.balls.push({
+      x: -exitMargin,
+      y: canvas.height * 0.5,
+      vx: 0,
+      vy: 0,
+      radius: ball.radius,
+      travelDistance: 0,
+      isReal: true,
+      opacity: 1,
+      lastPaddleHit: null,
+      portalCooldown: 0,
+    })
+
+    const startingLeft = game.state.leftScore
+    const startingRight = game.state.rightScore
+
+    game.tick(0.016)
+
+    expect(game.state.leftScore).toBe(startingLeft)
+    expect(game.state.rightScore).toBe(startingRight + 1)
   })
 })
