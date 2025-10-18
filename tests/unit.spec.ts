@@ -27,8 +27,19 @@ describe('Pong core', () => {
     }
     canvas.getContext = vi.fn().mockReturnValue(ctx) as any
 
-    const game = createPong(canvas, { autoStart: false })
-    game.state.ballX = canvas.width + 20
+    const game = createPong(canvas, {
+      autoStart: false,
+      serveCountdownDuration: 0,
+      modRevealDelay: 0,
+    })
+    const primaryBall = game.state.balls[0]
+    expect(primaryBall).toBeDefined()
+    const ball = primaryBall!
+
+    const exitMargin = ball.radius + 5
+    game.state.ballX = canvas.width + exitMargin
+    game.state.vx = 0
+
     const before = game.state.leftScore
     game.tick(0.016)
     expect(game.state.leftScore).toBe(before + 1)
