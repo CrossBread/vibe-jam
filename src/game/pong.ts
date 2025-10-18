@@ -2186,7 +2186,7 @@ export function createPong(
           ? bottomKey
           : modVote.options[Math.floor(Math.random() * modVote.options.length)]
 
-    setActiveMod(selectedKey)
+    applyModVoteSelection(selectedKey)
     modRevealDelayPending = true
     preServeDelayRemaining = Math.max(preServeDelayRemaining, modRevealDelayDuration)
     serveCountdownRemaining = Math.max(serveCountdownRemaining, serveCountdownDuration)
@@ -3700,6 +3700,28 @@ export function createPong(
     return previousKey !== nextKey || !previousEnabled
   }
 
+  function applyModVoteSelection(nextKey: GravityWellKey) {
+    const hasOtherActiveMods = GRAVITY_WELL_KEYS.some(
+      key => key !== nextKey && config.modifiers.arena[key].enabled,
+    )
+
+    if (!hasOtherActiveMods) {
+      setActiveMod(nextKey)
+      return
+    }
+
+    const modifier = config.modifiers.arena[nextKey]
+    const wasEnabled = modifier.enabled
+
+    modifier.enabled = true
+    activeModKey = nextKey
+
+    if (!wasEnabled) {
+      arenaModManager.syncEnabled()
+      activeGravityWells = collectActiveGravityWells()
+    }
+  }
+
   function pickRandomMod(exclude: GravityWellKey | null) {
     const pool = buildRandomModPool(exclude ? [exclude] : [])
     return pool[Math.floor(Math.random() * pool.length)]
@@ -4604,8 +4626,10 @@ export function createPong(
     const spacing = 96
     const paddingX = 32
     const paddingY = 18
-    const indicatorSpacing = 42
-    const indicatorRadius = 12
+    const indicatorSpacing = 58
+    const indicatorFontSize = 54
+    const indicatorFont =
+      `900 ${indicatorFontSize}px 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif`
 
     const entries = [
       {
@@ -4663,20 +4687,19 @@ export function createPong(
       const leftIndicatorX = boxX - indicatorSpacing
       const rightIndicatorX = boxX + boxWidth + indicatorSpacing
 
-      ctx.beginPath()
+      ctx.font = indicatorFont
       ctx.fillStyle = entry.leftSelected
         ? LEFT_PADDLE_EDGE_COLOR
         : applyAlphaToColor(LEFT_PADDLE_EDGE_COLOR, 0.22)
-      ctx.arc(leftIndicatorX, entry.y, indicatorRadius, 0, Math.PI * 2)
-      ctx.fill()
+      ctx.fillText('<', leftIndicatorX, entry.y)
 
-      ctx.beginPath()
+      ctx.font = indicatorFont
       ctx.fillStyle = entry.rightSelected
         ? RIGHT_PADDLE_EDGE_COLOR
         : applyAlphaToColor(RIGHT_PADDLE_EDGE_COLOR, 0.22)
-      ctx.arc(rightIndicatorX, entry.y, indicatorRadius, 0, Math.PI * 2)
-      ctx.fill()
+      ctx.fillText('>', rightIndicatorX, entry.y)
 
+      ctx.font = entry.font
       ctx.fillStyle = HIGHLIGHT_COLOR
       ctx.fillText(entry.label, centerX, entry.y)
     }
