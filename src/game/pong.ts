@@ -4526,14 +4526,57 @@ export function createPong(
     const countdownValue = Math.ceil(serveCountdownRemaining)
     if (countdownValue <= 0) return
 
+    const text = String(countdownValue)
+
     ctx.save()
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     const baseSize = Math.min(W, H)
     const fontSize = Math.max(72, Math.floor(baseSize * 0.45))
     ctx.font = `900 ${fontSize}px 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif`
-    ctx.fillStyle = applyAlphaToColor('#ffffff', 0.08)
-    ctx.fillText(String(countdownValue), W / 2, H / 2)
+
+    const metrics = ctx.measureText(text)
+    const textWidth = metrics.width
+    const textHeight =
+      metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent || fontSize
+    const paddingX = fontSize * 0.4
+    const paddingY = fontSize * 0.3
+    const cardWidth = textWidth + paddingX * 2
+    const cardHeight = textHeight + paddingY * 2
+    const cardX = W / 2 - cardWidth / 2
+    const cardY = H / 2 - cardHeight / 2
+    const cardRadius = Math.min(cardHeight * 0.35, cardWidth / 2, cardHeight / 2)
+
+    const drawRoundedRectPath = (
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      radius: number,
+    ) => {
+      const r = Math.max(0, Math.min(radius, width / 2, height / 2))
+      ctx.beginPath()
+      ctx.moveTo(x + r, y)
+      ctx.lineTo(x + width - r, y)
+      ctx.quadraticCurveTo(x + width, y, x + width, y + r)
+      ctx.lineTo(x + width, y + height - r)
+      ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height)
+      ctx.lineTo(x + r, y + height)
+      ctx.quadraticCurveTo(x, y + height, x, y + height - r)
+      ctx.lineTo(x, y + r)
+      ctx.quadraticCurveTo(x, y, x + r, y)
+      ctx.closePath()
+    }
+
+    drawRoundedRectPath(cardX, cardY, cardWidth, cardHeight, cardRadius)
+    ctx.fillStyle = applyAlphaToColor('#020617', 0.78)
+    ctx.fill()
+    ctx.lineWidth = Math.max(4, fontSize * 0.06)
+    ctx.strokeStyle = applyAlphaToColor('#94a3b8', 0.35)
+    ctx.stroke()
+
+    ctx.fillStyle = applyAlphaToColor('#ffffff', 0.92)
+    ctx.fillText(text, W / 2, H / 2)
     ctx.restore()
   }
 
