@@ -277,7 +277,7 @@ export function createPong(
   const CHARLOTTE_PADDLE_COLOR = '#6b7280'
   const CHARLOTTE_EDGE_COLOR = '#4b5563'
   const MIN_CHARLOTTE_WEB_LENGTH = 6
-  const MIN_POTION_PADDLE_HEIGHT = 36
+  const MIN_POTION_PADDLE_HEIGHT = 18
 
   const defaults = createDevConfig()
   const config = deepClone(defaults)
@@ -2316,7 +2316,7 @@ export function createPong(
     if (!modifier.enabled) return
     const trail = getOutOfBodyTrailForPaddle(paddle)
     if (!trail) return
-    if (trail.points.length <= 1) return
+    if (trail.points.length === 0) return
 
     const fadeStrength = clamp01(
       Number.isFinite(modifier.trailFade) ? modifier.trailFade : 0.7,
@@ -2327,7 +2327,10 @@ export function createPong(
     for (let i = trail.points.length - 1; i >= 0; i--) {
       const point = trail.points[i]
       const fadeIndex = trail.points.length - 1 - i
-      const alpha = clamp01(baseOpacity * Math.pow(fadeStrength, fadeIndex))
+      const isHead = i === trail.points.length - 1
+      const alpha = isHead
+        ? 1
+        : clamp01(baseOpacity * Math.pow(fadeStrength, fadeIndex))
       if (alpha <= 0.001) continue
 
       const ghostPaddle: PhysicalPaddle = {

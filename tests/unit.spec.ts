@@ -3,6 +3,7 @@
  */
 
 import { createPong } from '../src/game/pong'
+import devConfig from '../src/game/devConfig.json'
 import { describe, it, expect, vi } from 'vitest'
 
 describe('Pong core', () => {
@@ -110,5 +111,47 @@ describe('Pong core', () => {
 
     expect(ball.vx).toBeLessThan(0)
     expect(game.state.vx).toBeLessThan(0)
+  })
+
+  it('shrinks the opponent paddle to the potion minimum height when Drink Me triggers', () => {
+    const originalRandom = Math.random
+    const drinkMeDefaults = devConfig.modifiers.arena.drinkMe
+    const originalDrinkMe = JSON.parse(JSON.stringify(drinkMeDefaults)) as typeof drinkMeDefaults
+
+    Math.random = () => 0.5
+    Object.assign(drinkMeDefaults, {
+      enabled: true,
+      spawnCount: 1,
+      shrinkAmount: 200,
+      objectRadius: 18,
+    })
+
+    try {
+      const { canvas, game } = createTestGame()
+      const primaryBall = game.state.balls[0]
+      expect(primaryBall).toBeDefined()
+      const ball = primaryBall!
+
+      const potionRadius = 18
+      const margin = Math.max(potionRadius + 12, potionRadius)
+      const maxX = Math.max(margin, canvas.width - margin)
+      const maxY = Math.max(margin, canvas.height - margin)
+      const targetX = margin + (maxX - margin) * 0.5
+      const targetY = margin + (maxY - margin) * 0.5
+
+      ball.x = targetX
+      ball.y = targetY
+      ball.lastPaddleHit = 'left'
+
+      expect(game.state.rightPaddleHeight).toBeGreaterThan(18)
+
+      game.tick(0.016)
+
+      expect(game.state.rightPaddleHeight).toBe(18)
+      expect(game.state.leftPaddleHeight).toBe(90)
+    } finally {
+      Math.random = originalRandom
+      Object.assign(drinkMeDefaults, originalDrinkMe)
+    }
   })
 })
