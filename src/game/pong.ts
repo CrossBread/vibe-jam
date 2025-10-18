@@ -76,6 +76,44 @@ import {
   type OsteoLane,
 } from './mods/paddle/osteoWhat/osteoWhatView'
 
+const GRAVITY_WELL_SELECTION_ORDER: GravityWellKey[] = [
+  'blackHole',
+  'blackMole',
+  'gopher',
+  'ceres',
+  'superMassive',
+  'jupiter',
+  'threeBodyProblem',
+  'whiteDwarf',
+  'divots',
+  'fogOfWar',
+  'wonderland',
+  'secondChances',
+  'spaceInvaders',
+  'minesweeper',
+  'ireland',
+  'russianRoulette',
+  'drinkMe',
+  'teaParty',
+  'madHatter',
+  'wormhole',
+  'vortex',
+  'searchLight',
+] as const
+
+const GRAVITY_WELL_SELECTION_RANK = new Map<GravityWellKey, number>(
+  GRAVITY_WELL_SELECTION_ORDER.map((key, index) => [key, index]),
+)
+
+function sortBySelectionOrder(keys: GravityWellKey[]): GravityWellKey[] {
+  return keys
+    .slice()
+    .sort((a, b) =>
+      (GRAVITY_WELL_SELECTION_RANK.get(a) ?? Number.MAX_SAFE_INTEGER) -
+      (GRAVITY_WELL_SELECTION_RANK.get(b) ?? Number.MAX_SAFE_INTEGER),
+    )
+}
+
 export interface PongState {
   leftScore: number
   rightScore: number
@@ -3618,7 +3656,9 @@ export function createPong(
   }
 
   function initializeActiveModState() {
-    const enabledMods = GRAVITY_WELL_KEYS.filter(key => config.modifiers.arena[key].enabled)
+    const enabledMods = sortBySelectionOrder(
+      GRAVITY_WELL_KEYS.filter(key => config.modifiers.arena[key].enabled),
+    )
     if (enabledMods.length === 0) {
       setActiveMod(pickRandomMod(null))
       modRevealDelayPending = true
@@ -3680,12 +3720,12 @@ export function createPong(
     const eligible = GRAVITY_WELL_KEYS.filter(
       key => !excludeSet.has(key) && config.modifiers.arena[key].includeInRandom,
     )
-    if (eligible.length > 0) return eligible
+    if (eligible.length > 0) return sortBySelectionOrder(eligible)
 
     const fallback = GRAVITY_WELL_KEYS.filter(key => !excludeSet.has(key))
-    if (fallback.length > 0) return fallback
+    if (fallback.length > 0) return sortBySelectionOrder(fallback)
 
-    return [...GRAVITY_WELL_KEYS]
+    return sortBySelectionOrder([...GRAVITY_WELL_KEYS])
   }
 
   function getModDisplayName(key: GravityWellKey): string {

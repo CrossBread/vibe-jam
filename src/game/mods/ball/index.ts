@@ -15,9 +15,9 @@ type BallBuilderMap = {
 }
 
 export const ballModifierBuilders: BallBuilderMap = {
-  kite: createKiteModifier,
   bumShuffle: createBumShuffleModifier,
+  kite: createKiteModifier,
+  meteor: createMeteorModifier,
   pollok: createPollokModifier,
   snowball: createSnowballModifier,
-  meteor: createMeteorModifier,
 }

@@ -68,6 +68,100 @@ export type DevOverlayElement = HTMLDivElement & {
 
 let devOverlayStylesInjected = false
 
+type ModifierSection = 'paddle' | 'ball' | 'arena'
+
+const FILTER_CATEGORY_LABELS = {
+  arena: 'Arena',
+  ball: 'Ball',
+  ballSize: 'Ball Size',
+  ballVisuals: 'Ball Visuals',
+  gravity: 'Gravity',
+  paddle: 'Paddle',
+  paddleControl: 'Paddle Control',
+  paddleSize: 'Paddle Size',
+  paddleSpeed: 'Paddle Speed',
+  projectiles: 'Projectiles',
+  visibility: 'Visibility',
+} as const
+
+type FilterCategory = keyof typeof FILTER_CATEGORY_LABELS
+
+const SECTION_BASE_CATEGORIES: Record<ModifierSection, FilterCategory[]> = {
+  arena: ['arena', 'gravity'],
+  ball: ['ball'],
+  paddle: ['paddle'],
+}
+
+const MODIFIER_CATEGORY_OVERRIDES: Record<string, FilterCategory[]> = {
+  'arena:drinkMe': ['paddleSize'],
+  'arena:fogOfWar': ['visibility'],
+  'arena:searchLight': ['visibility'],
+  'arena:spaceInvaders': ['projectiles'],
+  'arena:teaParty': ['paddleSize'],
+  'arena:wonderland': ['visibility'],
+  'ball:bumShuffle': ['ballVisuals'],
+  'ball:kite': ['ballVisuals'],
+  'ball:meteor': ['ballSize'],
+  'ball:pollok': ['ballVisuals'],
+  'ball:snowball': ['ballSize'],
+  'paddle:angry': ['paddleSpeed'],
+  'paddle:apparition': ['visibility'],
+  'paddle:bendy': ['paddleSize'],
+  'paddle:brokePhysics': ['paddleControl'],
+  'paddle:buckTooth': ['paddleSize'],
+  'paddle:bungee': ['paddleControl'],
+  'paddle:charlotte': ['visibility'],
+  'paddle:chilly': ['paddleSize'],
+  'paddle:crabby': ['paddleControl'],
+  'paddle:dizzy': ['paddleControl'],
+  'paddle:dundee': ['paddleSpeed'],
+  'paddle:foosball': ['paddleSize'],
+  'paddle:frisbee': ['projectiles'],
+  'paddle:hadron': ['projectiles'],
+  'paddle:inchworm': ['paddleControl'],
+  'paddle:missileCommander': ['projectiles'],
+  'paddle:outOfBody': ['visibility'],
+  'paddle:osteoWhat': ['paddleSize'],
+  'paddle:slinky': ['paddleSize'],
+}
+
+function collectModifierCategories(
+  section: ModifierSection,
+  key: string,
+  modifier: Record<string, unknown>,
+): FilterCategory[] {
+  const categories = new Set<FilterCategory>(SECTION_BASE_CATEGORIES[section] ?? [])
+  const overrideKey = `${section}:${key}`
+  const overrides = MODIFIER_CATEGORY_OVERRIDES[overrideKey]
+  if (overrides) {
+    overrides.forEach(category => categories.add(category))
+  }
+
+  if (
+    section === 'paddle' &&
+    Object.prototype.hasOwnProperty.call(modifier, 'paddleSizeMultiplier')
+  ) {
+    categories.add('paddleSize')
+  }
+
+  if (
+    section === 'ball' &&
+    (Object.prototype.hasOwnProperty.call(modifier, 'minRadius') ||
+      Object.prototype.hasOwnProperty.call(modifier, 'maxRadius'))
+  ) {
+    categories.add('ballSize')
+  }
+
+  if (
+    section === 'arena' &&
+    Object.prototype.hasOwnProperty.call(modifier, 'gravityStrength')
+  ) {
+    categories.add('gravity')
+  }
+
+  return Array.from(categories)
+}
+
 interface DevOverlayOptions {
   onDockChange?: (docked: boolean) => void
 }
@@ -210,6 +304,89 @@ function ensureDevOverlayStyles() {
       background: rgba(71, 85, 105, 0.35);
       border-color: rgba(148, 163, 184, 0.6);
     }
+    .dev-overlay__search {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .dev-overlay__search-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dev-overlay__search-input {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: rgba(15, 23, 42, 0.6);
+      color: inherit;
+      font-size: 13px;
+      line-height: 1.3;
+    }
+    .dev-overlay__search-input::placeholder {
+      color: rgba(226, 232, 240, 0.5);
+    }
+    .dev-overlay__filter {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .dev-overlay__filter-button {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: rgba(15, 23, 42, 0.6);
+      color: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+    .dev-overlay__filter-button:hover {
+      border-color: rgba(148, 163, 184, 0.75);
+    }
+    .dev-overlay__filter-button--active {
+      border-color: rgba(129, 140, 248, 0.85);
+      background: rgba(79, 70, 229, 0.25);
+    }
+    .dev-overlay__filter-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      min-width: 200px;
+      padding: 12px;
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.45);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 10000;
+    }
+    .dev-overlay__filter-menu[hidden] {
+      display: none;
+    }
+    .dev-overlay__filter-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .dev-overlay__filter-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .dev-overlay__filter-option input {
+      accent-color: #6366f1;
+    }
+    .dev-overlay__search-error {
+      min-height: 16px;
+      font-size: 12px;
+      color: #f97316;
+    }
     .dev-overlay__content {
       display: flex;
       flex-direction: column;
@@ -277,6 +454,13 @@ function ensureDevOverlayStyles() {
     .dev-overlay__card-hint {
       font-size: 11px;
       color: rgba(148, 163, 184, 0.75);
+    }
+    .dev-overlay__card summary {
+      list-style: none;
+      cursor: pointer;
+    }
+    .dev-overlay__card summary::-webkit-details-marker {
+      display: none;
     }
     .dev-overlay__metrics {
       display: grid;
@@ -346,6 +530,11 @@ function ensureDevOverlayStyles() {
       display: flex;
       flex-direction: column;
       gap: 10px;
+    }
+    .dev-overlay__section-empty {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: rgba(226, 232, 240, 0.65);
     }
     .dev-overlay__modifier {
       border-radius: 10px;
@@ -529,9 +718,32 @@ export function createDevOverlay(
 
   const overlay = document.createElement('div') as DevOverlayElement
   overlay.className = 'dev-overlay'
+  overlay.classList.add('dev-overlay--docked')
   overlay.setAttribute('aria-hidden', 'true')
 
   const { onDockChange } = options
+
+  interface ModifierEntry {
+    element: HTMLDetailsElement
+    section: ModifierSection
+    key: string
+    name: string
+    description: string
+    categories: FilterCategory[]
+  }
+
+  interface SectionState {
+    container: HTMLDivElement
+    list: HTMLDivElement
+    emptyMessage: HTMLParagraphElement
+  }
+
+  const staticCollapsibleSections: HTMLDetailsElement[] = []
+  const collapsibleSections: HTMLDetailsElement[] = []
+  const modifierEntries: ModifierEntry[] = []
+  const sectionStates: Partial<Record<ModifierSection, SectionState>> = {}
+  let searchTerm = ''
+  const activeFilters = new Set<FilterCategory>()
 
   const title = document.createElement('div')
   title.className = 'dev-overlay__title'
@@ -552,18 +764,30 @@ export function createDevOverlay(
   const collapseAllButton = document.createElement('button')
   collapseAllButton.type = 'button'
   collapseAllButton.className = 'dev-overlay__collapse-all'
-  collapseAllButton.textContent = 'Collapse All'
+  collapseAllButton.textContent = 'Expand All'
+
+  function updateCollapseButtonLabel() {
+    const hasClosed = collapsibleSections.some(section => !section.open)
+    collapseAllButton.textContent = hasClosed ? 'Expand All' : 'Collapse All'
+  }
+
+  function trackCollapsible(section: HTMLDetailsElement) {
+    section.addEventListener('toggle', updateCollapseButtonLabel)
+    return section
+  }
 
   const dockToggleLabel = document.createElement('label')
   dockToggleLabel.className = 'dev-overlay__dock-toggle'
 
   const dockToggle = document.createElement('input')
   dockToggle.type = 'checkbox'
+  dockToggle.checked = true
   dockToggle.addEventListener('change', () => {
     const docked = dockToggle.checked
     overlay.classList.toggle('dev-overlay--docked', docked)
     onDockChange?.(docked)
   })
+  overlay.classList.toggle('dev-overlay--docked', dockToggle.checked)
 
   const dockToggleText = document.createElement('span')
   dockToggleText.textContent = 'Dock panel'
@@ -579,8 +803,165 @@ export function createDevOverlay(
   title.appendChild(heading)
   title.appendChild(titleMeta)
 
+  const searchContainer = document.createElement('div')
+  searchContainer.className = 'dev-overlay__search'
+
+  const searchControls = document.createElement('div')
+  searchControls.className = 'dev-overlay__search-controls'
+
+  const searchInput = document.createElement('input')
+  searchInput.type = 'search'
+  searchInput.className = 'dev-overlay__search-input'
+  searchInput.placeholder = 'Search modifiers (regex)…'
+
+  const filterWrapper = document.createElement('div')
+  filterWrapper.className = 'dev-overlay__filter'
+
+  const filterButton = document.createElement('button')
+  filterButton.type = 'button'
+  filterButton.className = 'dev-overlay__filter-button'
+  filterButton.textContent = 'Filters'
+
+  const filterMenu = document.createElement('div')
+  filterMenu.className = 'dev-overlay__filter-menu'
+  filterMenu.hidden = true
+
+  const filterOptionsList = document.createElement('div')
+  filterOptionsList.className = 'dev-overlay__filter-options'
+  filterMenu.appendChild(filterOptionsList)
+
+  const sortedFilterEntries = Object.entries(FILTER_CATEGORY_LABELS).sort((a, b) =>
+    a[1].localeCompare(b[1]),
+  )
+
+  for (const [value, label] of sortedFilterEntries) {
+    const option = document.createElement('label')
+    option.className = 'dev-overlay__filter-option'
+
+    const checkbox = document.createElement('input')
+    checkbox.type = 'checkbox'
+    checkbox.value = value
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) {
+        activeFilters.add(value as FilterCategory)
+      } else {
+        activeFilters.delete(value as FilterCategory)
+      }
+      applyFilters()
+    })
+
+    const optionLabel = document.createElement('span')
+    optionLabel.textContent = label
+
+    option.appendChild(checkbox)
+    option.appendChild(optionLabel)
+    filterOptionsList.appendChild(option)
+  }
+
+  filterButton.addEventListener('click', event => {
+    event.stopPropagation()
+    filterMenu.hidden = !filterMenu.hidden
+  })
+
+  filterMenu.addEventListener('click', event => {
+    event.stopPropagation()
+  })
+
+  document.addEventListener('click', event => {
+    if (filterMenu.hidden) return
+    const target = event.target as Node | null
+    if (!filterMenu.contains(target) && target !== filterButton) {
+      filterMenu.hidden = true
+    }
+  })
+
+  filterWrapper.appendChild(filterButton)
+  filterWrapper.appendChild(filterMenu)
+
+  searchControls.appendChild(searchInput)
+  searchControls.appendChild(filterWrapper)
+
+  const searchError = document.createElement('div')
+  searchError.className = 'dev-overlay__search-error'
+
+  searchContainer.appendChild(searchControls)
+  searchContainer.appendChild(searchError)
+
+  searchInput.addEventListener('input', () => {
+    searchTerm = searchInput.value
+    applyFilters()
+  })
+
   const content = document.createElement('div')
   content.className = 'dev-overlay__content'
+
+  function applyFilters() {
+    const trimmed = searchTerm.trim()
+    let regex: RegExp | null = null
+    let regexValid = true
+
+    if (trimmed) {
+      try {
+        regex = new RegExp(trimmed, 'i')
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (error) {
+        regexValid = false
+      }
+    }
+
+    if (!regexValid && trimmed) {
+      searchError.textContent = 'Invalid search pattern: ' + eMsg
+    } else {
+      searchError.textContent = ''
+    }
+
+    const hasFilters = activeFilters.size > 0
+    const hasSearch = trimmed.length > 0
+    const hasValidSearch = !hasSearch || regex !== null
+
+    if (hasSearch) {
+      collapsibleSections.forEach(section => {
+        if (section.open) {
+          section.open = false
+        }
+      })
+    }
+
+    modifierEntries.forEach(entry => {
+      const matchesSearch = !hasSearch
+        ? true
+        : regex
+        ? regex.test(entry.name) || regex.test(entry.description)
+        : false
+      const matchesFilter =
+        !hasFilters || entry.categories.some(category => activeFilters.has(category))
+      const visible = matchesSearch && matchesFilter && hasValidSearch
+      entry.element.style.display = visible ? '' : 'none'
+    })
+
+    const hasActiveConstraints = hasFilters || (hasSearch && hasValidSearch)
+
+    Object.values(sectionStates).forEach(state => {
+      if (!state) return
+      const hasVisibleChild = Array.from(state.list.children).some(child => {
+        return (child as HTMLElement).style.display !== 'none'
+      })
+      state.list.style.display = hasVisibleChild ? '' : 'none'
+      state.emptyMessage.style.display = hasActiveConstraints && !hasVisibleChild ? '' : 'none'
+    })
+
+    filterButton.classList.toggle('dev-overlay__filter-button--active', hasFilters)
+
+    if (hasSearch && !hasValidSearch) {
+      collapsibleSections.forEach(section => {
+        if (!section.open) {
+          section.open = true
+        }
+      })
+    }
+
+    updateCollapseButtonLabel()
+  }
 
   type MetricKey =
     | 'averageFps'
@@ -588,8 +969,10 @@ export function createDevOverlay(
     | 'onePercentLowFps'
     | 'longFrameShare'
 
-  const statsCard = document.createElement('section')
+  const statsCard = document.createElement('details')
   statsCard.className = 'dev-overlay__card'
+  statsCard.open = false
+  staticCollapsibleSections.push(trackCollapsible(statsCard))
 
   const statsHeader = document.createElement('div')
   statsHeader.className = 'dev-overlay__card-header'
@@ -619,6 +1002,9 @@ export function createDevOverlay(
 
   statsHeader.appendChild(statsTitle)
   statsHeader.appendChild(statsToggle)
+
+  const statsSummary = document.createElement('summary')
+  statsSummary.appendChild(statsHeader)
 
   const statsBody = document.createElement('div')
   statsBody.className = 'dev-overlay__card-body'
@@ -702,7 +1088,7 @@ export function createDevOverlay(
   statsBody.appendChild(statsMeta)
   statsBody.appendChild(statsHint)
 
-  statsCard.appendChild(statsHeader)
+  statsCard.appendChild(statsSummary)
   statsCard.appendChild(statsBody)
 
   let statsEnabled = false
@@ -773,6 +1159,10 @@ export function createDevOverlay(
     statsToggleStatus.textContent = next ? 'On' : 'Off'
     statsCard.classList.toggle('dev-overlay__card--active', next)
 
+    if (next) {
+      statsCard.open = true
+    }
+
     if (!next) {
       hasStatsData = false
       statsMetrics.hidden = true
@@ -842,8 +1232,6 @@ export function createDevOverlay(
     overlay.scrollTo({ top: 0, behavior: 'smooth' })
   })
 
-  const collapsibleSections: HTMLDetailsElement[] = []
-
   function setStatus(message: string, variant: 'default' | 'error' = 'default') {
     status.textContent = message
     status.classList.toggle('dev-overlay__status--error', variant === 'error')
@@ -854,13 +1242,14 @@ export function createDevOverlay(
     paddleSection.innerHTML = ''
     ballSection.innerHTML = ''
     arenaSection.innerHTML = ''
-    collapsibleSections.length = 0
+    modifierEntries.length = 0
+
+    const dynamicCollapsibleSections: HTMLDetailsElement[] = []
 
     const createModifierDetails: CreateModifierDetails = (modifier, buildBody) => {
       const details = document.createElement('details')
       details.className = 'dev-overlay__modifier'
-      details.open = true
-      collapsibleSections.push(details)
+      details.open = false
 
       const summary = document.createElement('summary')
 
@@ -905,12 +1294,14 @@ export function createDevOverlay(
 
       details.appendChild(body)
 
+      dynamicCollapsibleSections.push(trackCollapsible(details))
+
       return details
     }
 
     const baseSection = document.createElement('details')
     baseSection.className = 'dev-overlay__collapsible'
-    baseSection.open = true
+    baseSection.open = false
 
     const baseSummary = document.createElement('summary')
     baseSummary.textContent = 'Game Parameters'
@@ -1052,7 +1443,7 @@ export function createDevOverlay(
         },
       ),
     )
-    collapsibleSections.push(baseSection)
+    dynamicCollapsibleSections.push(trackCollapsible(baseSection))
     controls.appendChild(baseSection)
 
     const paddleTitle = document.createElement('div')
@@ -1064,6 +1455,18 @@ export function createDevOverlay(
     paddleList.className = 'dev-overlay__modifiers'
     paddleSection.appendChild(paddleList)
 
+    const paddleEmpty = document.createElement('p')
+    paddleEmpty.className = 'dev-overlay__section-empty'
+    paddleEmpty.textContent = 'No paddle modifiers match the current filters.'
+    paddleEmpty.style.display = 'none'
+    paddleSection.appendChild(paddleEmpty)
+
+    sectionStates.paddle = {
+      container: paddleSection,
+      list: paddleList,
+      emptyMessage: paddleEmpty,
+    }
+
     const renderPaddleModifier = <K extends typeof PADDLE_MODIFIER_KEYS[number]>(key: K) => {
       const modifier = config.modifiers.paddle[key]
       const details = paddleModifierBuilders[key]({
@@ -1071,6 +1474,14 @@ export function createDevOverlay(
         createDetails: createModifierDetails,
       })
       paddleList.appendChild(details)
+      modifierEntries.push({
+        element: details,
+        section: 'paddle',
+        key,
+        name: modifier.name,
+        description: modifier.description,
+        categories: collectModifierCategories('paddle', key, modifier as Record<string, unknown>),
+      })
     }
 
     for (const key of PADDLE_MODIFIER_KEYS) {
@@ -1086,6 +1497,18 @@ export function createDevOverlay(
     ballList.className = 'dev-overlay__modifiers'
     ballSection.appendChild(ballList)
 
+    const ballEmpty = document.createElement('p')
+    ballEmpty.className = 'dev-overlay__section-empty'
+    ballEmpty.textContent = 'No ball modifiers match the current filters.'
+    ballEmpty.style.display = 'none'
+    ballSection.appendChild(ballEmpty)
+
+    sectionStates.ball = {
+      container: ballSection,
+      list: ballList,
+      emptyMessage: ballEmpty,
+    }
+
     const renderBallModifier = <K extends typeof BALL_MODIFIER_KEYS[number]>(key: K) => {
       const modifier = config.modifiers.ball[key]
       const details = ballModifierBuilders[key]({
@@ -1093,6 +1516,14 @@ export function createDevOverlay(
         createDetails: createModifierDetails,
       })
       ballList.appendChild(details)
+      modifierEntries.push({
+        element: details,
+        section: 'ball',
+        key,
+        name: modifier.name,
+        description: modifier.description,
+        categories: collectModifierCategories('ball', key, modifier as Record<string, unknown>),
+      })
     }
 
     for (const key of BALL_MODIFIER_KEYS) {
@@ -1108,6 +1539,18 @@ export function createDevOverlay(
     modifiersList.className = 'dev-overlay__modifiers'
     arenaSection.appendChild(modifiersList)
 
+    const arenaEmpty = document.createElement('p')
+    arenaEmpty.className = 'dev-overlay__section-empty'
+    arenaEmpty.textContent = 'No arena modifiers match the current filters.'
+    arenaEmpty.style.display = 'none'
+    arenaSection.appendChild(arenaEmpty)
+
+    sectionStates.arena = {
+      container: arenaSection,
+      list: modifiersList,
+      emptyMessage: arenaEmpty,
+    }
+
     const renderArenaModifier = <K extends typeof GRAVITY_WELL_KEYS[number]>(key: K) => {
       const modifier = config.modifiers.arena[key]
       const details = arenaModifierBuilders[key]({
@@ -1115,11 +1558,28 @@ export function createDevOverlay(
         createDetails: createModifierDetails,
       })
       modifiersList.appendChild(details)
+      modifierEntries.push({
+        element: details,
+        section: 'arena',
+        key,
+        name: modifier.name,
+        description: modifier.description,
+        categories: collectModifierCategories('arena', key, modifier as Record<string, unknown>),
+      })
     }
 
     for (const key of GRAVITY_WELL_KEYS) {
       renderArenaModifier(key)
     }
+
+    collapsibleSections.splice(
+      0,
+      collapsibleSections.length,
+      ...staticCollapsibleSections,
+      ...dynamicCollapsibleSections,
+    )
+    updateCollapseButtonLabel()
+    applyFilters()
   }
 
   const copyButton = createOverlayButton('Copy to Clipboard')
@@ -1159,9 +1619,11 @@ export function createDevOverlay(
   })
 
   collapseAllButton.addEventListener('click', () => {
+    const shouldExpand = collapsibleSections.some(section => !section.open)
     collapsibleSections.forEach(section => {
-      section.open = false
+      section.open = shouldExpand
     })
+    updateCollapseButtonLabel()
   })
 
   buttonsRow.appendChild(copyButton)
@@ -1175,6 +1637,7 @@ export function createDevOverlay(
   content.appendChild(arenaSection)
 
   overlay.appendChild(title)
+  overlay.appendChild(searchContainer)
   overlay.appendChild(content)
   overlay.appendChild(buttons)
   overlay.appendChild(status)
