@@ -1023,6 +1023,16 @@ export function createDevOverlay(
     )
 
     baseBody.appendChild(
+      createSliderControl('Shot Clock Duration', config.shotClockSeconds, {
+        min: 0,
+        max: 20,
+        step: 0.5,
+        format: v => `${v.toFixed(1)} s`,
+        onInput: v => (config.shotClockSeconds = v),
+      }),
+    )
+
+    baseBody.appendChild(
       createSliderControl(
         'Left Paddle Size Multiplier',
         config.leftPaddleSizeMultiplier,
@@ -1191,6 +1201,7 @@ function applyConfig(target: DevConfig, source: DevConfig) {
   target.baseBallSpeed = source.baseBallSpeed
   target.minHorizontalRatio = source.minHorizontalRatio
   target.speedIncreaseOnHit = source.speedIncreaseOnHit
+  target.shotClockSeconds = source.shotClockSeconds
   target.doubles = deepClone(source.doubles)
   target.modifiers = deepClone(source.modifiers)
 }
@@ -1206,7 +1217,8 @@ function isDevConfig(value: unknown): value is DevConfig {
     typeof candidate.rightPaddleSizeMultiplier !== 'number' ||
     typeof candidate.baseBallSpeed !== 'number' ||
     typeof candidate.minHorizontalRatio !== 'number' ||
-    typeof candidate.speedIncreaseOnHit !== 'number'
+    typeof candidate.speedIncreaseOnHit !== 'number' ||
+    typeof candidate.shotClockSeconds !== 'number'
   ) {
     return false
   }

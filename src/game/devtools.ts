@@ -342,6 +342,7 @@ export interface DevConfig {
   baseBallSpeed: number
   minHorizontalRatio: number
   speedIncreaseOnHit: number
+  shotClockSeconds: number
   doubles: DoublesConfig
   modifiers: ModifiersConfig
 }

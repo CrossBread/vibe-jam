@@ -99,6 +99,8 @@ export interface PongState {
   totalPips: number
   totalBites: number
   completedBitesSinceLastPoint: number
+  shotClockRemaining: number
+  shotClockActive: boolean
 }
 
 export interface PongAPI {
@@ -654,6 +656,8 @@ export function createPong(
     totalPips: 0,
     totalBites: 0,
     completedBitesSinceLastPoint: 0,
+    shotClockRemaining: 0,
+    shotClockActive: false,
   }
 
   let leftPaddleHeight = state.leftPaddleHeight
@@ -679,6 +683,9 @@ export function createPong(
       missile: createCharlotteState(),
     },
   }
+  let shotClockRemaining = 0
+  let shotClockActive = false
+  let shotClockLastHitter: 'left' | 'right' | null = null
   const missilePaddles: ActiveMissilePaddle[] = []
   const missileCooldowns: Record<'left' | 'right', number> = { left: 0, right: 0 }
   type InchwormPhase = 'idle' | 'contracting' | 'contracted' | 'extending'
@@ -1328,6 +1335,7 @@ export function createPong(
 
   function resetBall(toLeft: boolean) {
     balls.length = 0
+    clearShotClock()
     secondChancesMod.resetShields()
     spaceInvadersMod.resetBarricades()
     minesweeperMod.resetBoard()
@@ -1345,6 +1353,10 @@ export function createPong(
     state.vy = 0
     state.ballRadius = BALL_R
     syncPrimaryBallState()
+
+    if (modVote) {
+      return
+    }
 
     if (preServeDelayRemaining <= 0 && serveCountdownRemaining <= 0) {
       launchPendingServe()
@@ -1403,6 +1415,7 @@ export function createPong(
     state.totalBites = 0
     state.completedBitesSinceLastPoint = 0
     completedBitesSinceLastPoint = 0
+    clearShotClock()
     pendingModVoteCount = 0
     nextModVoteExclude = null
     modVote = null
@@ -1759,6 +1772,7 @@ export function createPong(
       return
     }
 
+    updateShotClock(dt)
     updateBallTrails(dt)
   }
 
@@ -1854,6 +1868,112 @@ export function createPong(
     return getEnabledArenaModifiers(arena).map(([key]) => key)
   }
 
+  function getShotClockDuration(): number {
+    const duration = Number(config.shotClockSeconds)
+    return Number.isFinite(duration) ? Math.max(0, duration) : 0
+  }
+
+  function isShotClockEnabled(): boolean {
+    return getShotClockDuration() > 0
+  }
+
+  function syncShotClockState() {
+    state.shotClockRemaining = shotClockRemaining
+    state.shotClockActive = shotClockActive
+  }
+
+  function clearShotClock() {
+    shotClockRemaining = 0
+    shotClockActive = false
+    shotClockLastHitter = null
+    syncShotClockState()
+  }
+
+  function registerShotClockHit(side: 'left' | 'right') {
+    if (!isShotClockEnabled()) {
+      clearShotClock()
+      return
+    }
+
+    const duration = getShotClockDuration()
+    const shouldStart = !shotClockActive
+    const opposingHit = shotClockLastHitter !== null && shotClockLastHitter !== side
+
+    if (shouldStart || opposingHit) {
+      shotClockRemaining = duration
+      shotClockActive = true
+    } else if (shotClockActive) {
+      shotClockRemaining = Math.min(shotClockRemaining, duration)
+    }
+
+    shotClockLastHitter = side
+    syncShotClockState()
+  }
+
+  function updateShotClock(dt: number) {
+    if (!shotClockActive) {
+      syncShotClockState()
+      return
+    }
+
+    if (!isShotClockEnabled()) {
+      clearShotClock()
+      return
+    }
+
+    const duration = getShotClockDuration()
+    shotClockRemaining = Math.min(shotClockRemaining, duration)
+
+    if (
+      pendingServeToLeft !== null ||
+      !balls.some(ball => ball.isReal) ||
+      Boolean(modVote) ||
+      Boolean(state.winner) ||
+      state.paused
+    ) {
+      syncShotClockState()
+      return
+    }
+
+    shotClockRemaining = Math.max(0, shotClockRemaining - dt)
+    if (shotClockRemaining <= 0) {
+      handleShotClockExpiration()
+      return
+    }
+
+    syncShotClockState()
+  }
+
+  function handleShotClockExpiration() {
+    const previousMod = activeModKey
+    const lastHitter = shotClockLastHitter
+    clearShotClock()
+
+    balls.length = 0
+    resetBallSize()
+    syncPrimaryBallState()
+
+    clearDivotWells()
+    rearmHadron()
+    syncOsteoState(true)
+    initializePaddleHeights(true)
+    bumShuffleMod.clearTrail()
+    fogOfWarMod.resetState()
+    wonderlandMod.resetState()
+
+    disableAllMods()
+    queueModVotes(1, previousMod ?? null)
+    completedBitesSinceLastPoint = 0
+    state.completedBitesSinceLastPoint = 0
+    state.currentPips = 0
+
+    const serveToLeft =
+      lastHitter === null ? Math.random() < 0.5 : lastHitter === 'right'
+
+    resetBall(serveToLeft)
+    syncPrimaryBallState()
+  }
+
   function handlePaddleReturn(side: 'left' | 'right', ball: BallState) {
     ball.lastPaddleHit = side
     pollokMod.registerReturn(side)
@@ -1862,6 +1982,7 @@ export function createPong(
     spawnDivotWell()
     applyChillyShrink(side)
     handleHadronSplit(side, ball)
+    registerShotClockHit(side)
   }
 
   function handleHadronSplit(side: 'left' | 'right', ball: BallState) {
@@ -4281,6 +4402,8 @@ export function createPong(
     const meterRight = pipStartX + (PIPS_PER_BITE - 1) * pipSpacing + pipRadius
     ctx.lineWidth = 2
 
+    drawShotClockCountdown(meterLeft, meterRight, pipY, pipRadius)
+
     if (state.completedBitesSinceLastPoint > 0) {
       const chevronWidth = 12
       const chevronHeight = 22
@@ -4342,6 +4465,31 @@ export function createPong(
       ctx.font = 'bold 36px ui-sans-serif, system-ui'
       ctx.fillText(`${state.winner.toUpperCase()} WINS!`, W / 2, H / 2)
     }
+  }
+
+  function drawShotClockCountdown(
+    meterLeft: number,
+    meterRight: number,
+    meterY: number,
+    pipRadius: number,
+  ) {
+    if (!state.shotClockActive) return
+
+    const remaining = Math.max(0, state.shotClockRemaining)
+    if (remaining <= 0 || remaining >= 3) return
+
+    const text = remaining.toFixed(1)
+    const centerX = (meterLeft + meterRight) / 2
+    const textY = meterY - pipRadius - 10
+
+    ctx.save()
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'bottom'
+    const fontSize = 24
+    ctx.font = `800 ${fontSize}px 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif`
+    ctx.fillStyle = remaining <= 1.5 ? '#f87171' : HIGHLIGHT_COLOR
+    ctx.fillText(text, centerX, textY)
+    ctx.restore()
   }
 
 
