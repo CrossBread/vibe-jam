@@ -115,7 +115,9 @@ function resolveRange(
   let min = typeof minValue === 'number' && Number.isFinite(minValue) ? minValue : fallbackMin
   let max = typeof maxValue === 'number' && Number.isFinite(maxValue) ? maxValue : fallbackMax
   if (min > max) {
-    ;[min, max] = [max, min]
+    const originalMin = min
+    min = max
+    max = originalMin
   }
   return [min, max]
 }

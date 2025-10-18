@@ -102,9 +102,9 @@ export interface PaddlePotionModifier extends GravityWellModifier {
   objectColor?: string
 }
 
-export interface DrinkMeModifier extends PaddlePotionModifier {}
+export type DrinkMeModifier = PaddlePotionModifier
 
-export interface TeaPartyModifier extends PaddlePotionModifier {}
+export type TeaPartyModifier = PaddlePotionModifier
 
 export type ArenaModifiers = {
   [K in GravityWellKey]: K extends 'searchLight'

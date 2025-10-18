@@ -9,7 +9,7 @@ import { describe, it, expect, vi } from 'vitest'
 describe('Pong core', () => {
   function createTestGame() {
     const canvas = Object.assign(document.createElement('canvas'), { width: 800, height: 480 })
-    const gradient = { addColorStop: vi.fn() }
+    const gradient = { addColorStop: vi.fn() } as unknown as CanvasGradient
     const ctx = {
       fillStyle: '',
       strokeStyle: '',
@@ -27,8 +27,8 @@ describe('Pong core', () => {
       fillText: vi.fn(),
       save: vi.fn(),
       restore: vi.fn(),
-    }
-    canvas.getContext = vi.fn().mockReturnValue(ctx) as any
+    } as unknown as CanvasRenderingContext2D
+    vi.spyOn(canvas, 'getContext').mockReturnValue(ctx)
 
     const game = createPong(canvas, {
       autoStart: false,
@@ -157,7 +157,7 @@ describe('Pong core', () => {
 
   it('starts and resets the shot clock when opposing paddles return the ball', () => {
     const canvas = Object.assign(document.createElement('canvas'), { width: 800, height: 480 })
-    const gradient = { addColorStop: vi.fn() }
+    const gradient = { addColorStop: vi.fn() } as unknown as CanvasGradient
     const ctx = {
       fillStyle: '',
       strokeStyle: '',
@@ -173,8 +173,8 @@ describe('Pong core', () => {
       arc: vi.fn(),
       fill: vi.fn(),
       fillText: vi.fn(),
-    }
-    canvas.getContext = vi.fn().mockReturnValue(ctx) as any
+    } as unknown as CanvasRenderingContext2D
+    vi.spyOn(canvas, 'getContext').mockReturnValue(ctx)
 
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.25)
     try {
@@ -249,7 +249,7 @@ describe('Pong core', () => {
 
   it('expires the shot clock and queues a new mod vote without scoring', () => {
     const canvas = Object.assign(document.createElement('canvas'), { width: 800, height: 480 })
-    const gradient = { addColorStop: vi.fn() }
+    const gradient = { addColorStop: vi.fn() } as unknown as CanvasGradient
     const ctx = {
       fillStyle: '',
       strokeStyle: '',
@@ -265,8 +265,8 @@ describe('Pong core', () => {
       arc: vi.fn(),
       fill: vi.fn(),
       fillText: vi.fn(),
-    }
-    canvas.getContext = vi.fn().mockReturnValue(ctx) as any
+    } as unknown as CanvasRenderingContext2D
+    vi.spyOn(canvas, 'getContext').mockReturnValue(ctx)
 
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.25)
     try {
