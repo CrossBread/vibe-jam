@@ -268,11 +268,6 @@ export function createPong(
   const ARENA_BACKGROUND = '#10172a'
   const ANNOUNCEMENT_COLOR = '#203275'
   const HIGHLIGHT_COLOR = '#e7ecf3'
-  const MAX_KITE_HISTORY = 240
-  const MAX_BUM_SHUFFLE_HISTORY = 4000
-  const MAX_POLLOK_HISTORY = 6000
-  const BUM_SHUFFLE_DISTANCE_SQ = 4
-  const POLLOK_DISTANCE_SQ = 9
   const MAX_GRAVITY_VISUAL_STRENGTH = 8_000_000
   const GOAL_ZONE_INDICATOR_COLOR = '#f97316'
   const GOAL_ZONE_INDICATOR_WIDTH = 4
@@ -427,12 +422,7 @@ export function createPong(
     }
   }
 
-  function toGravityFalloffValue(range: number): number {
-    const radius = Number.isFinite(range) ? Math.max(0, range) : 0
-    return radius * radius
-  }
-
-  if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined') {
     window.addEventListener('keydown', (e) => {
       if (e.key === '`' && !e.repeat) {
         toggleOverlay(overlay)
@@ -796,21 +786,21 @@ export function createPong(
   const clampChillyHeights = (modifier = config.modifiers.paddle.chilly) => {
     const leftSettings = getChillySettingsForSide('left', modifier)
     const rightSettings = getChillySettingsForSide('right', modifier)
-    const clampedLeft = clamp(
+    const nextLeftHeight = clamp(
       leftPaddleHeight,
       leftSettings.minimumHeight,
       leftSettings.startingHeight,
     )
-    const clampedRight = clamp(
+    const nextRightHeight = clamp(
       rightPaddleHeight,
       rightSettings.minimumHeight,
       rightSettings.startingHeight,
     )
-    if (clampedLeft !== leftPaddleHeight) {
-      setPaddleHeight('left', clampedLeft, { preserveCenter: true })
+    if (nextLeftHeight !== leftPaddleHeight) {
+      setPaddleHeight('left', nextLeftHeight, { preserveCenter: true })
     }
-    if (clampedRight !== rightPaddleHeight) {
-      setPaddleHeight('right', clampedRight, { preserveCenter: true })
+    if (nextRightHeight !== rightPaddleHeight) {
+      setPaddleHeight('right', nextRightHeight, { preserveCenter: true })
     }
   }
 
@@ -1535,12 +1525,11 @@ export function createPong(
 
         if (doublesEnabled) {
           if (config.modifiers.paddle.missileCommander.enabled) {
-            const target = clamp(
+            state.leftInnerY = clamp(
               H * 0.5 - state.leftInnerPaddleHeight / 2,
               0,
               H - state.leftInnerPaddleHeight,
             )
-            state.leftInnerY = target
           } else {
             let innerGamepad = 0
             if (gamepadInput.rightAxis)
@@ -1572,12 +1561,11 @@ export function createPong(
 
         if (doublesEnabled) {
           if (config.modifiers.paddle.missileCommander.enabled) {
-            const target = clamp(
+            state.rightInnerY = clamp(
               H * 0.5 - state.rightInnerPaddleHeight / 2,
               0,
               H - state.rightInnerPaddleHeight,
             )
-            state.rightInnerY = target
           } else {
             const innerKeyDirection = (keys['w'] ? -1 : 0) + (keys['s'] ? 1 : 0)
             const innerDirection = clamp(innerKeyDirection, -1, 1)
@@ -1731,23 +1719,21 @@ export function createPong(
         const shouldAwardPoint = realBallsRemaining === 1
         if (realBallsRemaining > 0) realBallsRemaining -= 1
         balls.splice(i, 1)
-        if (shouldAwardPoint) {
-          pointAwarded = getPointAwardedForExit('left')
-          break
-        }
-        i -= 1
-        continue
+          if (shouldAwardPoint) {
+            pointAwarded = getPointAwardedForExit('left')
+            break
+          }
+          i -= 1
       }
       if (ball.x > W + radius) {
         const shouldAwardPoint = realBallsRemaining === 1
         if (realBallsRemaining > 0) realBallsRemaining -= 1
         balls.splice(i, 1)
-        if (shouldAwardPoint) {
-          pointAwarded = getPointAwardedForExit('right')
-          break
-        }
-        i -= 1
-        continue
+          if (shouldAwardPoint) {
+            pointAwarded = getPointAwardedForExit('right')
+            break
+          }
+          i -= 1
       }
     }
 
@@ -3373,13 +3359,12 @@ export function createPong(
     return BASE_PADDLE_H * getPaddleSizeMultiplier(side)
   }
 
-  function getChillySettings(modifier = config.modifiers.paddle.chilly) {
-    const maxHeight = H
-    const startingHeight = clamp(
-      Number.isFinite(modifier.startingHeight) ? modifier.startingHeight : BASE_PADDLE_H,
-      40,
-      maxHeight,
-    )
+    function getChillySettings(modifier = config.modifiers.paddle.chilly) {
+      const startingHeight = clamp(
+        Number.isFinite(modifier.startingHeight) ? modifier.startingHeight : BASE_PADDLE_H,
+        40,
+        H,
+      )
     const minimumHeight = clamp(
       Number.isFinite(modifier.minimumHeight) ? modifier.minimumHeight : BASE_PADDLE_H * 0.75,
       20,
@@ -3705,7 +3690,7 @@ export function createPong(
 
   function getModDisplayName(key: GravityWellKey): string {
     const modifier = config.modifiers.arena[key]
-    if (modifier && typeof modifier.name === 'string' && modifier.name.trim().length > 0) {
+    if (modifier.name.trim().length > 0) {
       return modifier.name
     }
     return key
@@ -4720,10 +4705,6 @@ export function createPong(
     const clamped = Math.max(0, Math.min(1, alpha))
     const color = hexToRgb(hex)
     return `rgba(${color.r}, ${color.g}, ${color.b}, ${clamped})`
-  }
-
-  function randomRange(min: number, max: number) {
-    return Math.random() * (max - min) + min
   }
 
   function clamp(v: number, a: number, b: number) {

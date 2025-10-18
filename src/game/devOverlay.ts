@@ -26,9 +26,6 @@ import {
   type FoosballModifier,
   type DizzyModifier,
   type BungeeModifier,
-  type AngryModifier,
-  type InchwormModifier,
-  type SlinkyModifier,
   type MissileCommanderModifier,
   type FrisbeeModifier,
   type DundeeModifier,
@@ -41,8 +38,6 @@ import { paddleModifierBuilders } from './mods/paddle'
 import {
   createSliderControl,
   createToggleControl,
-  degreesToRadians,
-  radiansToDegrees,
   type CreateModifierDetails,
 } from './mods/shared'
 
@@ -810,12 +805,10 @@ export function createDevOverlay(
     setStatsEnabled(statsToggleInput.checked, { emitEvent: true })
   })
 
-  const devtoolsApi: DevOverlayApi = {
-    setStatsEnabled: value => setStatsEnabled(value),
-    updateStats: stats => renderStats(stats),
+  overlay.__devtools = {
+    setStatsEnabled,
+    updateStats: renderStats,
   }
-
-  overlay.__devtools = devtoolsApi
 
   setStatsEnabled(false)
   renderStats(null)
@@ -1260,9 +1253,7 @@ function isDevConfig(value: unknown): value is DevConfig {
   if (!isBungeeModifier(paddle.bungee)) return false
   if (!isMissileCommanderModifier(paddle.missileCommander)) return false
   if (!isFrisbeeModifier(paddle.frisbee)) return false
-  if (!isDundeeModifier(paddle.dundee)) return false
-
-  return true
+  return isDundeeModifier(paddle.dundee)
 }
 
 function isGravityWellModifier(value: unknown): value is GravityWellModifier {
@@ -1392,8 +1383,8 @@ function isGravityWellModifier(value: unknown): value is GravityWellModifier {
     return false
   }
 
-  if ('ballBrightness' in candidate && typeof (candidate as { ballBrightness?: unknown }).ballBrightness !== 'number') {
-    return false
+  if ('ballBrightness' in candidate) {
+    return typeof (candidate as { ballBrightness?: unknown }).ballBrightness === 'number'
   }
 
   return true
