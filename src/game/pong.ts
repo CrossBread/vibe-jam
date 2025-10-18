@@ -246,6 +246,7 @@ export function createPong(
   const H = canvas.height
   const BASE_PADDLE_H = 90
   const PADDLE_W = 12
+  const PADDLE_COLLISION_CUSHION = 2
   const BALL_R = 8
   const WIN_SCORE = 11
   const PIPS_PER_BITE = 8
@@ -4147,9 +4148,12 @@ export function createPong(
 
     const top = segment.y
     const bottom = segment.y + segment.height
-    if (ball.y <= top || ball.y >= bottom) return false
-
     const radius = ball.radius
+    const cushion = PADDLE_COLLISION_CUSHION
+    const ballTop = ball.y - radius
+    const ballBottom = ball.y + radius
+    if (ballBottom <= top - cushion || ballTop >= bottom + cushion) return false
+
     if (segment.paddle.physicalSide === 'left') {
       const contact = ball.x - radius
       if (contact <= segment.x || contact >= segment.x + segment.width) return false

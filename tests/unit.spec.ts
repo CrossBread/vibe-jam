@@ -84,4 +84,31 @@ describe('Pong core', () => {
     expect(game.state.leftScore).toBe(startingLeft)
     expect(game.state.rightScore).toBe(startingRight + 1)
   })
+
+  it('reflects a ball that grazes the top edge of the right paddle', () => {
+    const { canvas, game } = createTestGame()
+    const primaryBall = game.state.balls[0]
+    expect(primaryBall).toBeDefined()
+    const ball = primaryBall!
+
+    const paddleX = canvas.width - 40 - 12
+    const paddleTop = game.state.rightY
+    const epsilon = 0.5
+
+    ball.x = paddleX - ball.radius - 1
+    ball.y = paddleTop - ball.radius + epsilon
+    ball.vx = Math.max(150, Math.abs(ball.vx))
+    ball.vy = 0
+    game.state.ballX = ball.x
+    game.state.ballY = ball.y
+    game.state.vx = ball.vx
+    game.state.vy = ball.vy
+
+    expect(ball.y).toBeLessThanOrEqual(paddleTop)
+
+    game.tick(0.016)
+
+    expect(ball.vx).toBeLessThan(0)
+    expect(game.state.vx).toBeLessThan(0)
+  })
 })
