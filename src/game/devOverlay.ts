@@ -125,16 +125,24 @@ const MODIFIER_CATEGORY_OVERRIDES: Record<string, FilterCategory[]> = {
   'paddle:slinky': ['paddleSize'],
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 function collectModifierCategories(
   section: ModifierSection,
   key: string,
-  modifier: Record<string, unknown>,
+  modifier: unknown,
 ): FilterCategory[] {
   const categories = new Set<FilterCategory>(SECTION_BASE_CATEGORIES[section] ?? [])
   const overrideKey = `${section}:${key}`
   const overrides = MODIFIER_CATEGORY_OVERRIDES[overrideKey]
   if (overrides) {
     overrides.forEach(category => categories.add(category))
+  }
+
+  if (!isRecord(modifier)) {
+    return Array.from(categories)
   }
 
   if (
@@ -899,18 +907,21 @@ export function createDevOverlay(
     const trimmed = searchTerm.trim()
     let regex: RegExp | null = null
     let regexValid = true
+    let regexErrorMessage = ''
 
     if (trimmed) {
       try {
         regex = new RegExp(trimmed, 'i')
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (error) {
         regexValid = false
+        regexErrorMessage =
+          error instanceof Error ? error.message : String(error)
       }
     }
 
     if (!regexValid && trimmed) {
-      searchError.textContent = 'Invalid search pattern: ' + eMsg
+      const message = regexErrorMessage || 'Unknown error'
+      searchError.textContent = 'Invalid search pattern: ' + message
     } else {
       searchError.textContent = ''
     }
@@ -1480,7 +1491,7 @@ export function createDevOverlay(
         key,
         name: modifier.name,
         description: modifier.description,
-        categories: collectModifierCategories('paddle', key, modifier as Record<string, unknown>),
+        categories: collectModifierCategories('paddle', key, modifier),
       })
     }
 
@@ -1522,7 +1533,7 @@ export function createDevOverlay(
         key,
         name: modifier.name,
         description: modifier.description,
-        categories: collectModifierCategories('ball', key, modifier as Record<string, unknown>),
+        categories: collectModifierCategories('ball', key, modifier),
       })
     }
 
@@ -1564,7 +1575,7 @@ export function createDevOverlay(
         key,
         name: modifier.name,
         description: modifier.description,
-        categories: collectModifierCategories('arena', key, modifier as Record<string, unknown>),
+        categories: collectModifierCategories('arena', key, modifier),
       })
     }
 
