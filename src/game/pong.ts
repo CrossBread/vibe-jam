@@ -2114,7 +2114,9 @@ export function createPong(
     spawnDivotWell()
     applyChillyShrink(side)
     handleHadronSplit(side, ball)
-    registerShotClockHit(side)
+    if (ball.isReal) {
+      registerShotClockHit(side)
+    }
   }
 
   function handleHadronSplit(side: 'left' | 'right', ball: BallState) {

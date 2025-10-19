@@ -286,6 +286,86 @@ describe('Pong core', () => {
     }
   })
 
+  it('ignores non-real balls when determining shot clock resets', () => {
+    const { canvas, game } = createTestGame()
+    const dt = 0.016
+    const paddleWidth = 12
+    const leftPaddleX = 40
+    const rightPaddleX = canvas.width - 40 - paddleWidth
+
+    const primaryBall = game.state.balls[0]
+    expect(primaryBall).toBeDefined()
+    const realBall = primaryBall!
+
+    const baseSpeed = Math.max(200, Math.abs(game.state.vx) || 320)
+    const leftTargetY = game.state.leftY + game.state.leftPaddleHeight / 2
+    const leftTargetX = leftPaddleX + paddleWidth + realBall.radius - 0.5
+
+    game.state.ballX = leftTargetX
+    game.state.ballY = leftTargetY
+    game.state.vx = -baseSpeed
+    game.state.vy = 0
+    realBall.x = leftTargetX
+    realBall.y = leftTargetY
+    realBall.vx = -baseSpeed
+    realBall.vy = 0
+
+    game.tick(dt)
+
+    expect(game.state.balls[0]?.lastPaddleHit).toBe('left')
+    const afterLeftHit = game.state.shotClockRemaining
+
+    for (let i = 0; i < 4; i += 1) {
+      game.tick(0.1)
+    }
+
+    const beforeFakeHit = game.state.shotClockRemaining
+    expect(beforeFakeHit).toBeLessThan(afterLeftHit)
+
+    const fakeBall = {
+      x: rightPaddleX - realBall.radius - 1,
+      y: game.state.rightY + game.state.rightPaddleHeight / 2,
+      vx: baseSpeed,
+      vy: 0,
+      radius: realBall.radius,
+      travelDistance: 0,
+      isReal: false,
+      opacity: 1,
+      lastPaddleHit: null,
+      portalCooldown: 0,
+    }
+
+    const fakeBallState = fakeBall as typeof realBall
+    game.state.balls.push(fakeBallState)
+
+    game.tick(dt)
+
+    const afterFakeHit = game.state.shotClockRemaining
+    expect(afterFakeHit).toBeLessThanOrEqual(beforeFakeHit)
+
+    const fakeIndex = game.state.balls.indexOf(fakeBallState)
+    if (fakeIndex >= 0) {
+      game.state.balls.splice(fakeIndex, 1)
+    }
+
+    const rightTargetY = game.state.rightY + game.state.rightPaddleHeight / 2
+    const rightTargetX = rightPaddleX - realBall.radius + 0.5
+    const reboundSpeed = Math.max(baseSpeed, Math.abs(realBall.vx) || baseSpeed)
+
+    game.state.ballX = rightTargetX
+    game.state.ballY = rightTargetY
+    game.state.vx = reboundSpeed
+    game.state.vy = 0
+    realBall.x = rightTargetX
+    realBall.y = rightTargetY
+    realBall.vx = reboundSpeed
+    realBall.vy = 0
+
+    game.tick(dt)
+
+    expect(game.state.shotClockRemaining).toBeGreaterThan(afterFakeHit)
+  })
+
   it('expires the shot clock and queues a new mod vote without scoring', () => {
     const canvas = Object.assign(document.createElement('canvas'), { width: 800, height: 480 })
     const gradient = { addColorStop: vi.fn() } as unknown as CanvasGradient
