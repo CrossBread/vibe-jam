@@ -404,6 +404,7 @@ export interface DevConfig {
   minHorizontalRatio: number
   speedIncreaseOnHit: number
   shotClockSeconds: number
+  maxAiMisalignment: number
   doubles: DoublesConfig
   modifiers: ModifiersConfig
   ui: UISettings

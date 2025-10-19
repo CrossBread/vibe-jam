@@ -1543,6 +1543,16 @@ export function createDevOverlay(
     )
 
     baseBody.appendChild(
+      createSliderControl('Max AI Misalignment', config.maxAiMisalignment, {
+        min: 0,
+        max: 100,
+        step: 1,
+        format: v => `${Math.round(v)} %`,
+        onInput: v => (config.maxAiMisalignment = v),
+      }),
+    )
+
+    baseBody.appendChild(
       createSliderControl(
         'Left Paddle Size Multiplier',
         config.leftPaddleSizeMultiplier,

@@ -374,6 +374,9 @@ export function createPong(
   const keys: KeySet = {}
   let leftAIEnabled = true
   let rightAIEnabled = true
+  let leftAiOffset = 0
+  let rightAiOffset = 0
+  let lastAiBallDirection: -1 | 0 | 1 = 0
   let pendingServeToLeft: boolean | null = null
   let serveCountdownRemaining = 0
   let preServeDelayRemaining = 0
@@ -1333,6 +1336,32 @@ export function createPong(
     }
   }
 
+  function sampleAiMisalignment(paddleHeight: number): number {
+    const percent = clamp(config.maxAiMisalignment ?? 0, 0, 100)
+    if (percent <= 0 || paddleHeight <= 0) {
+      return 0
+    }
+    const range = (percent / 100) * paddleHeight
+    return (Math.random() * 2 - 1) * range
+  }
+
+  function updateAiMisalignment(direction: -1 | 0 | 1) {
+    if (direction === lastAiBallDirection) {
+      return
+    }
+
+    if (direction === -1) {
+      leftAiOffset = sampleAiMisalignment(leftPaddleHeight)
+    } else if (direction === 1) {
+      rightAiOffset = sampleAiMisalignment(rightPaddleHeight)
+    } else {
+      leftAiOffset = 0
+      rightAiOffset = 0
+    }
+
+    lastAiBallDirection = direction
+  }
+
   function syncPrimaryBallState() {
     const primary = balls[0]
     if (primary) {
@@ -1464,6 +1493,9 @@ export function createPong(
     modVote = null
     leftAIEnabled = true
     rightAIEnabled = true
+    leftAiOffset = 0
+    rightAiOffset = 0
+    lastAiBallDirection = 0
     ballModManager.reset()
     arenaModManager.reset()
     activeGravityWells = []
@@ -1561,11 +1593,14 @@ export function createPong(
     const leftPaddleSpeed = config.paddleSpeed * getPaddleSpeedMultiplier('left')
     const rightPaddleSpeed = config.paddleSpeed * getPaddleSpeedMultiplier('right')
 
+    const ballDirection: -1 | 0 | 1 = state.vx > 0 ? 1 : state.vx < 0 ? -1 : 0
+    updateAiMisalignment(ballDirection)
+
     if (modVote) {
       handleModVoteInput(gamepadInput)
     } else {
       if (leftAIEnabled) {
-        const target = state.ballY - leftPaddleHeight / 2
+        const target = state.ballY - leftPaddleHeight / 2 + leftAiOffset
         const maxStep = leftPaddleSpeed * dt
         const delta = clamp(target - state.leftY, -maxStep, maxStep)
         state.leftY += delta
@@ -1601,7 +1636,7 @@ export function createPong(
       }
 
       if (rightAIEnabled) {
-        const target = state.ballY - rightPaddleHeight / 2
+        const target = state.ballY - rightPaddleHeight / 2 + rightAiOffset
         const maxStep = rightPaddleSpeed * dt
         const delta = clamp(target - state.rightY, -maxStep, maxStep)
         state.rightY += delta

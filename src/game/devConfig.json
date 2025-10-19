@@ -8,6 +8,7 @@
   "minHorizontalRatio": 0.35,
   "speedIncreaseOnHit": 1.03,
   "shotClockSeconds": 8,
+  "maxAiMisalignment": 55,
   "doubles": {
     "enabled": false,
     "insideOffset": 72
