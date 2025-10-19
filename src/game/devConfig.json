@@ -16,7 +16,7 @@
     "typography": {
       "primaryFont": "'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif",
       "secondaryFont": "'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif",
-      "scoreFontSize": 28,
+      "scoreFontSize": 36,
       "countdownFontScale": 0.45,
       "countdownMinFontSize": 72,
       "announcementSingleLineSize": 148,
@@ -25,18 +25,18 @@
       "votingOptionFontSize": 48,
       "votingRandomFontSize": 60,
       "votingIndicatorFontSize": 54,
-      "shotClockFontSize": 24
+      "shotClockFontSize": 26
     },
     "scaling": {
       "countdownCardScale": 1,
       "returnMeterScale": 1,
-      "returnMeterSpacing": 22,
-      "scoreOffset": 60,
-      "halfcourtLineThickness": 2,
-      "halfcourtLineColor": "rgba(255,255,255,0.15)"
+      "returnMeterSpacing": 26,
+      "scoreOffset": 72,
+      "halfcourtLineThickness": 3,
+      "halfcourtLineColor": "rgba(255,255,255,0.25)"
     },
     "animations": {
-      "countdownFadeSeconds": 0.35,
+      "countdownFadeSeconds": 0.5,
       "countdownFadeCurve": "ease-in-out",
       "votingPanelFadeSeconds": 0.4,
       "votingPanelCurve": "ease-in-out",
