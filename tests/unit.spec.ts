@@ -155,6 +155,43 @@ describe('Pong core', () => {
     }
   })
 
+  it('starts the shot clock as soon as the ball is launched', () => {
+    const canvas = Object.assign(document.createElement('canvas'), { width: 800, height: 480 })
+    const gradient = { addColorStop: vi.fn() } as unknown as CanvasGradient
+    const ctx = {
+      fillStyle: '',
+      strokeStyle: '',
+      font: '',
+      textAlign: '',
+      fillRect: vi.fn(),
+      setLineDash: vi.fn(),
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      stroke: vi.fn(),
+      createRadialGradient: vi.fn(() => gradient),
+      arc: vi.fn(),
+      fill: vi.fn(),
+      fillText: vi.fn(),
+    } as unknown as CanvasRenderingContext2D
+    vi.spyOn(canvas, 'getContext').mockReturnValue(ctx)
+
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.25)
+    try {
+      const game = createPong(canvas, {
+        autoStart: false,
+        serveCountdownDuration: 0,
+        modRevealDelay: 0,
+      })
+
+      expect(game.state.balls[0]?.lastPaddleHit).toBeNull()
+      expect(game.state.shotClockActive).toBe(true)
+      expect(game.state.shotClockRemaining).toBeGreaterThan(7.5)
+    } finally {
+      randomSpy.mockRestore()
+    }
+  })
+
   it('starts and resets the shot clock when opposing paddles return the ball', () => {
     const canvas = Object.assign(document.createElement('canvas'), { width: 800, height: 480 })
     const gradient = { addColorStop: vi.fn() } as unknown as CanvasGradient
@@ -225,7 +262,9 @@ describe('Pong core', () => {
       primaryBall.vx = 0
       primaryBall.vy = 0
 
-      game.tick(1)
+      for (let i = 0; i < 4; i += 1) {
+        game.tick(0.25)
+      }
       const beforeReset = game.state.shotClockRemaining
       expect(beforeReset).toBeLessThan(afterLeftHit)
 

@@ -1415,6 +1415,8 @@ export function createPong(
     }
 
     resetBallSize()
+    const servingSide: 'left' | 'right' = toLeft ? 'right' : 'left'
+    registerShotClockHit(servingSide)
   }
 
   function updateServeTimers(dt: number) {
