@@ -3,14 +3,18 @@
  */
 
 import {
+  ANIMATION_CURVE_OPTIONS,
   BALL_MODIFIER_KEYS,
   GRAVITY_WELL_KEYS,
   PADDLE_MODIFIER_KEYS,
   deepClone,
+  type AnimationCurve,
   type DevConfig,
+  type DoublesConfig,
   type GravityWellModifier,
-  type ModifierBase,
   type KiteModifier,
+  type ModifiersConfig,
+  type ModifierBase,
   type BumShuffleModifier,
   type PollokModifier,
   type SnowballModifier,
@@ -29,8 +33,7 @@ import {
   type MissileCommanderModifier,
   type FrisbeeModifier,
   type DundeeModifier,
-  type ModifiersConfig,
-  type DoublesConfig,
+  type UISettings,
 } from './devtools'
 import { arenaModifierBuilders } from './mods/arena'
 import { ballModifierBuilders } from './mods/ball'
@@ -688,6 +691,29 @@ function ensureDevOverlayStyles() {
     .dev-overlay input[type='range'] {
       width: 100%;
     }
+    .dev-overlay__text-input,
+    .dev-overlay__select {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.6);
+      color: inherit;
+      font-size: 13px;
+      line-height: 1.3;
+    }
+    .dev-overlay__text-input::placeholder {
+      color: rgba(226, 232, 240, 0.5);
+    }
+    .dev-overlay__select {
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url('data:image/svg+xml;utf8,<svg fill="none" stroke="%23e2e8f0" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>');
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 16px 16px;
+      padding-right: 32px;
+    }
     .dev-overlay__color-input {
       width: 100%;
       height: 32px;
@@ -1257,6 +1283,95 @@ export function createDevOverlay(
 
     const dynamicCollapsibleSections: HTMLDetailsElement[] = []
 
+    const createHeading = (label: string) => {
+      const heading = document.createElement('div')
+      heading.className = 'dev-overlay__section-title'
+      heading.textContent = label
+      return heading
+    }
+
+    const createTextControl = (
+      label: string,
+      value: string,
+      options: { placeholder?: string; onCommit: (value: string) => string },
+    ) => {
+      const wrapper = document.createElement('label')
+      wrapper.className = 'dev-overlay__control'
+
+      const title = document.createElement('div')
+      title.className = 'dev-overlay__label'
+      title.textContent = label
+
+      const valueEl = document.createElement('span')
+      valueEl.className = 'dev-overlay__value'
+      valueEl.textContent = value
+      title.appendChild(valueEl)
+
+      const input = document.createElement('input')
+      input.type = 'text'
+      input.className = 'dev-overlay__text-input'
+      input.value = value
+      if (options.placeholder) {
+        input.placeholder = options.placeholder
+      }
+
+      const commit = () => {
+        const sanitized = options.onCommit(input.value.trim())
+        valueEl.textContent = sanitized
+        input.value = sanitized
+      }
+
+      input.addEventListener('change', commit)
+      input.addEventListener('blur', commit)
+
+      wrapper.appendChild(title)
+      wrapper.appendChild(input)
+
+      return wrapper
+    }
+
+    const createSelectControl = <Value extends string>(
+      label: string,
+      value: Value,
+      options: { values: Value[]; format: (value: Value) => string; onChange: (value: Value) => void },
+    ) => {
+      const wrapper = document.createElement('label')
+      wrapper.className = 'dev-overlay__control'
+
+      const title = document.createElement('div')
+      title.className = 'dev-overlay__label'
+      title.textContent = label
+
+      const valueEl = document.createElement('span')
+      valueEl.className = 'dev-overlay__value'
+      valueEl.textContent = options.format(value)
+      title.appendChild(valueEl)
+
+      const select = document.createElement('select')
+      select.className = 'dev-overlay__select'
+
+      for (const optionValue of options.values) {
+        const option = document.createElement('option')
+        option.value = optionValue
+        option.textContent = options.format(optionValue)
+        if (optionValue === value) {
+          option.selected = true
+        }
+        select.appendChild(option)
+      }
+
+      select.addEventListener('change', () => {
+        const next = select.value as Value
+        options.onChange(next)
+        valueEl.textContent = options.format(next)
+      })
+
+      wrapper.appendChild(title)
+      wrapper.appendChild(select)
+
+      return wrapper
+    }
+
     const createModifierDetails: CreateModifierDetails = (modifier, buildBody) => {
       const details = document.createElement('details')
       details.className = 'dev-overlay__modifier'
@@ -1456,6 +1571,301 @@ export function createDevOverlay(
     )
     dynamicCollapsibleSections.push(trackCollapsible(baseSection))
     controls.appendChild(baseSection)
+
+    const uiSection = document.createElement('details')
+    uiSection.className = 'dev-overlay__collapsible'
+    uiSection.open = false
+
+    const uiSummary = document.createElement('summary')
+    uiSummary.textContent = 'UI Settings'
+    uiSection.appendChild(uiSummary)
+
+    const uiBody = document.createElement('div')
+    uiBody.className = 'dev-overlay__collapsible-body'
+    uiSection.appendChild(uiBody)
+
+    const { typography, scaling, animations } = config.ui
+
+    const formatCurveLabel = (curve: AnimationCurve) =>
+      curve
+        .split('-')
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ')
+
+    uiBody.appendChild(createHeading('Typography'))
+    uiBody.appendChild(
+      createTextControl('Primary Font', typography.primaryFont, {
+        placeholder: "'Inter', ui-sans-serif",
+        onCommit: value => {
+          const sanitized = value || "ui-sans-serif, system-ui, sans-serif"
+          typography.primaryFont = sanitized
+          return sanitized
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createTextControl('Secondary Font', typography.secondaryFont, {
+        placeholder: "'Inter', ui-sans-serif",
+        onCommit: value => {
+          const sanitized = value || "ui-sans-serif, system-ui, sans-serif"
+          typography.secondaryFont = sanitized
+          return sanitized
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSliderControl('Score Font Size', typography.scoreFontSize, {
+        min: 12,
+        max: 72,
+        step: 1,
+        format: v => `${Math.round(v)} px`,
+        onInput: v => {
+          typography.scoreFontSize = v
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSliderControl('Countdown Font Scale', typography.countdownFontScale, {
+        min: 0.1,
+        max: 1,
+        step: 0.01,
+        format: v => `${v.toFixed(2)}×`,
+        onInput: v => {
+          typography.countdownFontScale = Number(v.toFixed(2))
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSliderControl('Countdown Min Font Size', typography.countdownMinFontSize, {
+        min: 32,
+        max: 240,
+        step: 1,
+        format: v => `${Math.round(v)} px`,
+        onInput: v => {
+          typography.countdownMinFontSize = v
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSliderControl('Announcement Font (1 Line)', typography.announcementSingleLineSize, {
+        min: 72,
+        max: 240,
+        step: 1,
+        format: v => `${Math.round(v)} px`,
+        onInput: v => {
+          typography.announcementSingleLineSize = v
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSliderControl('Announcement Font (2 Lines)', typography.announcementDoubleLineSize, {
+        min: 72,
+        max: 220,
+        step: 1,
+        format: v => `${Math.round(v)} px`,
+        onInput: v => {
+          typography.announcementDoubleLineSize = v
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSliderControl('Announcement Font (3 Lines)', typography.announcementTripleLineSize, {
+        min: 60,
+        max: 200,
+        step: 1,
+        format: v => `${Math.round(v)} px`,
+        onInput: v => {
+          typography.announcementTripleLineSize = v
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSliderControl('Voting Option Font Size', typography.votingOptionFontSize, {
+        min: 24,
+        max: 96,
+        step: 1,
+        format: v => `${Math.round(v)} px`,
+        onInput: v => {
+          typography.votingOptionFontSize = v
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSliderControl('Voting Random Font Size', typography.votingRandomFontSize, {
+        min: 32,
+        max: 110,
+        step: 1,
+        format: v => `${Math.round(v)} px`,
+        onInput: v => {
+          typography.votingRandomFontSize = v
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSliderControl('Voting Indicator Font Size', typography.votingIndicatorFontSize, {
+        min: 24,
+        max: 96,
+        step: 1,
+        format: v => `${Math.round(v)} px`,
+        onInput: v => {
+          typography.votingIndicatorFontSize = v
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSliderControl('Shot Clock Font Size', typography.shotClockFontSize, {
+        min: 12,
+        max: 72,
+        step: 1,
+        format: v => `${Math.round(v)} px`,
+        onInput: v => {
+          typography.shotClockFontSize = v
+        },
+      }),
+    )
+
+    uiBody.appendChild(createHeading('Layout & Scaling'))
+    uiBody.appendChild(
+      createSliderControl('Countdown Card Scale', scaling.countdownCardScale, {
+        min: 0.5,
+        max: 2,
+        step: 0.05,
+        format: v => `${v.toFixed(2)}×`,
+        onInput: v => {
+          scaling.countdownCardScale = Number(v.toFixed(2))
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSliderControl('Return Meter Scale', scaling.returnMeterScale, {
+        min: 0.5,
+        max: 2,
+        step: 0.05,
+        format: v => `${v.toFixed(2)}×`,
+        onInput: v => {
+          scaling.returnMeterScale = Number(v.toFixed(2))
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSliderControl('Return Meter Spacing', scaling.returnMeterSpacing, {
+        min: 12,
+        max: 48,
+        step: 1,
+        format: v => `${Math.round(v)} px`,
+        onInput: v => {
+          scaling.returnMeterSpacing = v
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSliderControl('Score Offset', scaling.scoreOffset, {
+        min: 24,
+        max: 140,
+        step: 1,
+        format: v => `${Math.round(v)} px`,
+        onInput: v => {
+          scaling.scoreOffset = v
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSliderControl('Halfcourt Line Thickness', scaling.halfcourtLineThickness, {
+        min: 0.5,
+        max: 8,
+        step: 0.1,
+        format: v => `${v.toFixed(1)} px`,
+        onInput: v => {
+          scaling.halfcourtLineThickness = Number(v.toFixed(1))
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createTextControl('Halfcourt Line Color', scaling.halfcourtLineColor, {
+        placeholder: '#ffffff or rgba(...)',
+        onCommit: value => {
+          const sanitized = value || 'rgba(255,255,255,0.15)'
+          scaling.halfcourtLineColor = sanitized
+          return sanitized
+        },
+      }),
+    )
+
+    uiBody.appendChild(createHeading('Animations'))
+    uiBody.appendChild(
+      createSliderControl('Countdown Fade Seconds', animations.countdownFadeSeconds, {
+        min: 0,
+        max: 2,
+        step: 0.05,
+        format: v => `${v.toFixed(2)} s`,
+        onInput: v => {
+          animations.countdownFadeSeconds = Number(v.toFixed(2))
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSelectControl('Countdown Fade Curve', animations.countdownFadeCurve, {
+        values: ANIMATION_CURVE_OPTIONS,
+        format: formatCurveLabel,
+        onChange: value => {
+          animations.countdownFadeCurve = value
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSliderControl('Voting Fade Seconds', animations.votingPanelFadeSeconds, {
+        min: 0,
+        max: 2,
+        step: 0.05,
+        format: v => `${v.toFixed(2)} s`,
+        onInput: v => {
+          animations.votingPanelFadeSeconds = Number(v.toFixed(2))
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSelectControl('Voting Fade Curve', animations.votingPanelCurve, {
+        values: ANIMATION_CURVE_OPTIONS,
+        format: formatCurveLabel,
+        onChange: value => {
+          animations.votingPanelCurve = value
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSelectControl('Announcement Fade Curve', animations.announcementFadeCurve, {
+        values: ANIMATION_CURVE_OPTIONS,
+        format: formatCurveLabel,
+        onChange: value => {
+          animations.announcementFadeCurve = value
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSliderControl('Mod Title Hold Seconds', animations.modTitleHoldSeconds, {
+        min: 0.5,
+        max: 6,
+        step: 0.1,
+        format: v => `${v.toFixed(1)} s`,
+        onInput: v => {
+          animations.modTitleHoldSeconds = Number(v.toFixed(1))
+        },
+      }),
+    )
+    uiBody.appendChild(
+      createSliderControl('Mod Title Fade Seconds', animations.modTitleFadeSeconds, {
+        min: 0,
+        max: 3,
+        step: 0.05,
+        format: v => `${v.toFixed(2)} s`,
+        onInput: v => {
+          animations.modTitleFadeSeconds = Number(v.toFixed(2))
+        },
+      }),
+    )
+
+    dynamicCollapsibleSections.push(trackCollapsible(uiSection))
+    controls.appendChild(uiSection)
 
     const paddleTitle = document.createElement('div')
     paddleTitle.className = 'dev-overlay__section-title'
@@ -1671,6 +2081,7 @@ function applyConfig(target: DevConfig, source: DevConfig) {
   target.shotClockSeconds = source.shotClockSeconds
   target.doubles = deepClone(source.doubles)
   target.modifiers = deepClone(source.modifiers)
+  target.ui = deepClone(source.ui)
 }
 
 function isDevConfig(value: unknown): value is DevConfig {
@@ -1727,7 +2138,9 @@ function isDevConfig(value: unknown): value is DevConfig {
   if (!isBungeeModifier(paddle.bungee)) return false
   if (!isMissileCommanderModifier(paddle.missileCommander)) return false
   if (!isFrisbeeModifier(paddle.frisbee)) return false
-  return isDundeeModifier(paddle.dundee)
+  if (!isDundeeModifier(paddle.dundee)) return false
+
+  return isUISettings(candidate.ui)
 }
 
 function isGravityWellModifier(value: unknown): value is GravityWellModifier {
@@ -2069,6 +2482,66 @@ function isDoublesConfig(value: unknown): value is DoublesConfig {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<DoublesConfig>
   return typeof candidate.enabled === 'boolean' && typeof candidate.insideOffset === 'number'
+}
+
+function isAnimationCurveValue(value: unknown): value is AnimationCurve {
+  return typeof value === 'string' && ANIMATION_CURVE_OPTIONS.includes(value as AnimationCurve)
+}
+
+function isUITypographySettings(value: unknown): value is UISettings['typography'] {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<UISettings['typography']>
+  return (
+    typeof candidate.primaryFont === 'string' &&
+    typeof candidate.secondaryFont === 'string' &&
+    typeof candidate.scoreFontSize === 'number' &&
+    typeof candidate.countdownFontScale === 'number' &&
+    typeof candidate.countdownMinFontSize === 'number' &&
+    typeof candidate.announcementSingleLineSize === 'number' &&
+    typeof candidate.announcementDoubleLineSize === 'number' &&
+    typeof candidate.announcementTripleLineSize === 'number' &&
+    typeof candidate.votingOptionFontSize === 'number' &&
+    typeof candidate.votingRandomFontSize === 'number' &&
+    typeof candidate.votingIndicatorFontSize === 'number' &&
+    typeof candidate.shotClockFontSize === 'number'
+  )
+}
+
+function isUIScalingSettings(value: unknown): value is UISettings['scaling'] {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<UISettings['scaling']>
+  return (
+    typeof candidate.countdownCardScale === 'number' &&
+    typeof candidate.returnMeterScale === 'number' &&
+    typeof candidate.returnMeterSpacing === 'number' &&
+    typeof candidate.scoreOffset === 'number' &&
+    typeof candidate.halfcourtLineThickness === 'number' &&
+    typeof candidate.halfcourtLineColor === 'string'
+  )
+}
+
+function isUIAnimationSettings(value: unknown): value is UISettings['animations'] {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<UISettings['animations']>
+  return (
+    typeof candidate.countdownFadeSeconds === 'number' &&
+    isAnimationCurveValue(candidate.countdownFadeCurve) &&
+    typeof candidate.votingPanelFadeSeconds === 'number' &&
+    isAnimationCurveValue(candidate.votingPanelCurve) &&
+    isAnimationCurveValue(candidate.announcementFadeCurve) &&
+    typeof candidate.modTitleHoldSeconds === 'number' &&
+    typeof candidate.modTitleFadeSeconds === 'number'
+  )
+}
+
+function isUISettings(value: unknown): value is UISettings {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<UISettings>
+  return (
+    isUITypographySettings(candidate.typography) &&
+    isUIScalingSettings(candidate.scaling) &&
+    isUIAnimationSettings(candidate.animations)
+  )
 }
 
 function createOverlayButton(label: string) {

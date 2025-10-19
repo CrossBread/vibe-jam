@@ -339,6 +339,61 @@ export interface DoublesConfig {
   insideOffset: number
 }
 
+export type AnimationCurve =
+  | 'linear'
+  | 'ease-in'
+  | 'ease-out'
+  | 'ease-in-out'
+  | 'ease-out-back'
+
+export interface UITypographySettings {
+  primaryFont: string
+  secondaryFont: string
+  scoreFontSize: number
+  countdownFontScale: number
+  countdownMinFontSize: number
+  announcementSingleLineSize: number
+  announcementDoubleLineSize: number
+  announcementTripleLineSize: number
+  votingOptionFontSize: number
+  votingRandomFontSize: number
+  votingIndicatorFontSize: number
+  shotClockFontSize: number
+}
+
+export interface UIScalingSettings {
+  countdownCardScale: number
+  returnMeterScale: number
+  returnMeterSpacing: number
+  scoreOffset: number
+  halfcourtLineThickness: number
+  halfcourtLineColor: string
+}
+
+export interface UIAnimationSettings {
+  countdownFadeSeconds: number
+  countdownFadeCurve: AnimationCurve
+  votingPanelFadeSeconds: number
+  votingPanelCurve: AnimationCurve
+  announcementFadeCurve: AnimationCurve
+  modTitleHoldSeconds: number
+  modTitleFadeSeconds: number
+}
+
+export interface UISettings {
+  typography: UITypographySettings
+  scaling: UIScalingSettings
+  animations: UIAnimationSettings
+}
+
+export const ANIMATION_CURVE_OPTIONS: AnimationCurve[] = [
+  'linear',
+  'ease-in',
+  'ease-out',
+  'ease-in-out',
+  'ease-out-back',
+]
+
 export interface DevConfig {
   paddleSpeed: number
   leftPaddleSpeedMultiplier: number
@@ -351,6 +406,7 @@ export interface DevConfig {
   shotClockSeconds: number
   doubles: DoublesConfig
   modifiers: ModifiersConfig
+  ui: UISettings
 }
 
 const DEFAULT_DEV_CONFIG: DevConfig = defaultDevConfig as DevConfig

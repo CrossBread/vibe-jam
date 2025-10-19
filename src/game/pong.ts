@@ -7,6 +7,7 @@ import {
   createDevConfig,
   deepClone,
   getGravityWellsEntries,
+  type AnimationCurve,
   type ArenaModifiers,
   type GravityWellKey,
   type GravityWellModifier,
@@ -179,11 +180,15 @@ export interface PongOptions {
 
 type KeySet = Record<string, boolean>
 
-interface Announcement {
+interface AnnouncementQueueItem {
   lines: string[]
-  elapsed: number
   holdDuration: number
   fadeDuration: number
+  blockServeCountdown: boolean
+}
+
+interface AnnouncementState extends AnnouncementQueueItem {
+  elapsed: number
 }
 
 interface PaddleHeightOptions {
@@ -384,6 +389,8 @@ export function createPong(
   let pendingModVoteCount = 0
   let nextModVoteExclude: GravityWellKey | null = null
   let modVote: ModVoteState | null = null
+  let modVoteVisibility = 0
+  let lastModVotePrompt: ModVoteState | null = null
 
   interface ModVoteInputState {
     upRequested: boolean
@@ -1249,7 +1256,9 @@ export function createPong(
     wormholeMod,
     vortexMod,
   ])
-  let announcement: Announcement | null = null
+  let announcement: AnnouncementState | null = null
+  const announcementQueue: AnnouncementQueueItem[] = []
+  let pendingBlockingAnnouncements = 0
   let lastEnabledArenaModifiers = new Set<GravityWellKey>(
     getEnabledArenaModifierKeys(config.modifiers.arena),
   )
@@ -1419,6 +1428,10 @@ export function createPong(
     }
 
     if (serveCountdownRemaining > 0) {
+      if (isServeCountdownBlocked()) {
+        serveCountdownRemaining = Math.max(serveCountdownRemaining, serveCountdownDuration)
+        return
+      }
       serveCountdownRemaining = Math.max(0, serveCountdownRemaining - dt)
       if (serveCountdownRemaining > 0) {
         return
@@ -1453,6 +1466,8 @@ export function createPong(
     arenaModManager.reset()
     activeGravityWells = []
     announcement = null
+    announcementQueue.length = 0
+    pendingBlockingAnnouncements = 0
     lastEnabledArenaModifiers = new Set<GravityWellKey>(
       getEnabledArenaModifierKeys(config.modifiers.arena),
     )
@@ -1505,6 +1520,7 @@ export function createPong(
 
   function tick(dt: number) {
     updateAnnouncement(dt)
+    updateModVoteFade(dt)
     checkModifierAnnouncements()
     updatePaddleModifierState(dt)
 
@@ -1822,12 +1838,29 @@ export function createPong(
     )
   }
 
+  function maybeStartNextAnnouncement() {
+    if (announcement || announcementQueue.length === 0) return
+    const next = announcementQueue.shift()
+    if (!next) return
+    announcement = { ...next, elapsed: 0 }
+  }
+
   function updateAnnouncement(dt: number) {
-    if (!announcement) return
+    if (!announcement) {
+      maybeStartNextAnnouncement()
+      if (!announcement) {
+        return
+      }
+    }
+
     announcement.elapsed += dt
     const totalDuration = announcement.holdDuration + announcement.fadeDuration
     if (announcement.elapsed >= totalDuration) {
+      if (announcement.blockServeCountdown) {
+        pendingBlockingAnnouncements = Math.max(0, pendingBlockingAnnouncements - 1)
+      }
       announcement = null
+      maybeStartNextAnnouncement()
     }
   }
 
@@ -1844,7 +1877,16 @@ export function createPong(
     }
 
     if (newlyEnabled.length > 0) {
-      showAnnouncement(newlyEnabled)
+      const animations = config.ui.animations
+      const hold = Math.max(0, animations.modTitleHoldSeconds)
+      const fade = Math.max(0, animations.modTitleFadeSeconds)
+      for (const name of newlyEnabled) {
+        queueAnnouncement([name], {
+          holdDuration: hold,
+          fadeDuration: fade,
+          blockServeCountdown: true,
+        })
+      }
     }
 
     lastEnabledArenaModifiers = enabledKeys
@@ -1866,19 +1908,80 @@ export function createPong(
     return config.modifiers.arena.searchLight as SearchLightModifier
   }
 
-  function showAnnouncement(lines: string[]) {
-    const uppercased = lines
-      .flatMap(line => line.trim().split(/\s+/))
+  function queueAnnouncement(
+    lines: string[],
+    options: {
+      holdDuration?: number
+      fadeDuration?: number
+      blockServeCountdown?: boolean
+    } = {},
+  ) {
+    const sanitized = lines
+      .map(line => line.trim())
       .filter(Boolean)
-      .map(segment => segment.toUpperCase())
+      .map(line => line.toUpperCase())
       .slice(0, 3)
-    if (uppercased.length === 0) return
+    if (sanitized.length === 0) return
 
-    announcement = {
-      lines: uppercased,
-      elapsed: 0,
-      holdDuration: Math.max(0, announcementHoldDuration),
-      fadeDuration: Math.max(0, announcementFadeDuration),
+    const animations = config.ui.animations
+    const hold = Math.max(0, options.holdDuration ?? animations.modTitleHoldSeconds)
+    const fade = Math.max(0, options.fadeDuration ?? animations.modTitleFadeSeconds)
+    const entry: AnnouncementQueueItem = {
+      lines: sanitized,
+      holdDuration: hold,
+      fadeDuration: fade,
+      blockServeCountdown: Boolean(options.blockServeCountdown),
+    }
+
+    if (entry.blockServeCountdown) {
+      pendingBlockingAnnouncements += 1
+    }
+
+    announcementQueue.push(entry)
+    maybeStartNextAnnouncement()
+  }
+
+  function isServeCountdownBlocked(): boolean {
+    return pendingBlockingAnnouncements > 0
+  }
+
+  function updateModVoteFade(dt: number) {
+    const target = modVote ? 1 : 0
+    const duration = Math.max(0, config.ui.animations.votingPanelFadeSeconds)
+
+    if (duration <= 0) {
+      modVoteVisibility = target
+      if (modVote) {
+        const [top, bottom] = modVote.options
+        lastModVotePrompt = {
+          options: [top, bottom],
+          leftSelection: modVote.leftSelection,
+          rightSelection: modVote.rightSelection,
+        }
+      } else {
+        lastModVotePrompt = null
+      }
+      return
+    }
+
+    const step = dt / duration
+    if (target > modVoteVisibility) {
+      modVoteVisibility = Math.min(1, modVoteVisibility + step)
+    } else if (target < modVoteVisibility) {
+      modVoteVisibility = Math.max(0, modVoteVisibility - step)
+      if (target === 0 && modVoteVisibility <= 1e-3) {
+        modVoteVisibility = 0
+        lastModVotePrompt = null
+      }
+    }
+
+    if (modVote) {
+      const [top, bottom] = modVote.options
+      lastModVotePrompt = {
+        options: [top, bottom],
+        leftSelection: modVote.leftSelection,
+        rightSelection: modVote.rightSelection,
+      }
     }
   }
 
@@ -1984,6 +2087,9 @@ export function createPong(
     bumShuffleMod.clearTrail()
     fogOfWarMod.resetState()
     wonderlandMod.resetState()
+
+    modVoteVisibility = 0
+    lastModVotePrompt = null
 
     disableAllMods()
     queueModVotes(1, previousMod ?? null)
@@ -2109,6 +2215,12 @@ export function createPong(
 
     const [firstOption, secondOption] = pickRandomModPair(exclude)
     modVote = {
+      options: [firstOption, secondOption],
+      leftSelection: 'neutral',
+      rightSelection: 'neutral',
+    }
+    modVoteVisibility = 0
+    lastModVotePrompt = {
       options: [firstOption, secondOption],
       leftSelection: 'neutral',
       rightSelection: 'neutral',
@@ -4331,12 +4443,18 @@ export function createPong(
     drawAnnouncement()
     drawServeCountdown()
 
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)'
+    const uiScaling = config.ui.scaling
+    const uiTypography = config.ui.typography
+
+    ctx.save()
+    ctx.strokeStyle = uiScaling.halfcourtLineColor
+    ctx.lineWidth = Math.max(0.5, uiScaling.halfcourtLineThickness)
     ctx.setLineDash([6, 10])
     ctx.beginPath()
     ctx.moveTo(W / 2, 0)
     ctx.lineTo(W / 2, H)
     ctx.stroke()
+    ctx.restore()
     ctx.setLineDash([])
 
     drawGravityWells(ctx, activeGravityWells, {
@@ -4441,20 +4559,21 @@ export function createPong(
       }
     }
 
-    const pipRadius = 6
-    const pipSpacing = 22
-    const pipY = H - 24
+    const returnMeterScale = Math.max(0.2, uiScaling.returnMeterScale)
+    const pipRadius = 6 * returnMeterScale
+    const pipSpacing = Math.max(4, uiScaling.returnMeterSpacing)
+    const pipY = H - 24 * returnMeterScale
     const pipStartX = W / 2 - ((PIPS_PER_BITE - 1) * pipSpacing) / 2
     const meterLeft = pipStartX - pipRadius
     const meterRight = pipStartX + (PIPS_PER_BITE - 1) * pipSpacing + pipRadius
-    ctx.lineWidth = 2
+    ctx.lineWidth = Math.max(1, 2 * returnMeterScale)
 
     drawShotClockCountdown(meterLeft, meterRight, pipY, pipRadius)
 
     if (state.completedBitesSinceLastPoint > 0) {
-      const chevronWidth = 12
-      const chevronHeight = 22
-      const chevronSpacing = 6
+      const chevronWidth = 12 * returnMeterScale
+      const chevronHeight = 22 * returnMeterScale
+      const chevronSpacing = 6 * returnMeterScale
       const previousLineCap = ctx.lineCap
       const previousLineJoin = ctx.lineJoin
       ctx.strokeStyle = HIGHLIGHT_COLOR
@@ -4502,14 +4621,19 @@ export function createPong(
     drawModVotePrompt()
 
     ctx.fillStyle = HIGHLIGHT_COLOR
-    ctx.font =
-      'bold 28px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto'
+    const scoreFontSize = Math.max(8, uiTypography.scoreFontSize)
+    ctx.font = `bold ${Math.round(scoreFontSize)}px ${getPrimaryFontFamily()}`
     ctx.textAlign = 'center'
-    ctx.fillText(String(state.leftScore), W / 2 - 60, 40)
-    ctx.fillText(String(state.rightScore), W / 2 + 60, 40)
+    const scoreOffset = uiScaling.scoreOffset
+    const scoreY = 40
+    ctx.fillText(String(state.leftScore), W / 2 - scoreOffset, scoreY)
+    ctx.fillText(String(state.rightScore), W / 2 + scoreOffset, scoreY)
 
     if (state.winner) {
-      ctx.font = 'bold 36px ui-sans-serif, system-ui'
+      const winnerFontSize = Math.round(
+        Math.max(scoreFontSize * 1.3, scoreFontSize + 8),
+      )
+      ctx.font = `bold ${winnerFontSize}px ${getPrimaryFontFamily()}`
       ctx.fillText(`${state.winner.toUpperCase()} WINS!`, W / 2, H / 2)
     }
   }
@@ -4527,13 +4651,13 @@ export function createPong(
 
     const text = remaining.toFixed(1)
     const centerX = (meterLeft + meterRight) / 2
-    const textY = meterY - pipRadius - 10
+    const textY = meterY - pipRadius - 10 * Math.max(0.5, config.ui.scaling.returnMeterScale)
 
     ctx.save()
     ctx.textAlign = 'center'
     ctx.textBaseline = 'bottom'
-    const fontSize = 24
-    ctx.font = `800 ${fontSize}px 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif`
+    const fontSize = Math.max(8, config.ui.typography.shotClockFontSize)
+    ctx.font = `800 ${Math.round(fontSize)}px ${getPrimaryFontFamily()}`
     ctx.fillStyle = remaining <= 1.5 ? '#f87171' : HIGHLIGHT_COLOR
     ctx.fillText(text, centerX, textY)
     ctx.restore()
@@ -4554,20 +4678,48 @@ export function createPong(
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     const baseSize = Math.min(W, H)
-    const fontSize = Math.max(72, Math.floor(baseSize * 0.45))
-    ctx.font = `900 ${fontSize}px 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif`
+    const typography = config.ui.typography
+    const scaling = config.ui.scaling
+    const animations = config.ui.animations
+    const fontScale = Math.max(0, typography.countdownFontScale)
+    const minFontSize = Math.max(1, typography.countdownMinFontSize)
+    const fontSize = Math.max(minFontSize, Math.floor(baseSize * fontScale))
+    ctx.font = `900 ${Math.round(fontSize)}px ${getSecondaryFontFamily()}`
 
     const metrics = ctx.measureText(text)
     const textWidth = metrics.width
     const textHeight =
       metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent || fontSize
-    const paddingX = fontSize * 0.4
-    const paddingY = fontSize * 0.3
+    const cardScale = Math.max(0.1, scaling.countdownCardScale)
+    const paddingX = fontSize * 0.4 * cardScale
+    const paddingY = fontSize * 0.3 * cardScale
     const cardWidth = textWidth + paddingX * 2
     const cardHeight = textHeight + paddingY * 2
     const cardX = W / 2 - cardWidth / 2
     const cardY = H / 2 - cardHeight / 2
-    const cardRadius = Math.min(cardHeight * 0.35, cardWidth / 2, cardHeight / 2)
+    const cardRadius =
+      Math.min(cardHeight * 0.35, cardWidth / 2, cardHeight / 2) * cardScale
+
+    let alpha = 1
+    const fadeDuration = Math.max(0, animations.countdownFadeSeconds)
+    if (fadeDuration > 0) {
+      const elapsed = Math.max(0, serveCountdownDuration - serveCountdownRemaining)
+      if (elapsed < fadeDuration) {
+        const fadeInProgress = clamp01(elapsed / fadeDuration)
+        alpha *= evaluateAnimationCurve(fadeInProgress, animations.countdownFadeCurve)
+      }
+      if (serveCountdownRemaining < fadeDuration) {
+        const fadeOutProgress = clamp01(1 - serveCountdownRemaining / fadeDuration)
+        const eased = evaluateAnimationCurve(fadeOutProgress, animations.countdownFadeCurve)
+        alpha *= Math.max(0, 1 - eased)
+      }
+    }
+
+    alpha = clamp01(alpha)
+    if (alpha <= 0) {
+      ctx.restore()
+      return
+    }
 
     const drawRoundedRectPath = (
       x: number,
@@ -4591,9 +4743,11 @@ export function createPong(
     }
 
     drawRoundedRectPath(cardX, cardY, cardWidth, cardHeight, cardRadius)
+    ctx.globalAlpha *= alpha
     ctx.fillStyle = applyAlphaToColor('#020617', 0.78)
     ctx.fill()
-    ctx.lineWidth = Math.max(4, fontSize * 0.06)
+
+    ctx.lineWidth = Math.max(4, fontSize * 0.06 * cardScale)
     ctx.strokeStyle = applyAlphaToColor('#94a3b8', 0.35)
     ctx.stroke()
 
@@ -4608,18 +4762,21 @@ export function createPong(
   }
 
   function drawModVotePrompt() {
-    if (!modVote) return
+    const prompt = modVote ?? lastModVotePrompt
+    const visibility = clamp01(modVoteVisibility)
+    if (!prompt || visibility <= 0) return
 
-    const [topKey, bottomKey] = modVote.options
+    const [topKey, bottomKey] = prompt.options
     const topLabel = getModDisplayName(topKey)
     const bottomLabel = getModDisplayName(bottomKey)
 
-    const optionFontSize = 48
-    const randomFontSize = 60
-    const optionFont =
-      `800 ${optionFontSize}px 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif`
-    const randomFont =
-      `900 ${randomFontSize}px 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif`
+    const typography = config.ui.typography
+    const optionFontSize = Math.max(12, typography.votingOptionFontSize)
+    const randomFontSize = Math.max(12, typography.votingRandomFontSize)
+    const indicatorFontSize = Math.max(8, typography.votingIndicatorFontSize)
+    const optionFont = `800 ${Math.round(optionFontSize)}px ${getPrimaryFontFamily()}`
+    const randomFont = `900 ${Math.round(randomFontSize)}px ${getSecondaryFontFamily()}`
+    const indicatorFont = `900 ${Math.round(indicatorFontSize)}px ${getPrimaryFontFamily()}`
 
     const centerX = W / 2
     const centerY = H / 2
@@ -4627,9 +4784,6 @@ export function createPong(
     const paddingX = 32
     const paddingY = 18
     const indicatorSpacing = 58
-    const indicatorFontSize = 54
-    const indicatorFont =
-      `900 ${indicatorFontSize}px 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif`
 
     const entries = [
       {
@@ -4637,30 +4791,35 @@ export function createPong(
         y: centerY - spacing,
         font: optionFont,
         fontSize: optionFontSize,
-        leftSelected: modVote.leftSelection === 'up',
-        rightSelected: modVote.rightSelection === 'up',
+        leftSelected: prompt.leftSelection === 'up',
+        rightSelected: prompt.rightSelection === 'up',
       },
       {
         label: 'Random',
         y: centerY,
         font: randomFont,
         fontSize: randomFontSize,
-        leftSelected: modVote.leftSelection === 'neutral',
-        rightSelected: modVote.rightSelection === 'neutral',
+        leftSelected: prompt.leftSelection === 'neutral',
+        rightSelected: prompt.rightSelection === 'neutral',
       },
       {
         label: bottomLabel,
         y: centerY + spacing,
         font: optionFont,
         fontSize: optionFontSize,
-        leftSelected: modVote.leftSelection === 'down',
-        rightSelected: modVote.rightSelection === 'down',
+        leftSelected: prompt.leftSelection === 'down',
+        rightSelected: prompt.rightSelection === 'down',
       },
     ]
 
     ctx.save()
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
+    const easedVisibility = evaluateAnimationCurve(
+      visibility,
+      config.ui.animations.votingPanelCurve,
+    )
+    ctx.globalAlpha *= easedVisibility
 
     let maxBoxWidth = 0
     for (const entry of entries) {
@@ -4717,7 +4876,12 @@ export function createPong(
     let alpha = 1
     if (elapsed > holdDuration) {
       if (fadeDuration === 0) return
-      alpha = Math.max(0, 1 - (elapsed - holdDuration) / fadeDuration)
+      const fadeProgress = clamp01((elapsed - holdDuration) / fadeDuration)
+      const eased = evaluateAnimationCurve(
+        fadeProgress,
+        config.ui.animations.announcementFadeCurve,
+      )
+      alpha = Math.max(0, 1 - eased)
     }
 
     if (alpha <= 0) return
@@ -4726,14 +4890,20 @@ export function createPong(
     const lineCount = visibleLines.length
     if (lineCount === 0) return
 
-    const fontSize = lineCount === 1 ? 148 : lineCount === 2 ? 122 : 96
+    const typography = config.ui.typography
+    const fontSize =
+      lineCount === 1
+        ? typography.announcementSingleLineSize
+        : lineCount === 2
+          ? typography.announcementDoubleLineSize
+          : typography.announcementTripleLineSize
     const lineHeight = fontSize * 1.12
     const startY = H / 2 - ((lineCount - 1) * lineHeight) / 2
 
     ctx.save()
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.font = `900 ${fontSize}px 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif`
+    ctx.font = `900 ${Math.round(fontSize)}px ${getSecondaryFontFamily()}`
     ctx.fillStyle = applyAlphaToColor(ANNOUNCEMENT_COLOR, alpha)
     ctx.shadowColor = applyAlphaToColor('#0f172a', alpha * 0.6)
     ctx.shadowBlur = 22
@@ -4745,6 +4915,40 @@ export function createPong(
     }
 
     ctx.restore()
+  }
+
+  function getPrimaryFontFamily(): string {
+    const value = config.ui.typography.primaryFont?.trim()
+    return value && value.length > 0 ? value : 'ui-sans-serif, system-ui, sans-serif'
+  }
+
+  function getSecondaryFontFamily(): string {
+    const value = config.ui.typography.secondaryFont?.trim()
+    if (value && value.length > 0) {
+      return value
+    }
+    return getPrimaryFontFamily()
+  }
+
+  function evaluateAnimationCurve(t: number, curve: AnimationCurve): number {
+    const clamped = clamp01(t)
+    switch (curve) {
+      case 'ease-in':
+        return clamped * clamped
+      case 'ease-out':
+        return 1 - (1 - clamped) * (1 - clamped)
+      case 'ease-in-out':
+        return clamped < 0.5
+          ? 2 * clamped * clamped
+          : 1 - Math.pow(-2 * clamped + 2, 2) / 2
+      case 'ease-out-back': {
+        const c1 = 1.70158
+        const c3 = c1 + 1
+        return 1 + c3 * Math.pow(clamped - 1, 3) + c1 * Math.pow(clamped - 1, 2)
+      }
+      default:
+        return clamped
+    }
   }
 
   function getBallColorRgb(): RGBColor {
