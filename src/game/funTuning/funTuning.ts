@@ -157,6 +157,14 @@ export interface FunTuningOptions {
   timeScale?: number
 }
 
+export interface TrialSuiteDefinition {
+  id: string
+  label?: string
+  trials: TrialDefinition[]
+  options?: FunTuningOptions
+  metadata?: Record<string, unknown>
+}
+
 export interface FunTuningGeneration {
   generation: number
   mutationFactor: number

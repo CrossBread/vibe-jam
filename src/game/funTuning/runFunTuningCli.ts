@@ -11,6 +11,7 @@ import {
   type FunTuningStatus,
   type TrialDefinition,
   type TrialRunReport,
+  type TrialSuiteDefinition,
 } from './funTuning'
 
 interface CliArguments {
@@ -23,8 +24,25 @@ interface CliArguments {
 }
 
 interface TrialConfigFile {
-  trials: TrialDefinition[]
+  trials?: TrialDefinition[]
+  suites?: TrialSuiteDefinition[]
   options?: FunTuningOptions
+}
+
+interface FunScoreImprovement {
+  startingScore: number
+  bestScore: number
+  absoluteChange: number
+  signedAbsoluteChange: string
+  percentChange: number | null
+  percentChangeLabel: string
+}
+
+interface TrialSuiteRunResult {
+  suite: TrialSuiteDefinition
+  report: FunTuningReport
+  improvement: FunScoreImprovement | null
+  options: FunTuningOptions
 }
 
 function printUsage(): void {
@@ -150,11 +168,24 @@ function normalizeTrialConfig(
     return { trials: data }
   }
 
-  if (!Array.isArray(data.trials)) {
-    throw new Error('Trial config must include a "trials" array.')
+  const normalized: TrialConfigFile = { ...data }
+
+  if (normalized.trials !== undefined && !Array.isArray(normalized.trials)) {
+    throw new Error('Trial config must include a "trials" array when provided.')
   }
 
-  return data
+  if (normalized.suites !== undefined && !Array.isArray(normalized.suites)) {
+    throw new Error('Trial config must include a "suites" array when provided.')
+  }
+
+  const hasTrials = Array.isArray(normalized.trials) && normalized.trials.length > 0
+  const hasSuites = Array.isArray(normalized.suites) && normalized.suites.length > 0
+
+  if (!hasTrials && !hasSuites) {
+    throw new Error('Trial config must include a "trials" array or a "suites" array.')
+  }
+
+  return normalized
 }
 
 async function resolveSimulator(modulePath: string): Promise<HeadlessMatchSimulator> {
@@ -192,13 +223,61 @@ function findStartingTrialReport(report: FunTuningReport): TrialRunReport | null
   return firstGeneration.trialReports.find(trialReport => !trialReport.mutation) ?? null
 }
 
-function printSummary(report: FunTuningReport): void {
+function calculateFunScoreImprovement(
+  report: FunTuningReport,
+): FunScoreImprovement | null {
+  if (!report.bestTrial) {
+    return null
+  }
+
+  const startingReport = findStartingTrialReport(report)
+  if (!startingReport) {
+    return null
+  }
+
+  const startingScore = startingReport.summary.averageFunScore
+  const bestScore = report.bestTrial.summary.averageFunScore
+  const absoluteChange = bestScore - startingScore
+  const signedAbsoluteChange = `${absoluteChange >= 0 ? '+' : ''}${absoluteChange.toFixed(3)}`
+
+  let percentChange: number | null = null
+  let percentChangeLabel: string
+  if (startingScore === 0) {
+    if (absoluteChange === 0) {
+      percentChange = 0
+      percentChangeLabel = '0.0%'
+    } else if (absoluteChange > 0) {
+      percentChangeLabel = '∞%'
+    } else {
+      percentChangeLabel = '-∞%'
+    }
+  } else {
+    const percent = (absoluteChange / startingScore) * 100
+    percentChange = percent
+    percentChangeLabel = `${percent.toFixed(1)}%`
+  }
+
+  return {
+    startingScore,
+    bestScore,
+    absoluteChange,
+    signedAbsoluteChange,
+    percentChange,
+    percentChangeLabel,
+  }
+}
+
+function printSummary(report: FunTuningReport, context?: { suiteLabel?: string }): void {
   if (!report.bestTrial) {
     console.log('No trials completed.')
     return
   }
 
-  console.log('Fun tuning completed.')
+  if (context?.suiteLabel) {
+    console.log(`Fun tuning completed for suite ${context.suiteLabel}.`)
+  } else {
+    console.log('Fun tuning completed.')
+  }
   console.log(`Generations evaluated: ${report.generations.length}`)
   const startingReport = findStartingTrialReport(report)
   if (startingReport) {
@@ -212,31 +291,32 @@ function printSummary(report: FunTuningReport): void {
   const bestScore = report.bestTrial.summary.averageFunScore
   console.log(`Average fun score (best trial): ${bestScore.toFixed(3)}`)
 
-  if (startingReport) {
-    const startingScore = startingReport.summary.averageFunScore
-    const improvement = bestScore - startingScore
-    const signedImprovement = improvement >= 0
-      ? `+${improvement.toFixed(3)}`
-      : improvement.toFixed(3)
-    let percentMessage: string
-    if (startingScore === 0) {
-      if (improvement === 0) {
-        percentMessage = '0.0%'
-      } else {
-        percentMessage = improvement > 0 ? '∞%' : '-∞%'
-      }
-    } else {
-      const percent = (improvement / startingScore) * 100
-      percentMessage = `${percent.toFixed(1)}%`
-    }
-
+  const improvement = calculateFunScoreImprovement(report)
+  if (improvement) {
     console.log(
-      `Fun score improvement: ${signedImprovement} (${percentMessage})`,
+      `Fun score improvement: ${improvement.signedAbsoluteChange} (${improvement.percentChangeLabel})`,
     )
   }
 
   console.log('Recommended config patch:')
   console.log(JSON.stringify(report.recommendedConfigPatch, null, 2))
+}
+
+function printSuiteCollectionSummary(results: TrialSuiteRunResult[]): void {
+  if (!results.length) {
+    console.log('No trial suites completed.')
+    return
+  }
+
+  console.log(
+    `Fun tuning completed for ${results.length} trial suite${results.length === 1 ? '' : 's'}.`,
+  )
+
+  for (const result of results) {
+    const label = result.suite.label ?? result.suite.id
+    console.log('')
+    printSummary(result.report, { suiteLabel: label })
+  }
 }
 
 async function main(): Promise<void> {
@@ -275,38 +355,111 @@ async function main(): Promise<void> {
     const trialConfig = normalizeTrialConfig(rawTrialConfig as TrialConfigFile | TrialDefinition[])
 
     if (args.verbose) {
-      const trialCount = trialConfig.trials.length
-      console.log(`Loaded ${trialCount} trial${trialCount === 1 ? '' : 's'} from configuration.`)
-    }
-
-    const options = mergeOptions(trialConfig.options, args.overrides)
-    if (args.verbose) {
-      const generationCount = options.generations ?? 1
-      console.log(
-        `[${formatTimestamp(runStart)}] Starting fun tuning with ${generationCount} ` +
-          `generation${generationCount === 1 ? '' : 's'}. ETA updates will be provided as data becomes available.`,
-      )
-      if (typeof options.timeScale === 'number') {
-        console.log(`Simulated time scale: ${options.timeScale}x.`)
+      const suiteCount = trialConfig.suites?.length ?? 0
+      const trialCount = trialConfig.trials?.length ?? 0
+      if (suiteCount > 0) {
+        console.log(
+          `Loaded ${suiteCount} trial suite${suiteCount === 1 ? '' : 's'} from configuration.`,
+        )
+      }
+      if (trialCount > 0 && suiteCount === 0) {
+        console.log(`Loaded ${trialCount} trial${trialCount === 1 ? '' : 's'} from configuration.`)
       }
     }
 
-    const statusLogger = args.verbose ? createVerboseStatusLogger(runStart) : undefined
-    const report = await runFunTuning(
-      simulator,
-      trialConfig.trials,
-      options,
-      statusLogger,
-    )
+    const hasSuites = Array.isArray(trialConfig.suites) && trialConfig.suites.length > 0
 
-    printSummary(report)
+    if (hasSuites) {
+      const suiteResults: TrialSuiteRunResult[] = []
 
-    if (args.outputPath) {
-      const resolvedOutput = path.resolve(process.cwd(), args.outputPath)
-      await writeFile(resolvedOutput, JSON.stringify(report, null, 2))
-      console.log(`Full report saved to ${resolvedOutput}`)
-    } else if (args.verbose) {
-      console.log('No output path provided; skipping report file write.')
+      for (const suite of trialConfig.suites!) {
+        const suiteLabel = suite.label ?? suite.id
+        const suiteOptionsBase = mergeOptions(trialConfig.options, suite.options ?? {})
+        const suiteOptions = mergeOptions(suiteOptionsBase, args.overrides)
+
+        if (args.verbose) {
+          const trialCount = suite.trials.length
+          const generationCount = suiteOptions.generations ?? 1
+          console.log(
+            `[${formatTimestamp(new Date())}] Starting trial suite ${suiteLabel} with ${trialCount} ` +
+              `trial${trialCount === 1 ? '' : 's'} across ${generationCount} generation${generationCount === 1 ? '' : 's'}.`,
+          )
+          if (typeof suiteOptions.timeScale === 'number') {
+            console.log(`Simulated time scale: ${suiteOptions.timeScale}x.`)
+          }
+        }
+
+        const suiteStatusLogger = args.verbose
+          ? createVerboseStatusLogger(new Date())
+          : undefined
+        const report = await runFunTuning(
+          simulator,
+          suite.trials,
+          suiteOptions,
+          suiteStatusLogger,
+        )
+
+        suiteResults.push({
+          suite,
+          report,
+          improvement: calculateFunScoreImprovement(report),
+          options: suiteOptions,
+        })
+      }
+
+      printSuiteCollectionSummary(suiteResults)
+
+      if (args.outputPath) {
+        const resolvedOutput = path.resolve(process.cwd(), args.outputPath)
+        const suiteOutput = {
+          suites: suiteResults.map(result => ({
+            suite: {
+              id: result.suite.id,
+              label: result.suite.label ?? null,
+              trials: result.suite.trials,
+              options: result.suite.options ?? null,
+            },
+            funScoreImprovement: result.improvement,
+            recommendedConfigPatch: result.report.recommendedConfigPatch,
+            report: result.report,
+            effectiveOptions: result.options,
+          })),
+        }
+        await writeFile(resolvedOutput, JSON.stringify(suiteOutput, null, 2))
+        console.log(`Full report saved to ${resolvedOutput}`)
+      } else if (args.verbose) {
+        console.log('No output path provided; skipping report file write.')
+      }
+    } else {
+      const options = mergeOptions(trialConfig.options, args.overrides)
+      if (args.verbose) {
+        const generationCount = options.generations ?? 1
+        console.log(
+          `[${formatTimestamp(runStart)}] Starting fun tuning with ${generationCount} ` +
+            `generation${generationCount === 1 ? '' : 's'}. ETA updates will be provided as data becomes available.`,
+        )
+        if (typeof options.timeScale === 'number') {
+          console.log(`Simulated time scale: ${options.timeScale}x.`)
+        }
+      }
+
+      const statusLogger = args.verbose ? createVerboseStatusLogger(runStart) : undefined
+      const report = await runFunTuning(
+        simulator,
+        trialConfig.trials!,
+        options,
+        statusLogger,
+      )
+
+      printSummary(report)
+
+      if (args.outputPath) {
+        const resolvedOutput = path.resolve(process.cwd(), args.outputPath)
+        await writeFile(resolvedOutput, JSON.stringify(report, null, 2))
+        console.log(`Full report saved to ${resolvedOutput}`)
+      } else if (args.verbose) {
+        console.log('No output path provided; skipping report file write.')
+      }
     }
   } catch (error) {
     console.error('Failed to run fun tuning:')

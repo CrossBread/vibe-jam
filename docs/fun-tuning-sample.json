@@ -4,14 +4,16 @@
       "id": "baseline-black-hole",
       "mods": [
         {
-          "modPath": "paddle.hadron",
+          "modPath": "arena.minesweeper",
           "parameters": {
-            "splitAngle": 0.35,
-            "paddleSizeMultiplier": 1
+            "gridSpacing": 68,
+            "squareSize": 34,
+            "rows": 5,
+            "columns": 6
           }
         }
       ],
-      "repetitions": 20,
+      "repetitions": 18,
       "aiMisalignment": 0.6
     }
   ],
