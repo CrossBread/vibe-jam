@@ -491,7 +491,7 @@
         "splitAngle": 0.35,
         "armedColor": "#facc15",
         "disarmedColor": "#475569",
-        "paddleSizeMultiplier": 1,
+        "paddleSizeMultiplier": 3,
         "includeInRandom": true
       },
       "foosball": {

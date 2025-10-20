@@ -4,21 +4,22 @@
       "id": "baseline-black-hole",
       "mods": [
         {
-          "modPath": "arena.blackHole",
+          "modPath": "paddle.hadron",
           "parameters": {
-            "gravityStrength": 800000,
-            "gravityFalloff": 140
+            "splitAngle": 0.35,
+            "paddleSizeMultiplier": 1
           }
         }
       ],
-      "repetitions": 10,
+      "repetitions": 20,
       "aiMisalignment": 0.6
     }
   ],
   "options": {
-    "generations": 3,
-    "mutationSurvivors": 2,
-    "concurrency": 2,
-    "scoreLimit": 11
+    "generations": 4,
+    "mutationSurvivors": 3,
+    "concurrency": 5,
+    "scoreLimit": 11,
+    "timeScale": 2
   }
 }
