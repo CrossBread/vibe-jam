@@ -125,6 +125,7 @@ async function readJsonFileSafe(filePath: string) {
   const abs = path.resolve(filePath);
   const raw = await fs.readFile(abs, 'utf8');
   const noBom = raw.replace(/^\uFEFF/, ''); // strip UTF-8 BOM if present
+
   try {
     return JSON.parse(noBom);
   } catch (err) {
@@ -201,7 +202,12 @@ async function main(): Promise<void> {
     return
   }
 
+  let runStartTime: Date | null = null
+
   try {
+    const runStart = new Date()
+    runStartTime = runStart
+
     if (args.verbose) {
       console.log('Verbose status reporting enabled.')
       console.log(`Resolving simulator from ${args.simulatorPath}`)
@@ -223,23 +229,21 @@ async function main(): Promise<void> {
     }
 
     const options = mergeOptions(trialConfig.options, args.overrides)
-
     if (args.verbose) {
       const generationCount = options.generations ?? 1
-      console.log(`Starting fun tuning with ${generationCount} generation${generationCount === 1 ? '' : 's'}.`)
+      console.log(
+        `[${formatTimestamp(runStart)}] Starting fun tuning with ${generationCount} ` +
+          `generation${generationCount === 1 ? '' : 's'}. ETA updates will be provided as data becomes available.`,
+      )
     }
 
-    const statusLogger = args.verbose ? createVerboseStatusLogger() : undefined
+    const statusLogger = args.verbose ? createVerboseStatusLogger(runStart) : undefined
     const report = await runFunTuning(
       simulator,
       trialConfig.trials,
       options,
       statusLogger,
     )
-
-    if (args.verbose) {
-      console.log('Fun tuning run finished.')
-    }
 
     printSummary(report)
 
@@ -258,17 +262,40 @@ async function main(): Promise<void> {
       console.error(error)
     }
     process.exitCode = 1
+  } finally {
+    if (runStartTime) {
+      const finishTime = new Date()
+      const totalDurationMs = finishTime.getTime() - runStartTime.getTime()
+      console.log(
+        `[${formatTimestamp(finishTime)}] Fun tuning command finished. Total runtime: ${formatDuration(totalDurationMs)} ` +
+          `(${formatMinutes(totalDurationMs)}).`,
+      )
+    }
   }
 }
 
 await main()
 
-function createVerboseStatusLogger(): (status: FunTuningStatus) => void {
+function createVerboseStatusLogger(runStartTime: Date): (status: FunTuningStatus) => void {
+  const generationStartTimes = new Map<number, Date>()
+  const generationDurations: number[] = []
+
   return status => {
+    const now = new Date()
+
     switch (status.type) {
       case 'generation-start':
+        generationStartTimes.set(status.generation, now)
         console.log(
-          `Generation ${status.generation}/${status.totalGenerations} started (mutation factor ${status.mutationFactor.toFixed(2)}).`,
+          `[${formatTimestamp(now)}] Generation ${status.generation}/${status.totalGenerations} started ` +
+            `(mutation factor ${status.mutationFactor.toFixed(2)}). ${buildEtaMessage(
+              now,
+              generationDurations,
+              status.totalGenerations - status.generation + 1,
+            )}`,
+        )
+        console.log(
+          `  Runtime so far: ${formatDuration(now.getTime() - runStartTime.getTime())}.`,
         )
         break
       case 'trial-start': {
@@ -282,10 +309,69 @@ function createVerboseStatusLogger(): (status: FunTuningStatus) => void {
         break
       }
       case 'generation-complete':
-        console.log(`Generation ${status.generation}/${status.totalGenerations} complete.`)
+        {
+          const startedAt = generationStartTimes.get(status.generation)
+          const durationMs = startedAt ? now.getTime() - startedAt.getTime() : undefined
+          if (typeof durationMs === 'number') {
+            generationDurations.push(durationMs)
+          }
+
+          const remainingGenerations = status.totalGenerations - status.generation
+          const etaMessage = remainingGenerations > 0
+            ? buildEtaMessage(now, generationDurations, remainingGenerations)
+            : 'All generations complete.'
+          const runtimeMessage = durationMs
+            ? `in ${formatDuration(durationMs)} (${formatMinutes(durationMs)}).`
+            : 'with unknown duration.'
+
+          console.log(
+            `[${formatTimestamp(now)}] Generation ${status.generation}/${status.totalGenerations} complete ${runtimeMessage} ${etaMessage}`,
+          )
+        }
         break
       default:
         break
     }
   }
+}
+
+function buildEtaMessage(
+  now: Date,
+  durations: number[],
+  remainingGenerations: number,
+): string {
+  if (!durations.length || remainingGenerations <= 0) {
+    return 'ETA pending.'
+  }
+
+  const averageMs = durations.reduce((total, value) => total + value, 0) / durations.length
+  const remainingMs = averageMs * remainingGenerations
+  const eta = new Date(now.getTime() + remainingMs)
+  return `ETA ~${formatMinutes(remainingMs)} (approximately ${formatTimestamp(eta)}).`
+}
+
+function formatTimestamp(date: Date): string {
+  return date.toISOString()
+}
+
+function formatDuration(durationMs: number): string {
+  const totalSeconds = Math.max(0, Math.round(durationMs / 1000))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  const parts: string[] = []
+  if (hours) {
+    parts.push(`${hours}h`)
+  }
+  if (minutes || hours) {
+    parts.push(`${minutes}m`)
+  }
+  parts.push(`${seconds}s`)
+
+  return parts.join(' ')
+}
+
+function formatMinutes(durationMs: number): string {
+  return `${(durationMs / 60000).toFixed(1)} minutes`
 }
