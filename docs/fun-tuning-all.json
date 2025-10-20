@@ -1033,7 +1033,7 @@
     "generations": 4,
     "mutationSurvivors": 3,
     "concurrency": 6,
-    "scoreLimit": 11,
+    "scoreLimit": 5,
     "timeScale": 2
   }
 }
