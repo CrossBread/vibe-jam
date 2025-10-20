@@ -13,4 +13,4 @@
 ## Agent Self Reflection
 
 - Use this section to record high-level concepts, patterns, or approaches that future agents should follow or adapt.
-- Always provide a summary of any updates made to this AGENTS.md so future agents can quickly understand the changes.
+- Always provide a summary of any updates made to this AGENTS.md so human developers can review and understand the changes.
