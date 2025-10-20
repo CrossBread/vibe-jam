@@ -401,11 +401,11 @@ function createHeadlessRenderingContext(
   canvas: HTMLCanvasElement,
 ): CanvasRenderingContext2D {
   const noop = () => {}
-  const gradient = { addColorStop: noop }
-  return new Proxy(
-    {
-      canvas,
-      measureText: () => ({
+  const gradient = { addColorStop: noop } as CanvasGradient
+  const baseContext = {
+    canvas,
+    measureText: () =>
+      ({
         width: 0,
         actualBoundingBoxAscent: 0,
         actualBoundingBoxDescent: 0,
@@ -413,23 +413,26 @@ function createHeadlessRenderingContext(
         actualBoundingBoxRight: 0,
         fontBoundingBoxAscent: 0,
         fontBoundingBoxDescent: 0,
-      }),
-      createLinearGradient: () => gradient,
-      createRadialGradient: () => gradient,
-      createPattern: () => null,
+      } as TextMetrics),
+    createLinearGradient: () => gradient,
+    createRadialGradient: () => gradient,
+    createPattern: () => null,
+  } satisfies Partial<CanvasRenderingContext2D>
+
+  const proxyTarget = baseContext as unknown as CanvasRenderingContext2D
+  const handler: ProxyHandler<CanvasRenderingContext2D> = {
+    get(target, prop) {
+      if (prop in target) {
+        return Reflect.get(target, prop)
+      }
+      return noop
     },
-    {
-      get(target, prop) {
-        if (prop in target) {
-          return Reflect.get(target, prop)
-        }
-        return noop
-      },
-      set() {
-        return true
-      },
+    set() {
+      return true
     },
-  ) as CanvasRenderingContext2D
+  }
+
+  return new Proxy(proxyTarget, handler)
 }
 
 interface PerformanceTrackerLike {
