@@ -243,10 +243,10 @@
         "gravityStrength": 0,
         "gravityFalloff": 0,
         "radius": 0,
-        "gridSpacing": 68,
+        "gridSpacing": 85,
         "squareSize": 34,
         "rows": 5,
-        "columns": 6,
+        "columns": 4,
         "positiveTint": "#e2e8f0",
         "negativeTint": "#ef4444",
         "includeInRandom": true
