@@ -128,6 +128,83 @@ const MODIFIER_CATEGORY_OVERRIDES: Record<string, FilterCategory[]> = {
   'paddle:slinky': ['paddleSize'],
 }
 
+const MODIFIER_BASE_FIELDS = new Set(['name', 'description', 'enabled', 'includeInRandom'])
+
+const COSMETIC_EXACT_KEYS = new Set([
+  'radius',
+  'sampleInterval',
+  'tailLength',
+  'trailFade',
+  'trailLength',
+])
+
+const COSMETIC_KEY_PREFIXES = ['snowflake'] as const
+
+const COSMETIC_KEYS_BY_MOD_PATH = new Map<string, ReadonlySet<string>>()
+
+function isCopyableParameterValue(value: unknown): value is number | string | boolean {
+  return (
+    typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean'
+  )
+}
+
+function isCosmeticParameter(
+  key: string,
+  value: unknown,
+  modSpecificCosmetics: ReadonlySet<string> | null,
+): boolean {
+  if (modSpecificCosmetics?.has(key)) {
+    return true
+  }
+
+  if (COSMETIC_EXACT_KEYS.has(key)) {
+    return true
+  }
+
+  const lowerKey = key.toLowerCase()
+  if (lowerKey.includes('color') || lowerKey.includes('tint')) {
+    return true
+  }
+
+  if (lowerKey.includes('brightness') || lowerKey.includes('opacity')) {
+    return true
+  }
+
+  for (const prefix of COSMETIC_KEY_PREFIXES) {
+    if (lowerKey.startsWith(prefix)) {
+      return true
+    }
+  }
+
+  return false
+}
+
+function collectNonCosmeticParameters(
+  modPath: string,
+  modifier: ModifierBase,
+): Record<string, number | string | boolean> {
+  const result: Record<string, number | string | boolean> = {}
+  const modSpecificCosmetics = COSMETIC_KEYS_BY_MOD_PATH.get(modPath) ?? null
+
+  for (const [key, value] of Object.entries(modifier as Record<string, unknown>)) {
+    if (MODIFIER_BASE_FIELDS.has(key)) {
+      continue
+    }
+
+    if (!isCopyableParameterValue(value)) {
+      continue
+    }
+
+    if (isCosmeticParameter(key, value, modSpecificCosmetics)) {
+      continue
+    }
+
+    result[key] = value
+  }
+
+  return result
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
@@ -558,10 +635,11 @@ function ensureDevOverlayStyles() {
       align-items: center;
       justify-content: flex-start;
       gap: 12px;
-      padding: 10px;
+      padding: 10px 36px 10px 10px;
       font-weight: 500;
       cursor: pointer;
       list-style: none;
+      position: relative;
     }
     .dev-overlay__modifier summary::-webkit-details-marker {
       display: none;
@@ -572,17 +650,20 @@ function ensureDevOverlayStyles() {
       height: 8px;
       border-right: 2px solid rgba(226, 232, 240, 0.7);
       border-bottom: 2px solid rgba(226, 232, 240, 0.7);
-      transform: rotate(45deg);
-      margin-left: auto;
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%) rotate(45deg);
       transition: transform 0.2s ease;
     }
     .dev-overlay__modifier[open] summary::after {
-      transform: rotate(225deg);
+      transform: translateY(-50%) rotate(225deg);
     }
     .dev-overlay__modifier-header {
       display: flex;
       align-items: center;
       gap: 8px;
+      flex: 1;
       min-width: 0;
     }
     .dev-overlay__modifier-toggle {
@@ -592,6 +673,36 @@ function ensureDevOverlayStyles() {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .dev-overlay__modifier-copy-chip {
+      margin-left: auto;
+      margin-right: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(30, 41, 59, 0.45);
+      color: rgba(226, 232, 240, 0.85);
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+    .dev-overlay__modifier-copy-chip:hover {
+      background: rgba(51, 65, 85, 0.6);
+      border-color: rgba(148, 163, 184, 0.6);
+    }
+    .dev-overlay__modifier-copy-chip:focus-visible {
+      outline: 2px solid rgba(148, 163, 184, 0.85);
+      outline-offset: 2px;
+    }
+    .dev-overlay__modifier-copy-icon {
+      width: 12px;
+      height: 12px;
+      flex-shrink: 0;
     }
     .dev-overlay__collapsible {
       border-top: 1px solid rgba(148, 163, 184, 0.35);
@@ -1372,57 +1483,111 @@ export function createDevOverlay(
       return wrapper
     }
 
-    const createModifierDetails: CreateModifierDetails = (modifier, buildBody) => {
-      const details = document.createElement('details')
-      details.className = 'dev-overlay__modifier'
-      details.open = false
+    const createModifierDetails = (
+      section: ModifierSection,
+      key: string,
+    ): CreateModifierDetails => {
+      const modPath = `${section}.${key}`
 
-      const summary = document.createElement('summary')
+      return (modifier, buildBody) => {
+        const details = document.createElement('details')
+        details.className = 'dev-overlay__modifier'
+        details.open = false
 
-      const summaryHeader = document.createElement('div')
-      summaryHeader.className = 'dev-overlay__modifier-header'
+        const summary = document.createElement('summary')
 
-      const toggle = document.createElement('input')
-      toggle.type = 'checkbox'
-      toggle.checked = modifier.enabled
-      toggle.className = 'dev-overlay__modifier-toggle'
-      toggle.addEventListener('click', event => event.stopPropagation())
-      toggle.addEventListener('change', () => {
-        modifier.enabled = toggle.checked
-      })
+        const summaryHeader = document.createElement('div')
+        summaryHeader.className = 'dev-overlay__modifier-header'
 
-      const summaryLabel = document.createElement('span')
-      summaryLabel.className = 'dev-overlay__modifier-name'
-      summaryLabel.textContent = modifier.name
+        const toggle = document.createElement('input')
+        toggle.type = 'checkbox'
+        toggle.checked = modifier.enabled
+        toggle.className = 'dev-overlay__modifier-toggle'
+        toggle.addEventListener('click', event => event.stopPropagation())
+        toggle.addEventListener('change', () => {
+          modifier.enabled = toggle.checked
+        })
 
-      summaryHeader.appendChild(toggle)
-      summaryHeader.appendChild(summaryLabel)
-      summary.appendChild(summaryHeader)
-      details.appendChild(summary)
+        const summaryLabel = document.createElement('span')
+        summaryLabel.className = 'dev-overlay__modifier-name'
+        summaryLabel.textContent = modifier.name
 
-      const body = document.createElement('div')
-      body.className = 'dev-overlay__modifier-body'
+        summaryHeader.appendChild(toggle)
+        summaryHeader.appendChild(summaryLabel)
+        summary.appendChild(summaryHeader)
 
-      const description = document.createElement('p')
-      description.className = 'dev-overlay__description'
-      description.textContent = modifier.description
-      body.appendChild(description)
+        const copyChip = document.createElement('button')
+        copyChip.type = 'button'
+        copyChip.className = 'dev-overlay__modifier-copy-chip'
+        copyChip.title = `Copy trial parameters for ${modifier.name}`
 
-      body.appendChild(
-        createToggleControl('Include in Random Selection', modifier.includeInRandom, {
-          onChange: value => {
-            modifier.includeInRandom = value
-          },
-        }),
-      )
+        const copyIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+        copyIcon.setAttribute('viewBox', '0 0 20 20')
+        copyIcon.setAttribute('aria-hidden', 'true')
+        copyIcon.classList.add('dev-overlay__modifier-copy-icon')
 
-      buildBody(body)
+        const iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+        iconPath.setAttribute(
+          'd',
+          'M7 3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2zm-3 5a2 2 0 0 1 2-2h1v2H6v8h8v1a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z',
+        )
+        iconPath.setAttribute('fill', 'currentColor')
+        copyIcon.appendChild(iconPath)
 
-      details.appendChild(body)
+        const copyLabel = document.createElement('span')
+        copyLabel.textContent = 'Trial'
 
-      dynamicCollapsibleSections.push(trackCollapsible(details))
+        copyChip.appendChild(copyIcon)
+        copyChip.appendChild(copyLabel)
+        summary.appendChild(copyChip)
 
-      return details
+        copyChip.addEventListener('click', async event => {
+          event.stopPropagation()
+          event.preventDefault()
+
+          const parameters = collectNonCosmeticParameters(modPath, modifier)
+          const snippet = JSON.stringify({ modPath, parameters }, null, 2)
+
+          try {
+            await navigator.clipboard.writeText(snippet)
+            const count = Object.keys(parameters).length
+            setStatus(
+              count === 0
+                ? `Copied trial config for ${modPath} (no parameters).`
+                : `Copied trial config for ${modPath}.`,
+            )
+          } catch (error) {
+            console.error(error)
+            setStatus(`Failed to copy trial config for ${modPath}.`, 'error')
+          }
+        })
+
+        details.appendChild(summary)
+
+        const body = document.createElement('div')
+        body.className = 'dev-overlay__modifier-body'
+
+        const description = document.createElement('p')
+        description.className = 'dev-overlay__description'
+        description.textContent = modifier.description
+        body.appendChild(description)
+
+        body.appendChild(
+          createToggleControl('Include in Random Selection', modifier.includeInRandom, {
+            onChange: value => {
+              modifier.includeInRandom = value
+            },
+          }),
+        )
+
+        buildBody(body)
+
+        details.appendChild(body)
+
+        dynamicCollapsibleSections.push(trackCollapsible(details))
+
+        return details
+      }
     }
 
     const baseSection = document.createElement('details')
@@ -1902,7 +2067,7 @@ export function createDevOverlay(
       const modifier = config.modifiers.paddle[key]
       const details = paddleModifierBuilders[key]({
         modifier,
-        createDetails: createModifierDetails,
+        createDetails: createModifierDetails('paddle', key),
       })
       paddleList.appendChild(details)
       modifierEntries.push({
@@ -1944,7 +2109,7 @@ export function createDevOverlay(
       const modifier = config.modifiers.ball[key]
       const details = ballModifierBuilders[key]({
         modifier,
-        createDetails: createModifierDetails,
+        createDetails: createModifierDetails('ball', key),
       })
       ballList.appendChild(details)
       modifierEntries.push({
@@ -1986,7 +2151,7 @@ export function createDevOverlay(
       const modifier = config.modifiers.arena[key]
       const details = arenaModifierBuilders[key]({
         modifier,
-        createDetails: createModifierDetails,
+        createDetails: createModifierDetails('arena', key),
       })
       modifiersList.appendChild(details)
       modifierEntries.push({
