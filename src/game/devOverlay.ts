@@ -186,20 +186,22 @@ function collectNonCosmeticParameters(
   const result: Record<string, number | string | boolean> = {}
   const modSpecificCosmetics = COSMETIC_KEYS_BY_MOD_PATH.get(modPath) ?? null
 
-  for (const [key, value] of Object.entries(modifier as Record<string, unknown>)) {
-    if (MODIFIER_BASE_FIELDS.has(key)) {
+  for (const key of Object.keys(modifier) as (keyof typeof modifier)[]) {
+    if (MODIFIER_BASE_FIELDS.has(key as string)) {
       continue
     }
+
+    const value = modifier[key]
 
     if (!isCopyableParameterValue(value)) {
       continue
     }
 
-    if (isCosmeticParameter(key, value, modSpecificCosmetics)) {
+    if (isCosmeticParameter(key as string, value, modSpecificCosmetics)) {
       continue
     }
 
-    result[key] = value
+    result[key as string] = value
   }
 
   return result

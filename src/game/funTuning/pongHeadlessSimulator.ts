@@ -100,6 +100,12 @@ function createDirectionTracker(): DirectionTracker {
   return { sign: 0, sinceLastReturn: 0, max: 0 }
 }
 
+type ModifierSection = 'arena' | 'ball' | 'paddle'
+
+function isModifierSection(value: string): value is ModifierSection {
+  return value === 'arena' || value === 'ball' || value === 'paddle'
+}
+
 function resetTracker(tracker: DirectionTracker) {
   tracker.sign = 0
   tracker.sinceLastReturn = 0
@@ -203,9 +209,11 @@ function applyTrialParameters(config: DevConfig, mods: TrialModConfig[]) {
     const parts = mod.modPath.split('.')
     if (parts.length < 2) continue
     const [section, key] = parts
-    const sectionConfig = (config.modifiers as Record<string, Record<string, unknown>>)[section]
-    if (!sectionConfig) continue
-    const target = sectionConfig[key]
+    if (!isModifierSection(section)) continue
+    const sectionConfig = config.modifiers[section]
+    if (!sectionConfig || typeof sectionConfig !== 'object') continue
+    const sectionRecord = sectionConfig as Record<string, unknown>
+    const target = sectionRecord[key]
     if (!target || typeof target !== 'object') continue
     const params = mod.parameters ?? {}
     const targetRecord = target as Record<string, unknown>

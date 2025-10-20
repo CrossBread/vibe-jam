@@ -2272,7 +2272,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
 
   function startRoundFeedback(context: RoundFeedbackContext) {
     const baseDuration = Math.max(serveCountdownDuration, 5)
-    const selections = createPlayerSelections(() => 'neutral')
+    const selections = createPlayerSelections<RoundFeedbackSelection>(() => 'neutral')
     roundFeedback = {
       selections,
       remaining: baseDuration,
@@ -2705,7 +2705,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     const exclude = nextModVoteExclude ?? null
 
     const [firstOption, secondOption] = pickRandomModPair(exclude)
-    const initialSelections = createPlayerSelections(() => 'neutral')
+    const initialSelections = createPlayerSelections<ModVoteSelection>(() => 'neutral')
     modVote = {
       options: [firstOption, secondOption],
       selections: initialSelections,
