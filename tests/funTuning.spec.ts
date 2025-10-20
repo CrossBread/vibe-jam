@@ -32,6 +32,28 @@ class MockSimulator implements HeadlessMatchSimulator {
   }
 }
 
+class TrackingSimulator implements HeadlessMatchSimulator {
+  private readonly match: MatchSample
+  private active = 0
+  private maxActive = 0
+
+  constructor(match: MatchSample) {
+    this.match = match
+  }
+
+  get maxConcurrency(): number {
+    return this.maxActive
+  }
+
+  async runMatch(): Promise<MatchSample> {
+    this.active += 1
+    this.maxActive = Math.max(this.maxActive, this.active)
+    await new Promise(resolve => setTimeout(resolve, 5))
+    this.active -= 1
+    return this.match
+  }
+}
+
 function createTrial(mods: TrialModConfig[]): TrialDefinition {
   return {
     id: 'trial-1',
@@ -168,5 +190,34 @@ describe('fun tuning utilities', () => {
     expect(tuning.generations).toHaveLength(2)
     expect(tuning.bestTrial).not.toBeNull()
     expect(tuning.recommendedConfigPatch).toMatchObject({ modifiers: { arena: { blackHole: {} } } })
+  })
+
+  it('runs repetitions concurrently when concurrency is specified', async () => {
+    const match: MatchSample = {
+      rounds: [
+        {
+          durationSeconds: 6,
+          returnCount: 5,
+          shotClockExpired: false,
+          winner: 'left',
+          leftDirectionChanges: 3,
+          rightDirectionChanges: 4,
+        },
+      ],
+      finalScore: { left: 11, right: 8 },
+      finalScoreGap: 3,
+      maxScoreGap: 4,
+      aiMisses: [],
+    }
+
+    const simulator = new TrackingSimulator(match)
+    const trial = createTrial([
+      { modPath: 'arena.blackHole', parameters: { gravityStrength: 1_000_000 } },
+    ])
+
+    const report = await runTrial(simulator, trial, { repetitions: 4, concurrency: 2 })
+
+    expect(report.repetitions).toHaveLength(4)
+    expect(simulator.maxConcurrency).toBeGreaterThan(1)
   })
 })

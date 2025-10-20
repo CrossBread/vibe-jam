@@ -151,6 +151,7 @@ export interface FunTuningOptions {
   scoreLimit?: number
   mutationSurvivors?: number
   generations?: number
+  concurrency?: number
 }
 
 export interface FunTuningGeneration {
@@ -418,29 +419,48 @@ async function runTrialInternal(
   options: Required<Pick<FunTuningOptions, 'scoreLimit'>> & {
     repetitions: number
     aiMisalignment: number
+    concurrency: number
   },
   mutation: TrialMutationDescriptor | null,
 ): Promise<TrialRunReport> {
   const repetitions: TrialRepetitionResult[] = []
+  const concurrency = Math.max(1, Math.floor(options.concurrency))
+  let nextIndex = 0
 
-  for (let index = 0; index < options.repetitions; index += 1) {
-    const match = await simulator.runMatch({
-      trial,
-      parameters: trial.mods,
-      aiMisalignment: options.aiMisalignment,
-      scoreLimit: options.scoreLimit,
-    })
+  while (nextIndex < options.repetitions) {
+    const batchIndices: number[] = []
+    while (batchIndices.length < concurrency && nextIndex < options.repetitions) {
+      batchIndices.push(nextIndex)
+      nextIndex += 1
+    }
 
-    const metrics = buildRepetitionMetrics(match)
-    const funScore = computeFunFitnessScore(metrics, options.scoreLimit)
+    const batchMatches = await Promise.all(
+      batchIndices.map(async index => {
+        const match = await simulator.runMatch({
+          trial,
+          parameters: trial.mods,
+          aiMisalignment: options.aiMisalignment,
+          scoreLimit: options.scoreLimit,
+        })
 
-    repetitions.push({
-      repetitionIndex: index,
-      match,
-      metrics,
-      funScore,
-      mutation,
-    })
+        return { index, match }
+      }),
+    )
+
+    batchMatches
+      .sort((a, b) => a.index - b.index)
+      .forEach(({ index, match }) => {
+        const metrics = buildRepetitionMetrics(match)
+        const funScore = computeFunFitnessScore(metrics, options.scoreLimit)
+
+        repetitions.push({
+          repetitionIndex: index,
+          match,
+          metrics,
+          funScore,
+          mutation,
+        })
+      })
   }
 
   return summarizeTrial(trial, repetitions, options.scoreLimit, mutation)
@@ -455,11 +475,12 @@ export async function runTrial(
   const repetitions = options.repetitions ?? trial.repetitions ?? 10
   const aiMisalignment = options.aiMisalignment ?? trial.aiMisalignment ?? 0.6
   const scoreLimit = options.scoreLimit ?? 11
+  const concurrency = options.concurrency ?? 1
 
   return runTrialInternal(
     simulator,
     trial,
-    { repetitions, aiMisalignment, scoreLimit },
+    { repetitions, aiMisalignment, scoreLimit, concurrency },
     mutation,
   )
 }

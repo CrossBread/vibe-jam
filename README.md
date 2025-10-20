@@ -22,6 +22,54 @@ npm run test   # unit
 npm run test:e2e
 ```
 
+### Fun tuning simulations
+
+The fun tuning utilities live in `src/game/funTuning`. A thin CLI wrapper is available so you can run mutation batches without wiring them into the main game loop.
+
+1. Provide a headless simulator module that implements the `HeadlessMatchSimulator` contract. Export either:
+   - a `createSimulator()` factory that returns the simulator instance, or
+   - a named export called `simulator`, or
+   - a default export that already implements `runMatch()`.
+
+2. Create a trial definition file (JSON). You can provide either an array of trials or an object that includes additional default options:
+
+```json
+{
+  "trials": [
+    {
+      "id": "black-hole-baseline",
+      "mods": [
+        {
+          "modPath": "arena.blackHole",
+          "parameters": {
+            "gravityStrength": 1000000,
+            "radius": 320
+          }
+        }
+      ],
+      "repetitions": 5,
+      "aiMisalignment": 0.6
+    }
+  ],
+  "options": {
+    "generations": 3,
+    "mutationSurvivors": 2
+  }
+}
+```
+
+3. Run the CLI:
+
+```bash
+npm run fun-tuning -- \
+  --simulator ./simulators/blackHoleSimulator.ts \
+  --trials ./configs/black-hole-trials.json \
+  --concurrency 4 \
+  --output ./reports/black-hole-report.json
+```
+
+CLI overrides (`--repetitions`, `--score-limit`, `--ai-misalignment`, `--generations`, `--mutation-survivors`, `--concurrency`) replace the defaults from the trials file. The `--concurrency` flag controls how many matches run in parallel per trial; increase it to take advantage of multicore machines when your simulator supports concurrent work. The command prints a high-level summary (best fun score and recommended config patch) and, if `--output` is provided, writes the full `FunTuningReport` JSON to disk.
+
 ## Auto-deploy (GitHub Pages)
 This repo includes a Pages workflow for branch **master**. On every push to `master`: test → build → deploy to Pages.
 
