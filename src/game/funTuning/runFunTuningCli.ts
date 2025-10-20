@@ -10,6 +10,7 @@ import {
   type HeadlessMatchSimulator,
   type FunTuningStatus,
   type TrialDefinition,
+  type TrialRunReport,
 } from './funTuning'
 
 interface CliArguments {
@@ -182,6 +183,15 @@ function mergeOptions(base: FunTuningOptions | undefined, overrides: FunTuningOp
   return { ...base, ...overrides }
 }
 
+function findStartingTrialReport(report: FunTuningReport): TrialRunReport | null {
+  const firstGeneration = report.generations[0]
+  if (!firstGeneration) {
+    return null
+  }
+
+  return firstGeneration.trialReports.find(trialReport => !trialReport.mutation) ?? null
+}
+
 function printSummary(report: FunTuningReport): void {
   if (!report.bestTrial) {
     console.log('No trials completed.')
@@ -190,8 +200,41 @@ function printSummary(report: FunTuningReport): void {
 
   console.log('Fun tuning completed.')
   console.log(`Generations evaluated: ${report.generations.length}`)
+  const startingReport = findStartingTrialReport(report)
+  if (startingReport) {
+    console.log(`Starting trial id: ${startingReport.trial.id}`)
+    console.log(
+      `Starting average fun score: ${startingReport.summary.averageFunScore.toFixed(3)}`,
+    )
+  }
+
   console.log(`Best trial id: ${report.bestTrial.trial.id}`)
-  console.log(`Average fun score: ${report.bestTrial.summary.averageFunScore.toFixed(3)}`)
+  const bestScore = report.bestTrial.summary.averageFunScore
+  console.log(`Average fun score (best trial): ${bestScore.toFixed(3)}`)
+
+  if (startingReport) {
+    const startingScore = startingReport.summary.averageFunScore
+    const improvement = bestScore - startingScore
+    const signedImprovement = improvement >= 0
+      ? `+${improvement.toFixed(3)}`
+      : improvement.toFixed(3)
+    let percentMessage: string
+    if (startingScore === 0) {
+      if (improvement === 0) {
+        percentMessage = '0.0%'
+      } else {
+        percentMessage = improvement > 0 ? '∞%' : '-∞%'
+      }
+    } else {
+      const percent = (improvement / startingScore) * 100
+      percentMessage = `${percent.toFixed(1)}%`
+    }
+
+    console.log(
+      `Fun score improvement: ${signedImprovement} (${percentMessage})`,
+    )
+  }
+
   console.log('Recommended config patch:')
   console.log(JSON.stringify(report.recommendedConfigPatch, null, 2))
 }

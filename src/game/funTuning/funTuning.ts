@@ -402,7 +402,20 @@ function cloneTrial(trial: TrialDefinition): TrialDefinition {
       modPath: mod.modPath,
       parameters: deepClone(mod.parameters),
     })),
+    metadata: trial.metadata ? deepClone(trial.metadata) : undefined,
   }
+}
+
+function appendIndexSuffix(
+  id: string,
+  segments: number[],
+): string {
+  const suffix = segments.map(segment => String(segment)).join('.')
+  if (!suffix) {
+    return id
+  }
+
+  return id ? `${id}.${suffix}` : suffix
 }
 
 function applyMutation(
@@ -673,7 +686,15 @@ export async function runFunTuning(
 
     currentTrials = generationReports
       .slice(0, mutationSurvivors)
-      .map(report => cloneTrial(report.trial))
+      .map((report, survivorIndex) => {
+        const cloned = cloneTrial(report.trial)
+        const nextId = appendIndexSuffix(cloned.id, [generation, survivorIndex + 1])
+        cloned.id = nextId
+        if (!cloned.label || cloned.label === report.trial.id) {
+          cloned.label = nextId
+        }
+        return cloned
+      })
   }
 
   const recommendedConfigPatch = bestTrialReport
