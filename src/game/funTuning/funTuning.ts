@@ -245,41 +245,96 @@ function clampScore(value: number): number {
   return Math.max(0, Math.min(1, value))
 }
 
+export const FUN_FITNESS_COMPONENT_KEYS = [
+  'balance',
+  'gap',
+  'duration',
+  'returns',
+  'shotClock',
+  'direction',
+] as const
+
+export type FunFitnessComponentKey = (typeof FUN_FITNESS_COMPONENT_KEYS)[number]
+
+export type FunFitnessComponentScores = Record<FunFitnessComponentKey, number>
+
+export type FunFitnessWeights = Partial<Record<FunFitnessComponentKey, number>>
+
+export const DEFAULT_FUN_FITNESS_WEIGHTS: Record<FunFitnessComponentKey, number> = {
+  balance: 1,
+  gap: 1,
+  duration: 1,
+  returns: 1,
+  shotClock: 1,
+  direction: 1,
+}
+
+export function computeFunFitnessComponents(
+  metrics: TrialRepetitionMetrics,
+  scoreLimit: number,
+): FunFitnessComponentScores {
+  const balance = clampScore(1 - Math.abs(metrics.roundWinRate - 0.5) * 2)
+  const gap = clampScore(1 - metrics.maxScoreGap / Math.max(scoreLimit, 1))
+
+  const durationMedian = metrics.roundDurationPercentiles.p50 ?? 0
+  let duration = 1
+  if (durationMedian < 5) {
+    duration = clampScore(1 - (5 - durationMedian) / 5)
+  } else if (durationMedian > 30) {
+    duration = clampScore(1 - (durationMedian - 30) / 30)
+  }
+
+  const returnsMedian = metrics.returnsPerRoundPercentiles.p50 ?? 0
+  const returns = clampScore(Math.min(1, returnsMedian / 8))
+
+  const shotClock = clampScore(1 - metrics.shotClock.expirationRate)
+
+  const directionMedian = metrics.directionChanges.percentiles.p50 ?? 0
+  const direction = directionMedian <= 10
+    ? 1
+    : clampScore(1 - (directionMedian - 10) / 10)
+
+  return {
+    balance,
+    gap,
+    duration,
+    returns,
+    shotClock,
+    direction,
+  }
+}
+
+export function computeWeightedFunFitnessScore(
+  components: FunFitnessComponentScores,
+  weights: FunFitnessWeights = {},
+): number {
+  const resolvedWeights: Record<FunFitnessComponentKey, number> = {
+    ...DEFAULT_FUN_FITNESS_WEIGHTS,
+    ...weights,
+  }
+
+  const totalWeight = FUN_FITNESS_COMPONENT_KEYS.reduce(
+    (total, key) => total + Math.max(0, resolvedWeights[key] ?? 0),
+    0,
+  )
+  if (totalWeight <= 0) {
+    return 0
+  }
+
+  const weightedSum = FUN_FITNESS_COMPONENT_KEYS.reduce(
+    (total, key) => total + components[key]! * Math.max(0, resolvedWeights[key] ?? 0),
+    0,
+  )
+
+  return clampScore(weightedSum / totalWeight)
+}
+
 export function computeFunFitnessScore(
   metrics: TrialRepetitionMetrics,
   scoreLimit: number,
 ): number {
-  const balanceScore = clampScore(1 - Math.abs(metrics.roundWinRate - 0.5) * 2)
-  const gapScore = clampScore(1 - metrics.maxScoreGap / Math.max(scoreLimit, 1))
-
-  const durationMedian = metrics.roundDurationPercentiles.p50 ?? 0
-  let durationScore = 1
-  if (durationMedian < 5) {
-    durationScore = clampScore(1 - (5 - durationMedian) / 5)
-  } else if (durationMedian > 30) {
-    durationScore = clampScore(1 - (durationMedian - 30) / 30)
-  }
-
-  const returnsMedian = metrics.returnsPerRoundPercentiles.p50 ?? 0
-  const returnsScore = clampScore(Math.min(1, returnsMedian / 8))
-
-  const shotClockScore = clampScore(1 - metrics.shotClock.expirationRate)
-
-  const directionMedian = metrics.directionChanges.percentiles.p50 ?? 0
-  const directionScore = directionMedian <= 10
-    ? 1
-    : clampScore(1 - (directionMedian - 10) / 10)
-
-  const scores = [
-    balanceScore,
-    gapScore,
-    durationScore,
-    returnsScore,
-    shotClockScore,
-    directionScore,
-  ]
-
-  return clampScore(average(scores))
+  const components = computeFunFitnessComponents(metrics, scoreLimit)
+  return computeWeightedFunFitnessScore(components)
 }
 
 function collectRoundDirectionChanges(rounds: RoundSample[]): number[] {

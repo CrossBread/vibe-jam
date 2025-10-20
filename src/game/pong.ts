@@ -151,6 +151,8 @@ export interface PongAPI {
   tick(dt: number): void
 
   config: DevConfig
+
+  getRoundRatings(): RoundRatingRecord[]
 }
 
 export interface PongOptions {
@@ -194,6 +196,67 @@ export interface PongOptions {
    * Override the match score limit (first to N points wins).
    */
   scoreLimit?: number
+}
+
+export interface ActiveModsSnapshot {
+  arena: Record<string, unknown>
+  ball: Record<string, unknown>
+  paddle: Record<string, unknown>
+}
+
+const PLAYER_SLOTS = ['leftOuter', 'leftInner', 'rightOuter', 'rightInner'] as const
+
+export type PlayerSlot = (typeof PLAYER_SLOTS)[number]
+
+type PlayerSelections<T> = Record<PlayerSlot, T>
+
+const LEFT_PLAYER_SLOTS: PlayerSlot[] = ['leftOuter', 'leftInner']
+const RIGHT_PLAYER_SLOTS: PlayerSlot[] = ['rightOuter', 'rightInner']
+
+function createPlayerSelections<T>(factory: () => T): PlayerSelections<T> {
+  return {
+    leftOuter: factory(),
+    leftInner: factory(),
+    rightOuter: factory(),
+    rightInner: factory(),
+  }
+}
+
+function clonePlayerSelections<T>(
+  selections: PlayerSelections<T>,
+): PlayerSelections<T> {
+  return {
+    leftOuter: selections.leftOuter,
+    leftInner: selections.leftInner,
+    rightOuter: selections.rightOuter,
+    rightInner: selections.rightInner,
+  }
+}
+
+function isPlayerSlotActive(slot: PlayerSlot, doublesEnabled: boolean): boolean {
+  if (!doublesEnabled) {
+    return slot === 'leftOuter' || slot === 'rightOuter'
+  }
+  return true
+}
+
+function getActiveSlotsForSide(
+  side: 'left' | 'right',
+  doublesEnabled: boolean,
+): PlayerSlot[] {
+  if (!doublesEnabled) {
+    return side === 'left' ? [LEFT_PLAYER_SLOTS[0]] : [RIGHT_PLAYER_SLOTS[0]]
+  }
+  return side === 'left' ? LEFT_PLAYER_SLOTS : RIGHT_PLAYER_SLOTS
+}
+
+export interface RoundRatingRecord {
+  id: string
+  player: PlayerSlot
+  value: -1 | 0 | 1
+  recordedAt: string
+  activeArenaModKey: GravityWellKey | null
+  mods: ActiveModsSnapshot
 }
 
 type KeySet = Record<string, boolean>
@@ -479,8 +542,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
 
   interface ModVoteState {
     options: [GravityWellKey, GravityWellKey]
-    leftSelection: ModVoteSelection
-    rightSelection: ModVoteSelection
+    selections: PlayerSelections<ModVoteSelection>
   }
 
   let pendingModVoteCount = 0
@@ -489,21 +551,91 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
   let modVoteVisibility = 0
   let lastModVotePrompt: ModVoteState | null = null
 
-  interface ModVoteInputState {
+  interface VoteInputSnapshot {
     upRequested: boolean
     downRequested: boolean
   }
 
-  const modVoteInputStates: Record<'left' | 'right', ModVoteInputState> = {
-    left: { upRequested: false, downRequested: false },
-    right: { upRequested: false, downRequested: false },
-  }
+  interface ModVoteInputState extends VoteInputSnapshot {}
+
+  const modVoteInputStates: PlayerSelections<ModVoteInputState> =
+    createPlayerSelections(() => ({ upRequested: false, downRequested: false }))
 
   function resetModVoteInputState() {
-    modVoteInputStates.left.upRequested = false
-    modVoteInputStates.left.downRequested = false
-    modVoteInputStates.right.upRequested = false
-    modVoteInputStates.right.downRequested = false
+    for (const slot of PLAYER_SLOTS) {
+      modVoteInputStates[slot].upRequested = false
+      modVoteInputStates[slot].downRequested = false
+    }
+  }
+
+  type RoundFeedbackSelection = 'positive' | 'neutral' | 'negative'
+
+  interface RoundFeedbackContext {
+    activeArenaModKey: GravityWellKey | null
+    mods: ActiveModsSnapshot
+  }
+
+  interface RoundFeedbackState {
+    selections: PlayerSelections<RoundFeedbackSelection>
+    remaining: number
+    totalDuration: number
+    context: RoundFeedbackContext
+  }
+
+  interface RoundFeedbackInputState extends VoteInputSnapshot {}
+
+  const pendingFeedbackContexts: RoundFeedbackContext[] = []
+  const roundRatings: RoundRatingRecord[] = []
+  let roundFeedback: RoundFeedbackState | null = null
+  let roundFeedbackVisibility = 0
+  let lastRoundFeedbackSelections: PlayerSelections<RoundFeedbackSelection> | null = null
+
+  const roundFeedbackInputStates: PlayerSelections<RoundFeedbackInputState> =
+    createPlayerSelections(() => ({ upRequested: false, downRequested: false }))
+
+  function resetRoundFeedbackInputState() {
+    for (const slot of PLAYER_SLOTS) {
+      roundFeedbackInputStates[slot].upRequested = false
+      roundFeedbackInputStates[slot].downRequested = false
+    }
+  }
+
+  function getPlayerVoteInput(
+    slot: PlayerSlot,
+    doublesEnabled: boolean,
+    gamepadInput: GamepadInput,
+  ): VoteInputSnapshot {
+    if (slot === 'leftOuter') {
+      const control = getPaddleControlState('left', doublesEnabled, gamepadInput)
+      return { upRequested: control.upRequested, downRequested: control.downRequested }
+    }
+
+    if (slot === 'rightOuter') {
+      const control = getPaddleControlState('right', doublesEnabled, gamepadInput)
+      return { upRequested: control.upRequested, downRequested: control.downRequested }
+    }
+
+    if (slot === 'leftInner' && doublesEnabled) {
+      let direction = withDeadzone(gamepadInput.rightAxis)
+      if (gamepadInput.rightUp) direction -= 1
+      if (gamepadInput.rightDown) direction += 1
+      direction = clamp(direction, -1, 1)
+      return {
+        upRequested: gamepadInput.rightUp || direction < -0.25,
+        downRequested: gamepadInput.rightDown || direction > 0.25,
+      }
+    }
+
+    if (slot === 'rightInner' && doublesEnabled) {
+      const keyDirection = (keys['w'] ? -1 : 0) + (keys['s'] ? 1 : 0)
+      const direction = clamp(keyDirection, -1, 1)
+      return {
+        upRequested: Boolean(keys['w']) || direction < -0.25,
+        downRequested: Boolean(keys['s']) || direction > 0.25,
+      }
+    }
+
+    return { upRequested: false, downRequested: false }
   }
 
   interface GamepadInput {
@@ -1522,7 +1654,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     state.ballRadius = BALL_R
     syncPrimaryBallState()
 
-    if (modVote) {
+    if (roundFeedback || modVote) {
       return
     }
 
@@ -1552,6 +1684,12 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
 
   function updateServeTimers(dt: number) {
     if (pendingServeToLeft === null) return
+
+    if (roundFeedback) {
+      if (updateRoundFeedbackCountdown(dt)) {
+        return
+      }
+    }
 
     if (preServeDelayRemaining > 0) {
       preServeDelayRemaining = Math.max(0, preServeDelayRemaining - dt)
@@ -1593,6 +1731,11 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     pendingModVoteCount = 0
     nextModVoteExclude = null
     modVote = null
+    roundFeedback = null
+    roundFeedbackVisibility = 0
+    lastRoundFeedbackSelections = null
+    pendingFeedbackContexts.length = 0
+    resetRoundFeedbackInputState()
     leftAIEnabled = true
     rightAIEnabled = true
     leftAiOffset = 0
@@ -1659,6 +1802,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
   function tick(dt: number) {
     updateAnnouncement(dt)
     updateModVoteFade(dt)
+    updateRoundFeedbackFade(dt)
     checkModifierAnnouncements()
     updatePaddleModifierState(dt)
 
@@ -1700,7 +1844,9 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     const ballDirection: -1 | 0 | 1 = state.vx > 0 ? 1 : state.vx < 0 ? -1 : 0
     updateAiMisalignment(ballDirection)
 
-    if (modVote) {
+    if (roundFeedback) {
+      handleRoundFeedbackInput(gamepadInput)
+    } else if (modVote) {
       handleModVoteInput(gamepadInput)
     } else {
       if (leftAIEnabled) {
@@ -2096,8 +2242,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
         const [top, bottom] = modVote.options
         lastModVotePrompt = {
           options: [top, bottom],
-          leftSelection: modVote.leftSelection,
-          rightSelection: modVote.rightSelection,
+          selections: clonePlayerSelections(modVote.selections),
         }
       } else {
         lastModVotePrompt = null
@@ -2120,10 +2265,142 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
       const [top, bottom] = modVote.options
       lastModVotePrompt = {
         options: [top, bottom],
-        leftSelection: modVote.leftSelection,
-        rightSelection: modVote.rightSelection,
+        selections: clonePlayerSelections(modVote.selections),
       }
     }
+  }
+
+  function startRoundFeedback(context: RoundFeedbackContext) {
+    const baseDuration = Math.max(serveCountdownDuration, 5)
+    const selections = createPlayerSelections(() => 'neutral')
+    roundFeedback = {
+      selections,
+      remaining: baseDuration,
+      totalDuration: baseDuration,
+      context,
+    }
+    roundFeedbackVisibility = 0
+    lastRoundFeedbackSelections = clonePlayerSelections(selections)
+    resetRoundFeedbackInputState()
+  }
+
+  function updateRoundFeedbackFade(dt: number) {
+    const target = roundFeedback ? 1 : 0
+    const duration = Math.max(0, config.ui.animations.votingPanelFadeSeconds)
+
+    if (duration <= 0) {
+      roundFeedbackVisibility = target
+      if (roundFeedback) {
+        lastRoundFeedbackSelections = clonePlayerSelections(roundFeedback.selections)
+      } else if (target === 0) {
+        lastRoundFeedbackSelections = null
+      }
+      return
+    }
+
+    const step = dt / duration
+    if (target > roundFeedbackVisibility) {
+      roundFeedbackVisibility = Math.min(1, roundFeedbackVisibility + step)
+    } else if (target < roundFeedbackVisibility) {
+      roundFeedbackVisibility = Math.max(0, roundFeedbackVisibility - step)
+      if (target === 0 && roundFeedbackVisibility <= 1e-3) {
+        roundFeedbackVisibility = 0
+        if (!roundFeedback) {
+          lastRoundFeedbackSelections = null
+        }
+      }
+    }
+
+    if (roundFeedback) {
+      lastRoundFeedbackSelections = clonePlayerSelections(roundFeedback.selections)
+    }
+  }
+
+  function updateRoundFeedbackCountdown(dt: number): boolean {
+    if (!roundFeedback) return false
+
+    if (isServeCountdownBlocked()) {
+      return true
+    }
+
+    roundFeedback.remaining = Math.max(0, roundFeedback.remaining - dt)
+    if (roundFeedback.remaining > 0) {
+      return true
+    }
+
+    resolveRoundFeedback()
+    return false
+  }
+
+  function handleRoundFeedbackInput(gamepadInput: GamepadInput) {
+    if (!roundFeedback) return
+
+    const doublesEnabled = Boolean(config.doubles.enabled)
+    for (const slot of PLAYER_SLOTS) {
+      if (!isPlayerSlotActive(slot, doublesEnabled)) continue
+
+      const control = getPlayerVoteInput(slot, doublesEnabled, gamepadInput)
+      const state = roundFeedbackInputStates[slot]
+      const upJustPressed = control.upRequested && !state.upRequested
+      const downJustPressed = control.downRequested && !state.downRequested
+
+      let current = roundFeedback.selections[slot]
+      if (upJustPressed && !downJustPressed) {
+        current = current === 'positive' ? 'neutral' : 'positive'
+      } else if (downJustPressed && !upJustPressed) {
+        current = current === 'negative' ? 'neutral' : 'negative'
+      }
+
+      roundFeedback.selections[slot] = current
+      state.upRequested = control.upRequested
+      state.downRequested = control.downRequested
+    }
+
+    lastRoundFeedbackSelections = clonePlayerSelections(roundFeedback.selections)
+  }
+
+  function resolveRoundFeedback() {
+    if (!roundFeedback) return
+
+    const { selections, context } = roundFeedback
+    const doublesEnabled = Boolean(config.doubles.enabled)
+    const recordedAt = new Date().toISOString()
+
+    for (const slot of PLAYER_SLOTS) {
+      if (!isPlayerSlotActive(slot, doublesEnabled)) continue
+
+      const selection = selections[slot]
+      const value: -1 | 0 | 1 =
+        selection === 'positive' ? 1 : selection === 'negative' ? -1 : 0
+
+      roundRatings.push({
+        id: generateGuid(),
+        player: slot,
+        value,
+        recordedAt,
+        activeArenaModKey: context.activeArenaModKey,
+        mods: cloneActiveModsSnapshot(context.mods),
+      })
+    }
+
+    lastRoundFeedbackSelections = clonePlayerSelections(selections)
+    roundFeedback = null
+    resetRoundFeedbackInputState()
+    serveCountdownRemaining = serveCountdownDuration
+    maybeStartFeedbackOrVote()
+  }
+
+  function generateGuid(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID()
+    }
+
+    const template = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
+    return template.replace(/[xy]/g, char => {
+      const rand = Math.floor(Math.random() * 16)
+      const value = char === 'x' ? rand : (rand & 0x3) | 0x8
+      return value.toString(16)
+    })
   }
 
   function getEnabledArenaModifiers(
@@ -2134,6 +2411,35 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
 
   function getEnabledArenaModifierKeys(arena: ArenaModifiers): GravityWellKey[] {
     return getEnabledArenaModifiers(arena).map(([key]) => key)
+  }
+
+  function captureActiveModsSnapshot(): ActiveModsSnapshot {
+    return {
+      arena: collectEnabledModifierSettings(config.modifiers.arena),
+      ball: collectEnabledModifierSettings(config.modifiers.ball),
+      paddle: collectEnabledModifierSettings(config.modifiers.paddle),
+    }
+  }
+
+  function cloneActiveModsSnapshot(snapshot: ActiveModsSnapshot): ActiveModsSnapshot {
+    return {
+      arena: deepClone(snapshot.arena),
+      ball: deepClone(snapshot.ball),
+      paddle: deepClone(snapshot.paddle),
+    }
+  }
+
+  function collectEnabledModifierSettings<T extends Record<string, unknown>>(
+    source: T,
+  ): Record<string, unknown> {
+    const snapshot: Record<string, unknown> = {}
+    for (const key of Object.keys(source)) {
+      const modifier = source[key]
+      if (!modifier || typeof modifier !== 'object') continue
+      if (!(modifier as { enabled?: boolean }).enabled) continue
+      snapshot[key] = deepClone(modifier)
+    }
+    return snapshot
   }
 
   function getShotClockDuration(): number {
@@ -2214,6 +2520,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
 
   function handleShotClockExpiration() {
     const previousMod = activeModKey
+    const feedbackContext = createRoundFeedbackContext(previousMod ?? null)
     const lastHitter = shotClockLastHitter
     clearShotClock()
 
@@ -2233,7 +2540,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     lastModVotePrompt = null
 
     disableAllMods()
-    queueModVotes(1, previousMod ?? null)
+    queueModVotes(1, previousMod ?? null, feedbackContext)
     completedBitesSinceLastPoint = 0
     state.completedBitesSinceLastPoint = 0
     state.currentPips = 0
@@ -2315,8 +2622,9 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     initializePaddleHeights(true)
     if (completedBitesSinceLastPoint > 0) {
       const previousActive = activeModKey
+      const feedbackContext = createRoundFeedbackContext(previousActive)
       disableAllMods()
-      queueModVotes(completedBitesSinceLastPoint, previousActive)
+      queueModVotes(completedBitesSinceLastPoint, previousActive, feedbackContext)
       modChanged = true
       completedBitesSinceLastPoint = 0
       state.completedBitesSinceLastPoint = 0
@@ -2339,34 +2647,73 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     return modChanged
   }
 
-  function queueModVotes(count: number, initialExclude: GravityWellKey | null) {
+  function createRoundFeedbackContext(
+    previousActive: GravityWellKey | null,
+  ): RoundFeedbackContext {
+    return {
+      activeArenaModKey: previousActive,
+      mods: captureActiveModsSnapshot(),
+    }
+  }
+
+  function queueModVotes(
+    count: number,
+    initialExclude: GravityWellKey | null,
+    feedbackContext?: RoundFeedbackContext | null,
+  ) {
     if (count <= 0) return
 
-    const wasIdle = pendingModVoteCount <= 0 && !modVote
+    const wasIdle = pendingModVoteCount <= 0 && !modVote && !roundFeedback
     pendingModVoteCount += count
 
+    if (feedbackContext) {
+      pendingFeedbackContexts.push(feedbackContext)
+    }
+
     if (wasIdle) {
+      modRevealDelayPending = true
       nextModVoteExclude = initialExclude ?? null
+      maybeStartFeedbackOrVote()
+      return
+    }
+
+    if (!modVote && !roundFeedback) {
+      maybeStartFeedbackOrVote()
+    }
+  }
+
+  function maybeStartFeedbackOrVote() {
+    if (roundFeedback) return
+
+    if (pendingFeedbackContexts.length > 0) {
+      const nextContext = pendingFeedbackContexts.shift()
+      if (nextContext) {
+        startRoundFeedback(nextContext)
+        return
+      }
+    }
+
+    if (pendingModVoteCount > 0 && !modVote) {
       startNextModVote()
     }
   }
 
   function startNextModVote() {
     if (pendingModVoteCount <= 0) return
+    if (roundFeedback) return
 
     const exclude = nextModVoteExclude ?? null
 
     const [firstOption, secondOption] = pickRandomModPair(exclude)
+    const initialSelections = createPlayerSelections(() => 'neutral')
     modVote = {
       options: [firstOption, secondOption],
-      leftSelection: 'neutral',
-      rightSelection: 'neutral',
+      selections: initialSelections,
     }
     modVoteVisibility = 0
     lastModVotePrompt = {
       options: [firstOption, secondOption],
-      leftSelection: 'neutral',
-      rightSelection: 'neutral',
+      selections: clonePlayerSelections(initialSelections),
     }
 
     resetModVoteInputState()
@@ -2388,33 +2735,25 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     if (!modVote) return
 
     const doublesEnabled = Boolean(config.doubles.enabled)
-    const leftControl = getPaddleControlState('left', doublesEnabled, gamepadInput)
-    const rightControl = getPaddleControlState('right', doublesEnabled, gamepadInput)
+    for (const slot of PLAYER_SLOTS) {
+      if (!isPlayerSlotActive(slot, doublesEnabled)) continue
 
-    const updateSelection = (
-      side: 'left' | 'right',
-      control: PaddleControlState,
-      current: ModVoteSelection,
-    ): ModVoteSelection => {
-      const inputState = modVoteInputStates[side]
-      const upJustPressed = control.upRequested && !inputState.upRequested
-      const downJustPressed = control.downRequested && !inputState.downRequested
+      const control = getPlayerVoteInput(slot, doublesEnabled, gamepadInput)
+      const state = modVoteInputStates[slot]
+      const upJustPressed = control.upRequested && !state.upRequested
+      const downJustPressed = control.downRequested && !state.downRequested
 
-      let next = current
+      let current = modVote.selections[slot]
       if (upJustPressed && !downJustPressed) {
-        next = current === 'down' ? 'neutral' : 'up'
+        current = current === 'down' ? 'neutral' : 'up'
       } else if (downJustPressed && !upJustPressed) {
-        next = current === 'up' ? 'neutral' : 'down'
+        current = current === 'up' ? 'neutral' : 'down'
       }
 
-      inputState.upRequested = control.upRequested
-      inputState.downRequested = control.downRequested
-
-      return next
+      modVote.selections[slot] = current
+      state.upRequested = control.upRequested
+      state.downRequested = control.downRequested
     }
-
-    modVote.leftSelection = updateSelection('left', leftControl, modVote.leftSelection)
-    modVote.rightSelection = updateSelection('right', rightControl, modVote.rightSelection)
 
     centerPaddle('left')
     centerPaddle('right')
@@ -2429,10 +2768,13 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     let topVotes = 0
     let bottomVotes = 0
 
-    if (modVote.leftSelection === 'up') topVotes += 1
-    if (modVote.leftSelection === 'down') bottomVotes += 1
-    if (modVote.rightSelection === 'up') topVotes += 1
-    if (modVote.rightSelection === 'down') bottomVotes += 1
+    const doublesEnabled = Boolean(config.doubles.enabled)
+    for (const slot of PLAYER_SLOTS) {
+      if (!isPlayerSlotActive(slot, doublesEnabled)) continue
+      const selection = modVote.selections[slot]
+      if (selection === 'up') topVotes += 1
+      if (selection === 'down') bottomVotes += 1
+    }
 
     const selectedKey =
       topVotes > bottomVotes
@@ -2449,8 +2791,8 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     modVote = null
     nextModVoteExclude = activeModKey
 
-    if (pendingModVoteCount > 0) {
-      startNextModVote()
+    if (pendingModVoteCount > 0 || pendingFeedbackContexts.length > 0) {
+      maybeStartFeedbackOrVote()
     }
 
     return true
@@ -4588,6 +4930,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
 
     drawAnnouncement()
     drawServeCountdown()
+    drawRoundFeedbackPrompt()
 
     const uiScaling = config.ui.scaling
     const uiTypography = config.ui.typography
@@ -4814,6 +5157,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     if (pendingServeToLeft === null) return
     if (preServeDelayRemaining > 0) return
     if (serveCountdownRemaining <= 0) return
+    if (roundFeedback || (roundFeedbackVisibility > 0 && lastRoundFeedbackSelections)) return
 
     const countdownValue = Math.ceil(serveCountdownRemaining)
     if (countdownValue <= 0) return
@@ -4907,6 +5251,171 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     ballModManager.draw()
   }
 
+  function drawRoundFeedbackPrompt() {
+    const selections = roundFeedback
+      ? roundFeedback.selections
+      : lastRoundFeedbackSelections
+    const visibility = clamp01(roundFeedbackVisibility)
+    if (!selections || visibility <= 0) return
+
+    const typography = config.ui.typography
+    const questionFontSize = Math.max(18, typography.votingOptionFontSize * 0.75)
+    const emojiFontSize = Math.max(32, typography.votingOptionFontSize)
+    const ratingFontSize = Math.max(14, emojiFontSize * 0.38)
+    const indicatorFontSize = Math.max(8, typography.votingIndicatorFontSize)
+
+    const centerX = W / 2
+    const centerY = H / 2
+    const spacing = 96
+    const paddingX = 32
+    const paddingY = 18
+    const labelSpacing = 12
+    const indicatorSpacing = 58
+    const indicatorStackSpacing = indicatorFontSize * 0.85
+    const questionY = centerY - spacing * 1.9
+    const doublesEnabled = Boolean(config.doubles.enabled)
+    const leftSlots = getActiveSlotsForSide('left', doublesEnabled)
+    const rightSlots = getActiveSlotsForSide('right', doublesEnabled)
+
+    const entries: Array<{
+      icon: string
+      value: RoundFeedbackSelection
+      label: string
+      y: number
+    }> = [
+      { icon: '😄', value: 'positive', label: '+1', y: centerY - spacing },
+      { icon: '😐', value: 'neutral', label: '0', y: centerY },
+      { icon: '☹️', value: 'negative', label: '-1', y: centerY + spacing },
+    ]
+
+    const baseBackground = 'rgba(15,23,42,0.72)'
+    const highlightBackground = 'rgba(148,163,184,0.28)'
+
+    ctx.save()
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    const easedVisibility = evaluateAnimationCurve(
+      visibility,
+      config.ui.animations.votingPanelCurve,
+    )
+    ctx.globalAlpha *= easedVisibility
+
+    const questionFont = `900 ${Math.round(questionFontSize)}px ${getSecondaryFontFamily()}`
+    ctx.font = questionFont
+    ctx.fillStyle = HIGHLIGHT_COLOR
+    ctx.fillText('Was that last round fun?', centerX, questionY)
+
+    const emojiFont = `900 ${Math.round(emojiFontSize)}px ${getPrimaryFontFamily()}`
+    const ratingFont = `800 ${Math.round(ratingFontSize)}px ${getPrimaryFontFamily()}`
+    const indicatorFont = `900 ${Math.round(indicatorFontSize)}px ${getPrimaryFontFamily()}`
+    const boxHeight = emojiFontSize + ratingFontSize + labelSpacing + paddingY * 2
+
+    let maxBoxWidth = 0
+    for (const entry of entries) {
+      ctx.font = emojiFont
+      const emojiWidth = ctx.measureText(entry.icon).width
+      ctx.font = ratingFont
+      const labelWidth = ctx.measureText(entry.label).width
+      const contentWidth = Math.max(emojiWidth, labelWidth)
+      const boxWidth = contentWidth + paddingX * 2
+      maxBoxWidth = Math.max(maxBoxWidth, boxWidth)
+    }
+
+    const progressWidth = maxBoxWidth
+    if (progressWidth > 0) {
+      const progressHeight = Math.max(6, indicatorFontSize * 0.6)
+      const progressX = centerX - progressWidth / 2
+      const progressY = questionY + questionFontSize * 0.9
+      const progressRatio = roundFeedback
+        ? clamp01(
+            roundFeedback.totalDuration > 0
+              ? roundFeedback.remaining / roundFeedback.totalDuration
+              : 0,
+          )
+        : 0
+
+      ctx.fillStyle = applyAlphaToColor('#1e293b', 0.65)
+      ctx.fillRect(progressX, progressY, progressWidth, progressHeight)
+
+      if (progressRatio > 0) {
+        ctx.fillStyle = applyAlphaToColor('#38bdf8', 0.95)
+        ctx.fillRect(progressX, progressY, progressWidth * progressRatio, progressHeight)
+      }
+    }
+
+    const drawIndicators = (
+      slots: PlayerSlot[],
+      x: number,
+      glyph: string,
+      color: string,
+      entryValue: RoundFeedbackSelection,
+      baseY: number,
+    ) => {
+      const count = slots.length
+      if (count <= 0) return
+      for (let index = 0; index < count; index += 1) {
+        const slot = slots[index]
+        const offset = count > 1 ? index - (count - 1) / 2 : 0
+        const y = baseY + offset * indicatorStackSpacing
+        const selected = selections[slot] === entryValue
+        ctx.font = indicatorFont
+        ctx.fillStyle = selected
+          ? color
+          : applyAlphaToColor(color, 0.22)
+        ctx.fillText(glyph, x, y)
+      }
+    }
+
+    for (const entry of entries) {
+      const boxWidth = maxBoxWidth
+      const boxX = centerX - boxWidth / 2
+      const boxY = entry.y - boxHeight / 2
+      const highlighted =
+        leftSlots.some(slot => selections[slot] === entry.value) ||
+        rightSlots.some(slot => selections[slot] === entry.value)
+
+      ctx.fillStyle = highlighted ? highlightBackground : baseBackground
+      ctx.fillRect(boxX, boxY, boxWidth, boxHeight)
+
+      const leftIndicatorX = boxX - indicatorSpacing
+      const rightIndicatorX = boxX + boxWidth + indicatorSpacing
+
+      drawIndicators(
+        leftSlots,
+        leftIndicatorX,
+        '<',
+        LEFT_PADDLE_EDGE_COLOR,
+        entry.value,
+        entry.y,
+      )
+      drawIndicators(
+        rightSlots,
+        rightIndicatorX,
+        '>',
+        RIGHT_PADDLE_EDGE_COLOR,
+        entry.value,
+        entry.y,
+      )
+
+      ctx.font = emojiFont
+      ctx.fillStyle = highlighted
+        ? HIGHLIGHT_COLOR
+        : applyAlphaToColor(HIGHLIGHT_COLOR, 0.78)
+      const emojiY = boxY + paddingY + emojiFontSize / 2
+      ctx.fillText(entry.icon, centerX, emojiY)
+
+      ctx.font = ratingFont
+      ctx.fillStyle = highlighted
+        ? HIGHLIGHT_COLOR
+        : applyAlphaToColor(HIGHLIGHT_COLOR, 0.66)
+      const labelY =
+        boxY + paddingY + emojiFontSize + labelSpacing + ratingFontSize / 2
+      ctx.fillText(entry.label, centerX, labelY)
+    }
+
+    ctx.restore()
+  }
+
   function drawModVotePrompt() {
     const prompt = modVote ?? lastModVotePrompt
     const visibility = clamp01(modVoteVisibility)
@@ -4930,6 +5439,11 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     const paddingX = 32
     const paddingY = 18
     const indicatorSpacing = 58
+    const indicatorStackSpacing = indicatorFontSize * 0.85
+    const doublesEnabled = Boolean(config.doubles.enabled)
+    const leftSlots = getActiveSlotsForSide('left', doublesEnabled)
+    const rightSlots = getActiveSlotsForSide('right', doublesEnabled)
+    const selections = prompt.selections
 
     const entries = [
       {
@@ -4937,24 +5451,21 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
         y: centerY - spacing,
         font: optionFont,
         fontSize: optionFontSize,
-        leftSelected: prompt.leftSelection === 'up',
-        rightSelected: prompt.rightSelection === 'up',
+        value: 'up' as ModVoteSelection,
       },
       {
         label: 'Random',
         y: centerY,
         font: randomFont,
         fontSize: randomFontSize,
-        leftSelected: prompt.leftSelection === 'neutral',
-        rightSelected: prompt.rightSelection === 'neutral',
+        value: 'neutral' as ModVoteSelection,
       },
       {
         label: bottomLabel,
         y: centerY + spacing,
         font: optionFont,
         fontSize: optionFontSize,
-        leftSelected: prompt.leftSelection === 'down',
-        rightSelected: prompt.rightSelection === 'down',
+        value: 'down' as ModVoteSelection,
       },
     ]
 
@@ -4977,6 +5488,29 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     const baseBackground = 'rgba(15,23,42,0.72)'
     const highlightBackground = 'rgba(148,163,184,0.28)'
 
+    const drawIndicators = (
+      slots: PlayerSlot[],
+      x: number,
+      glyph: string,
+      color: string,
+      value: ModVoteSelection,
+      baseY: number,
+    ) => {
+      const count = slots.length
+      if (count <= 0) return
+      for (let index = 0; index < count; index += 1) {
+        const slot = slots[index]
+        const offset = count > 1 ? index - (count - 1) / 2 : 0
+        const y = baseY + offset * indicatorStackSpacing
+        const selected = selections[slot] === value
+        ctx.font = indicatorFont
+        ctx.fillStyle = selected
+          ? color
+          : applyAlphaToColor(color, 0.22)
+        ctx.fillText(glyph, x, y)
+      }
+    }
+
     for (const entry of entries) {
       ctx.font = entry.font
       const textWidth = ctx.measureText(entry.label).width
@@ -4984,7 +5518,9 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
       const boxHeight = entry.fontSize + paddingY * 2
       const boxX = centerX - boxWidth / 2
       const boxY = entry.y - boxHeight / 2
-      const highlighted = entry.leftSelected || entry.rightSelected
+      const highlighted =
+        leftSlots.some(slot => selections[slot] === entry.value) ||
+        rightSlots.some(slot => selections[slot] === entry.value)
 
       ctx.fillStyle = highlighted ? highlightBackground : baseBackground
       ctx.fillRect(boxX, boxY, boxWidth, boxHeight)
@@ -4992,17 +5528,23 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
       const leftIndicatorX = boxX - indicatorSpacing
       const rightIndicatorX = boxX + boxWidth + indicatorSpacing
 
-      ctx.font = indicatorFont
-      ctx.fillStyle = entry.leftSelected
-        ? LEFT_PADDLE_EDGE_COLOR
-        : applyAlphaToColor(LEFT_PADDLE_EDGE_COLOR, 0.22)
-      ctx.fillText('<', leftIndicatorX, entry.y)
+      drawIndicators(
+        leftSlots,
+        leftIndicatorX,
+        '<',
+        LEFT_PADDLE_EDGE_COLOR,
+        entry.value,
+        entry.y,
+      )
 
-      ctx.font = indicatorFont
-      ctx.fillStyle = entry.rightSelected
-        ? RIGHT_PADDLE_EDGE_COLOR
-        : applyAlphaToColor(RIGHT_PADDLE_EDGE_COLOR, 0.22)
-      ctx.fillText('>', rightIndicatorX, entry.y)
+      drawIndicators(
+        rightSlots,
+        rightIndicatorX,
+        '>',
+        RIGHT_PADDLE_EDGE_COLOR,
+        entry.value,
+        entry.y,
+      )
 
       ctx.font = entry.font
       ctx.fillStyle = HIGHLIGHT_COLOR
@@ -5167,5 +5709,12 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     return Math.max(a, Math.min(b, v))
   }
 
-  return { state, reset, tick, config }
+  function getRoundRatings(): RoundRatingRecord[] {
+    return roundRatings.map(record => ({
+      ...record,
+      mods: cloneActiveModsSnapshot(record.mods),
+    }))
+  }
+
+  return { state, reset, tick, config, getRoundRatings }
 }

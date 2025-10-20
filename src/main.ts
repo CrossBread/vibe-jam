@@ -2,7 +2,7 @@
  * Copyright (c) 2025. CrossBread Tech All rights reserved.
  */
 
-import { createPong } from './game/pong'
+import { createPong, type RoundRatingRecord } from './game/pong'
 
 const BASE_WIDTH = 800
 const BASE_HEIGHT = 480
@@ -17,6 +17,189 @@ canvas.style.maxHeight = '100%'
 app.appendChild(canvas)
 
 const game = createPong(canvas)
+
+const shareStyle = document.createElement('style')
+shareStyle.textContent = `
+  .round-feedback-share {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    background: rgba(15,23,42,0.88);
+    padding: 14px 22px;
+    border-radius: 999px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    z-index: 20;
+  }
+
+  .round-feedback-share--visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .round-feedback-share__button {
+    border: none;
+    border-radius: 999px;
+    background: #38bdf8;
+    color: #0f172a;
+    font-weight: 700;
+    font-size: 16px;
+    padding: 10px 26px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+  }
+
+  .round-feedback-share__button:hover:not(:disabled) {
+    background: #0ea5e9;
+    transform: translateY(-1px);
+  }
+
+  .round-feedback-share__button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .round-feedback-share__disclaimer {
+    margin: 0;
+    font-size: 12px;
+    color: rgba(226,232,240,0.78);
+    text-align: center;
+  }
+`
+document.head.appendChild(shareStyle)
+
+const shareContainer = document.createElement('div')
+shareContainer.className = 'round-feedback-share'
+const shareButton = document.createElement('button')
+shareButton.type = 'button'
+shareButton.className = 'round-feedback-share__button'
+shareButton.textContent = 'Share ratings with developer?'
+const shareDisclaimer = document.createElement('p')
+shareDisclaimer.className = 'round-feedback-share__disclaimer'
+shareDisclaimer.textContent = 'JUST ratings and the mod settings, no personal info'
+shareContainer.appendChild(shareButton)
+shareContainer.appendChild(shareDisclaimer)
+document.body.appendChild(shareContainer)
+shareButton.disabled = true
+
+const SHARE_EMAIL = 'jeff@pxlpug.com'
+let shareBusy = false
+
+function escapeCsvValue(value: string): string {
+  const safe = value.replace(/"/g, '""')
+  return `"${safe}"`
+}
+
+function ratingsToCsv(records: RoundRatingRecord[]): string {
+  const header = [
+    'id',
+    'player',
+    'value',
+    'recordedAt',
+    'activeArenaModKey',
+    'arenaMods',
+    'ballMods',
+    'paddleMods',
+  ]
+
+  const rows = records.map(record => [
+    record.id,
+    record.player,
+    String(record.value),
+    record.recordedAt,
+    record.activeArenaModKey ?? '',
+    JSON.stringify(record.mods.arena),
+    JSON.stringify(record.mods.ball),
+    JSON.stringify(record.mods.paddle),
+  ])
+
+  return [header, ...rows]
+    .map(cells => cells.map(cell => escapeCsvValue(String(cell ?? ''))).join(','))
+    .join('\r\n')
+}
+
+async function shareRatings(): Promise<void> {
+  const ratings = game.getRoundRatings()
+  if (ratings.length === 0 || shareBusy) return
+
+  const csv = ratingsToCsv(ratings)
+  const shareFile = new File([csv], 'round-ratings.csv', { type: 'text/csv' })
+  const canShareFiles =
+    typeof navigator !== 'undefined' &&
+    typeof navigator.canShare === 'function' &&
+    navigator.canShare({ files: [shareFile] })
+
+  shareBusy = true
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function' && canShareFiles) {
+      await navigator.share({
+        title: 'Vibe Jam Round Ratings',
+        text: `Ratings for ${SHARE_EMAIL}`,
+        files: [shareFile],
+      })
+      return
+    }
+
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'round-ratings.csv'
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    const subject = encodeURIComponent('Vibe Jam round ratings')
+    const body = encodeURIComponent(
+      'Download "round-ratings.csv" (just saved) and attach it in this email so it reaches the dev team.',
+    )
+    const mailto = document.createElement('a')
+    mailto.href = `mailto:${SHARE_EMAIL}?subject=${subject}&body=${body}`
+    mailto.style.display = 'none'
+    document.body.appendChild(mailto)
+    mailto.click()
+    document.body.removeChild(mailto)
+  } catch (error) {
+    console.error('Unable to share ratings', error)
+  } finally {
+    shareBusy = false
+  }
+}
+
+shareButton.addEventListener('click', () => {
+  void shareRatings()
+})
+
+let previousWinner: typeof game.state.winner = null
+
+const syncShareUi = () => {
+  const winner = game.state.winner
+  if (winner !== previousWinner) {
+    shareContainer.classList.toggle('round-feedback-share--visible', Boolean(winner))
+    previousWinner = winner
+  }
+
+  const hasRatings = game.getRoundRatings().length > 0
+  const shouldDisable = !hasRatings || shareBusy
+  if (shareButton.disabled !== shouldDisable) {
+    shareButton.disabled = shouldDisable
+  }
+
+  requestAnimationFrame(syncShareUi)
+}
+
+requestAnimationFrame(syncShareUi)
 
 type FullscreenCapableElement = HTMLElement & {
   webkitRequestFullscreen?: () => Promise<void>

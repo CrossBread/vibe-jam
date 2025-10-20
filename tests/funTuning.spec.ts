@@ -6,6 +6,9 @@ import { describe, expect, it } from 'vitest'
 import {
   calculatePercentile,
   computeFunFitnessScore,
+  computeFunFitnessComponents,
+  computeWeightedFunFitnessScore,
+  DEFAULT_FUN_FITNESS_WEIGHTS,
   buildRepetitionMetrics,
   runTrial,
   runFunTuning,
@@ -139,6 +142,43 @@ describe('fun tuning utilities', () => {
 
     expect(score).toBeGreaterThan(0.8)
     expect(score).toBeLessThanOrEqual(1)
+  })
+
+  it('exposes component scores and supports alternate weightings', () => {
+    const match: MatchSample = {
+      rounds: Array.from({ length: 4 }, (_, index) => ({
+        durationSeconds: 20,
+        returnCount: 10 - index,
+        shotClockExpired: false,
+        winner: index % 2 === 0 ? 'left' : 'right',
+        leftDirectionChanges: 8,
+        rightDirectionChanges: 9,
+      })),
+      finalScore: { left: 11, right: 9 },
+      finalScoreGap: 2,
+      maxScoreGap: 3,
+      aiMisses: [],
+    }
+
+    const metrics = buildRepetitionMetrics(match)
+    const components = computeFunFitnessComponents(metrics, 11)
+    const defaultScore = computeWeightedFunFitnessScore(
+      components,
+      DEFAULT_FUN_FITNESS_WEIGHTS,
+    )
+    const weightedScore = computeWeightedFunFitnessScore(components, {
+      balance: 5,
+      gap: 1,
+      duration: 1,
+      returns: 1,
+      shotClock: 1,
+      direction: 1,
+    })
+
+    expect(defaultScore).toBeCloseTo(computeFunFitnessScore(metrics, 11))
+    expect(components.balance).toBeGreaterThan(0.5)
+    expect(components.gap).toBeLessThanOrEqual(1)
+    expect(weightedScore).not.toBe(defaultScore)
   })
 
   it('runs trial mutations and generations', async () => {

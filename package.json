@@ -12,7 +12,8 @@
     "test:e2e": "playwright test",
     "format": "prettier --write .",
     "lint": "eslint .",
-    "fun-tuning": "tsx src/game/funTuning/runFunTuningCli.ts"
+    "fun-tuning": "tsx src/game/funTuning/runFunTuningCli.ts",
+    "fun-reweight": "tsx src/game/funTuning/reweightFunFitnessCli.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.1",
