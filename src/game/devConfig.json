@@ -67,9 +67,9 @@
         "name": "Black Hole",
         "description": "Gravity sink in the center of the playing field",
         "enabled": false,
-        "gravityStrength": 4800000,
-        "gravityFalloff": 110,
-        "radius": 40,
+        "gravityStrength": 800000,
+        "gravityFalloff": 140,
+        "radius": 90,
         "positiveTint": "#94a3b8",
         "negativeTint": "#e2e8f0",
         "includeInRandom": true
