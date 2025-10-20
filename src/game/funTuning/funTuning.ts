@@ -167,6 +167,38 @@ export interface FunTuningReport {
   recommendations: string[]
 }
 
+export type FunTuningStatus =
+  | {
+      type: 'generation-start'
+      generation: number
+      totalGenerations: number
+      trialCount: number
+      mutationFactor: number
+    }
+  | {
+      type: 'generation-complete'
+      generation: number
+      totalGenerations: number
+      trialCount: number
+      mutationFactor: number
+    }
+  | {
+      type: 'trial-start'
+      generation: number
+      totalGenerations: number
+      trialCount: number
+      trialIndex: number
+      trial: TrialDefinition
+    }
+  | {
+      type: 'trial-complete'
+      generation: number
+      totalGenerations: number
+      trialCount: number
+      trialIndex: number
+      trial: TrialDefinition
+    }
+
 export function calculatePercentile(values: number[], percentile: number): number | null {
   if (!values.length) return null
   if (percentile <= 0) return values[0] ?? null
@@ -564,6 +596,7 @@ export async function runFunTuning(
   simulator: HeadlessMatchSimulator,
   initialTrials: TrialDefinition[],
   options: FunTuningOptions = {},
+  statusCallback?: (status: FunTuningStatus) => void,
 ): Promise<FunTuningReport> {
   const generations: FunTuningGeneration[] = []
   const mutationSurvivors = options.mutationSurvivors ?? 2
@@ -575,8 +608,28 @@ export async function runFunTuning(
   for (let generation = 1; generation <= generationCount; generation += 1) {
     const factor = mutationFactorForGeneration(generation)
     const generationReports: TrialRunReport[] = []
+    const generationTrialCount = currentTrials.length
 
-    for (const trial of currentTrials) {
+    statusCallback?.({
+      type: 'generation-start',
+      generation,
+      totalGenerations: generationCount,
+      trialCount: generationTrialCount,
+      mutationFactor: factor,
+    })
+
+    for (let index = 0; index < generationTrialCount; index += 1) {
+      const trial = currentTrials[index]!
+
+      statusCallback?.({
+        type: 'trial-start',
+        generation,
+        totalGenerations: generationCount,
+        trialCount: generationTrialCount,
+        trialIndex: index + 1,
+        trial,
+      })
+
       const mutationSet = await runTrialMutationSet(
         simulator,
         trial,
@@ -584,6 +637,15 @@ export async function runFunTuning(
         options,
       )
       generationReports.push(mutationSet.base, ...mutationSet.mutations)
+
+      statusCallback?.({
+        type: 'trial-complete',
+        generation,
+        totalGenerations: generationCount,
+        trialCount: generationTrialCount,
+        trialIndex: index + 1,
+        trial,
+      })
     }
 
     generationReports.sort((a, b) => b.summary.averageFunScore - a.summary.averageFunScore)
@@ -593,6 +655,14 @@ export async function runFunTuning(
       generation,
       mutationFactor: factor,
       trialReports: generationReports,
+    })
+
+    statusCallback?.({
+      type: 'generation-complete',
+      generation,
+      totalGenerations: generationCount,
+      trialCount: generationTrialCount,
+      mutationFactor: factor,
     })
 
     currentTrials = generationReports
