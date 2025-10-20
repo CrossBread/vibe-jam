@@ -1,0 +1,763 @@
+﻿{
+  "trials": [
+    {
+      "id": "arena-blackHole",
+      "mods": [
+        {
+          "modPath": "arena.blackHole",
+          "parameters": {
+            "gravityStrength": 800000,
+            "gravityFalloff": 140,
+            "radius": 90
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-blackMole",
+      "mods": [
+        {
+          "modPath": "arena.blackMole",
+          "parameters": {
+            "gravityStrength": 4600000,
+            "gravityFalloff": 118,
+            "radius": 44,
+            "wanderWidthPercentage": 0.4,
+            "pauseDuration": 1.25,
+            "wanderSpeed": 110
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-ceres",
+      "mods": [
+        {
+          "modPath": "arena.ceres",
+          "parameters": {
+            "gravityStrength": 5600000,
+            "gravityFalloff": 128,
+            "radius": 62,
+            "wanderSpeed": 180
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-divots",
+      "mods": [
+        {
+          "modPath": "arena.divots",
+          "parameters": {
+            "gravityStrength": 5200000,
+            "gravityFalloff": 126,
+            "radius": 38,
+            "maxDivots": 14,
+            "spawnMargin": 64
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-drinkMe",
+      "mods": [
+        {
+          "modPath": "arena.drinkMe",
+          "parameters": {
+            "gravityStrength": 0,
+            "gravityFalloff": 0,
+            "radius": 20,
+            "objectRadius": 18,
+            "spawnCount": 4,
+            "shrinkAmount": 28
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-fogOfWar",
+      "mods": [
+        {
+          "modPath": "arena.fogOfWar",
+          "parameters": {
+            "gravityStrength": 0,
+            "gravityFalloff": 0,
+            "radius": 0,
+            "fogExpansionSpeed": 220,
+            "fogMaxRadius": 420,
+            "fogMaxOpacity": 0.85
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-gopher",
+      "mods": [
+        {
+          "modPath": "arena.gopher",
+          "parameters": {
+            "gravityStrength": -6200000,
+            "gravityFalloff": 45,
+            "radius": 53,
+            "wanderWidthPercentage": 0.45,
+            "pauseDuration": 1.1,
+            "wanderSpeed": 125
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-ireland",
+      "mods": [
+        {
+          "modPath": "arena.ireland",
+          "parameters": {
+            "gravityStrength": -1200000,
+            "gravityFalloff": 7,
+            "radius": 56,
+            "wellCount": 16,
+            "minGravityStrength": 1800000,
+            "maxGravityStrength": 6200000,
+            "minGravityFalloff": 95,
+            "maxGravityFalloff": 161,
+            "minRadius": 24,
+            "maxRadius": 86
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-jupiter",
+      "mods": [
+        {
+          "modPath": "arena.jupiter",
+          "parameters": {
+            "gravityStrength": 6800000,
+            "gravityFalloff": 112,
+            "radius": 74,
+            "wanderWidthPercentage": 0.7,
+            "wanderSpeed": 0.55
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-madHatter",
+      "mods": [
+        {
+          "modPath": "arena.madHatter",
+          "parameters": {
+            "gravityStrength": 0,
+            "gravityFalloff": 0,
+            "radius": 0
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-minesweeper",
+      "mods": [
+        {
+          "modPath": "arena.minesweeper",
+          "parameters": {
+            "gravityStrength": 0,
+            "gravityFalloff": 0,
+            "radius": 0,
+            "gridSpacing": 68,
+            "squareSize": 34,
+            "rows": 5,
+            "columns": 6
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-russianRoulette",
+      "mods": [
+        {
+          "modPath": "arena.russianRoulette",
+          "parameters": {
+            "gravityStrength": 0,
+            "gravityFalloff": 0,
+            "radius": 0,
+            "illusionFadeDistance": 140,
+            "illusionFadeSpeed": 6
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-searchLight",
+      "mods": [
+        {
+          "modPath": "arena.searchLight",
+          "parameters": {
+            "gravityStrength": 0,
+            "gravityFalloff": 0,
+            "radius": 0,
+            "coneLength": 240,
+            "coneWidth": 220,
+            "ballBrightness": 1.35
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-secondChances",
+      "mods": [
+        {
+          "modPath": "arena.secondChances",
+          "parameters": {
+            "gravityStrength": 0,
+            "gravityFalloff": 0,
+            "radius": 0,
+            "maxHits": 2
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-spaceInvaders",
+      "mods": [
+        {
+          "modPath": "arena.spaceInvaders",
+          "parameters": {
+            "gravityStrength": 0,
+            "gravityFalloff": 0,
+            "radius": 0,
+            "barricadeHealth": 3,
+            "barricadeCount": 4,
+            "barricadeSpacing": 26,
+            "barricadeDistance": 120
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-superMassive",
+      "mods": [
+        {
+          "modPath": "arena.superMassive",
+          "parameters": {
+            "gravityStrength": 3200000,
+            "gravityFalloff": 141,
+            "radius": 72
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-teaParty",
+      "mods": [
+        {
+          "modPath": "arena.teaParty",
+          "parameters": {
+            "gravityStrength": 0,
+            "gravityFalloff": 0,
+            "radius": 20,
+            "objectRadius": 20,
+            "spawnCount": 3,
+            "shrinkAmount": 24,
+            "growAmount": 20
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-threeBodyProblem",
+      "mods": [
+        {
+          "modPath": "arena.threeBodyProblem",
+          "parameters": {
+            "gravityStrength": 6200000,
+            "gravityFalloff": 126,
+            "radius": 72,
+            "orbitGravityStrength": 4200000,
+            "orbitGravityFalloff": 94,
+            "orbitRadius": 38,
+            "orbitDistance": 180,
+            "orbitSpeed": 0.9
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-vortex",
+      "mods": [
+        {
+          "modPath": "arena.vortex",
+          "parameters": {
+            "gravityStrength": 0,
+            "gravityFalloff": 0,
+            "radius": 0,
+            "portalPairs": 2,
+            "portalRadius": 34,
+            "portalMargin": 96,
+            "portalCooldown": 0.18,
+            "portalRotationSpeed": 3.14
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-whiteDwarf",
+      "mods": [
+        {
+          "modPath": "arena.whiteDwarf",
+          "parameters": {
+            "gravityStrength": 7200000,
+            "gravityFalloff": 77,
+            "radius": 26
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-wonderland",
+      "mods": [
+        {
+          "modPath": "arena.wonderland",
+          "parameters": {
+            "gravityStrength": 0,
+            "gravityFalloff": 0,
+            "radius": 0,
+            "snowflakeCount": 200,
+            "snowflakeSize": 8,
+            "snowflakeSpeed": 220,
+            "snowOpacity": 0.88
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "arena-wormhole",
+      "mods": [
+        {
+          "modPath": "arena.wormhole",
+          "parameters": {
+            "gravityStrength": 0,
+            "gravityFalloff": 0,
+            "radius": 0,
+            "portalPairs": 2,
+            "portalRadius": 34,
+            "portalMargin": 92,
+            "portalCooldown": 0.18
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "ball-bumShuffle",
+      "mods": [
+        {
+          "modPath": "ball.bumShuffle",
+          "parameters": {
+            "trailLength": 320
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "ball-kite",
+      "mods": [
+        {
+          "modPath": "ball.kite",
+          "parameters": {
+            "tailLength": 28
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "ball-meteor",
+      "mods": [
+        {
+          "modPath": "ball.meteor",
+          "parameters": {
+            "startRadius": 18,
+            "minRadius": 5,
+            "shrinkRate": 0.02
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "ball-pollok",
+      "mods": [
+        {
+          "modPath": "ball.pollok",
+          "parameters": {
+            "trailLength": 1200
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "ball-snowball",
+      "mods": [
+        {
+          "modPath": "ball.snowball",
+          "parameters": {
+            "minRadius": 4,
+            "maxRadius": 18,
+            "growthRate": 0.02
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-angry",
+      "mods": [
+        {
+          "modPath": "paddle.angry",
+          "parameters": {
+            "paddleSizeMultiplier": 1,
+            "stretchSpeed": 200,
+            "maxStretch": 54,
+            "releaseSpeed": 380,
+            "moveSpeedMultiplier": 0.55
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-apparition",
+      "mods": [
+        {
+          "modPath": "paddle.apparition",
+          "parameters": {
+            "minOpacity": 0.05,
+            "fadeDuration": 0.8,
+            "visibleHoldDuration": 3.2,
+            "hiddenHoldDuration": 1.4,
+            "paddleSizeMultiplier": 1
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-bendy",
+      "mods": [
+        {
+          "modPath": "paddle.bendy",
+          "parameters": {
+            "paddleSizeMultiplier": 1,
+            "maxOffset": 8,
+            "oscillationSpeed": 5,
+            "speedForMaxBend": 420
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-brokePhysics",
+      "mods": [
+        {
+          "modPath": "paddle.brokePhysics",
+          "parameters": {
+            "centerAngle": 1.2,
+            "edgeAngle": 0.05,
+            "paddleSizeMultiplier": 1
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-buckTooth",
+      "mods": [
+        {
+          "modPath": "paddle.buckTooth",
+          "parameters": {
+            "gapSize": 18,
+            "paddleSizeMultiplier": 1
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-bungee",
+      "mods": [
+        {
+          "modPath": "paddle.bungee",
+          "parameters": {
+            "paddleSizeMultiplier": 1,
+            "returnSpeed": 240
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-charlotte",
+      "mods": [
+        {
+          "modPath": "paddle.charlotte",
+          "parameters": {
+            "paddleSizeMultiplier": 1,
+            "webWidthMultiplier": 0.5,
+            "maxWebLengthMultiplier": 1
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-chilly",
+      "mods": [
+        {
+          "modPath": "paddle.chilly",
+          "parameters": {
+            "startingHeight": 132,
+            "shrinkAmount": 6,
+            "minimumHeight": 78,
+            "paddleSizeMultiplier": 1
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-crabby",
+      "mods": [
+        {
+          "modPath": "paddle.crabby",
+          "parameters": {
+            "gapSize": 12,
+            "clawRatio": 0.65,
+            "clawAdvantage": 0.3,
+            "swapSides": false,
+            "paddleSizeMultiplier": 1
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-dizzy",
+      "mods": [
+        {
+          "modPath": "paddle.dizzy",
+          "parameters": {
+            "paddleSizeMultiplier": 1
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-dundee",
+      "mods": [
+        {
+          "modPath": "paddle.dundee",
+          "parameters": {
+            "paddleSizeMultiplier": 1,
+            "baseSpeed": 220,
+            "acceleration": 520,
+            "maxSpeed": 560
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-foosball",
+      "mods": [
+        {
+          "modPath": "paddle.foosball",
+          "parameters": {
+            "gapSize": 10,
+            "paddleSizeMultiplier": 1
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-frisbee",
+      "mods": [
+        {
+          "modPath": "paddle.frisbee",
+          "parameters": {
+            "paddleSizeMultiplier": 1,
+            "throwSpeed": 560
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-hadron",
+      "mods": [
+        {
+          "modPath": "paddle.hadron",
+          "parameters": {
+            "splitAngle": 0.35,
+            "paddleSizeMultiplier": 3
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-inchworm",
+      "mods": [
+        {
+          "modPath": "paddle.inchworm",
+          "parameters": {
+            "paddleSizeMultiplier": 1,
+            "shrinkAmount": 28,
+            "minimumHeight": 48,
+            "shrinkSpeed": 220,
+            "extendSpeed": 260
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-missileCommander",
+      "mods": [
+        {
+          "modPath": "paddle.missileCommander",
+          "parameters": {
+            "paddleSizeMultiplier": 1,
+            "launchSpeed": 520,
+            "cooldown": 0.8,
+            "missileHeight": 68,
+            "missileLifetime": 1.6
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-osteoWhat",
+      "mods": [
+        {
+          "modPath": "paddle.osteoWhat",
+          "parameters": {
+            "segmentCount": 6,
+            "gapSize": 6,
+            "hitsBeforeBreak": 2,
+            "paddleSizeMultiplier": 1
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-outOfBody",
+      "mods": [
+        {
+          "modPath": "paddle.outOfBody",
+          "parameters": {
+            "paddleOpacity": 0.2,
+            "trailLength": 6,
+            "sampleInterval": 0.05,
+            "trailFade": 0.7,
+            "paddleSizeMultiplier": 1
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    },
+    {
+      "id": "paddle-slinky",
+      "mods": [
+        {
+          "modPath": "paddle.slinky",
+          "parameters": {
+            "paddleSizeMultiplier": 1,
+            "flopRate": 2.6
+          }
+        }
+      ],
+      "repetitions": 24,
+      "aiMisalignment": 0.6
+    }
+  ],
+  "options": {
+    "generations": 4,
+    "mutationSurvivors": 3,
+    "concurrency": 6,
+    "scoreLimit": 11,
+    "timeScale": 2
+  }
+}
