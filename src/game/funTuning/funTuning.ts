@@ -42,6 +42,7 @@ export interface TrialDefinition {
   mods: TrialModConfig[]
   repetitions?: number
   aiMisalignment?: number
+  timeScale?: number
   metadata?: Record<string, unknown>
 }
 
@@ -50,6 +51,7 @@ export interface SimulationRequest {
   parameters: TrialModConfig[]
   aiMisalignment: number
   scoreLimit: number
+  timeScale?: number
 }
 
 export interface HeadlessMatchSimulator {
@@ -152,6 +154,7 @@ export interface FunTuningOptions {
   mutationSurvivors?: number
   generations?: number
   concurrency?: number
+  timeScale?: number
 }
 
 export interface FunTuningGeneration {
@@ -452,6 +455,7 @@ async function runTrialInternal(
     repetitions: number
     aiMisalignment: number
     concurrency: number
+    timeScale: number
   },
   mutation: TrialMutationDescriptor | null,
 ): Promise<TrialRunReport> {
@@ -473,6 +477,7 @@ async function runTrialInternal(
           parameters: trial.mods,
           aiMisalignment: options.aiMisalignment,
           scoreLimit: options.scoreLimit,
+          timeScale: options.timeScale,
         })
 
         return { index, match }
@@ -508,11 +513,12 @@ export async function runTrial(
   const aiMisalignment = options.aiMisalignment ?? trial.aiMisalignment ?? 0.6
   const scoreLimit = options.scoreLimit ?? 11
   const concurrency = options.concurrency ?? 1
+  const timeScale = options.timeScale ?? trial.timeScale ?? 1
 
   return runTrialInternal(
     simulator,
     trial,
-    { repetitions, aiMisalignment, scoreLimit, concurrency },
+    { repetitions, aiMisalignment, scoreLimit, concurrency, timeScale },
     mutation,
   )
 }

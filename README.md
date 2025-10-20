@@ -159,7 +159,17 @@ The fun tuning utilities live in `src/game/funTuning`. The CLI reuses the produc
 }
 ```
 
-3. Run the CLI. On PowerShell, the Windows-friendly command looks like this:
+3. Install dependencies (`npm install`) and run the CLI. The npm script works cross-platform:
+
+```bash
+npm run fun-tuning -- \
+  --simulator ./src/game/funTuning/pongHeadlessSimulator.ts \
+  --trials ./docs/fun-tuning-sample.json \
+  --concurrency 4 \
+  --output ./reports/fun-tuning-report.json
+```
+
+PowerShell users can rely on line continuations instead:
 
 ```powershell
 npm run fun-tuning -- `
@@ -169,9 +179,31 @@ npm run fun-tuning -- `
   --output .\reports\fun-tuning-report.json
 ```
 
-The backtick (\`) is PowerShell's line-continuation character. Create the `reports` folder first if it does not already exist: `New-Item -ItemType Directory -Path .\reports -Force`.
+If you prefer to call the entry point directly (useful when scripting custom tooling), invoke `tsx` explicitly:
 
-CLI overrides (`--repetitions`, `--score-limit`, `--ai-misalignment`, `--generations`, `--mutation-survivors`, `--concurrency`) replace the defaults from the trials file. The `--concurrency` flag controls how many matches run in parallel per trial; increase it to take advantage of multicore machines when your simulator supports concurrent work. The command prints a high-level summary (best fun score and recommended config patch) and, if `--output` is provided, writes the full `FunTuningReport` JSON to disk.
+```bash
+npx tsx src/game/funTuning/runFunTuningCli.ts --simulator ./src/game/funTuning/pongHeadlessSimulator.ts --trials ./docs/fun-tuning-sample.json --concurrency 1 --output ./reports/fun-tuning-report.json
+```
+
+Create the `reports` folder first if it does not already exist: `New-Item -ItemType Directory -Path .\reports -Force`. The backtick (`) is PowerShell's line-continuation character.
+
+CLI overrides (`--repetitions`, `--score-limit`, `--ai-misalignment`, `--generations`, `--mutation-survivors`, `--concurrency`, `--time-scale`)
+replace the defaults from the trials file. The `--concurrency` flag controls how many matches run in parallel per trial; increase
+it to take advantage of multicore machines when your simulator supports concurrent work. Use `--time-scale` to multiply the in-game clock when you want headless runs to simulate faster than real time—the built-in simulator automatically renormalizes all time-based metrics so reports stay comparable. The command prints a high-level summary
+(best fun score and recommended config patch) and, if `--output` is provided, writes the full `FunTuningReport` JSON to disk.
+
+### Fun fitness scoring
+
+The fun tuning report includes an aggregate *fun fitness* score for each trial. The score is the simple average of six normalized components, so every factor carries equal weight:
+
+- **Balance** rewards evenly matched rounds by scoring `1 - |roundWinRate - 0.5| * 2`.
+- **Score gap** penalizes blowouts based on the largest lead observed relative to the score limit.
+- **Round duration** prefers rallies that last between roughly 5 and 30 seconds—the median round length is scaled toward 1 inside that window and gradually falls off outside it.
+- **Returns per round** encourages back-and-forth play by scaling the median rally length against eight returns.
+- **Shot clock** measures how often a rally actually ends because the clock expires. A lower expiration rate means a higher contribution.
+- **Direction changes** discourages excessive paddle thrashing by penalizing median combined direction changes above ten.
+
+The headless simulator normalizes all time-based measurements using the active time scale, so durations, shot clock summaries, and return counts line up with real seconds even when you accelerate the simulation with `--time-scale`.
 
 ## Auto-deploy (GitHub Pages)
 This repo includes a Pages workflow for branch **master**. On every push to `master`: test → build → deploy to Pages.

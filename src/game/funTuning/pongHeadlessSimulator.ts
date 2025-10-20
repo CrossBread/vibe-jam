@@ -26,6 +26,7 @@ export interface PongHeadlessSimulatorOptions {
    * Maximum simulated duration in seconds before a match is forced to stop.
    */
   maxDurationSeconds?: number
+  timeScale?: number
 }
 
 class HeadlessCanvas {
@@ -227,7 +228,8 @@ export function createPongHeadlessSimulator(
   const width = options.width ?? 1280
   const height = options.height ?? 720
   const stepsPerSecond = Math.max(30, options.stepsPerSecond ?? 240)
-  const dt = 1 / stepsPerSecond
+  const baseTimeScale = Number.isFinite(options.timeScale) ? Number(options.timeScale) : 1
+  const dtBase = 1 / stepsPerSecond
 
   return {
     async runMatch(request: SimulationRequest): Promise<MatchSample> {
@@ -248,6 +250,13 @@ export function createPongHeadlessSimulator(
 
       pong.reset()
 
+      const requestTimeScale = Number.isFinite(request.timeScale)
+        ? Number(request.timeScale)
+        : undefined
+      const combinedTimeScale = requestTimeScale ?? baseTimeScale
+      const timeScale = Math.max(0.1, combinedTimeScale)
+      const dtSim = dtBase * timeScale
+
       const state = pong.state
       const rounds: RoundSample[] = []
       const aiMisses: PaddleMissSample[] = []
@@ -256,24 +265,44 @@ export function createPongHeadlessSimulator(
 
       const maxDuration =
         options.maxDurationSeconds ?? Math.max(60, Math.max(1, request.scoreLimit) * 60)
-      const maxSteps = Math.ceil(maxDuration / dt)
+      const maxSteps = Math.ceil(maxDuration / dtSim)
 
       let roundActive = false
       let roundStartTime = 0
       let roundReturnCount = 0
-      let roundShotClockExpired = false
+      let roundLastHit: PaddleSide | null = null
 
       const leftTracker = createDirectionTracker()
       const rightTracker = createDirectionTracker()
       let ballHitMap: WeakMap<PongAPI['state']['balls'][number], PaddleSide | null> = new WeakMap()
+
+      const endCurrentRound = (winner: PaddleSide, shotClockExpired: boolean) => {
+        const duration = Math.max(0, elapsed - roundStartTime)
+        const leftChanges = finalizeRoundTracker(leftTracker)
+        const rightChanges = finalizeRoundTracker(rightTracker)
+        rounds.push({
+          durationSeconds: duration,
+          returnCount: roundReturnCount,
+          shotClockExpired,
+          winner,
+          leftDirectionChanges: leftChanges,
+          rightDirectionChanges: rightChanges,
+        })
+        roundActive = false
+        roundReturnCount = 0
+        roundLastHit = null
+        resetTracker(leftTracker)
+        resetTracker(rightTracker)
+        ballHitMap = new WeakMap()
+      }
 
       let step = 0
       while (!state.winner && step < maxSteps) {
         step += 1
         const snapshot = captureSnapshot(state)
 
-        pong.tick(dt)
-        elapsed += dt
+        pong.tick(dtSim)
+        elapsed += dtSim
 
         maxScoreGap = Math.max(maxScoreGap, Math.abs(state.leftScore - state.rightScore))
 
@@ -282,7 +311,7 @@ export function createPongHeadlessSimulator(
           roundActive = true
           roundStartTime = elapsed
           roundReturnCount = 0
-          roundShotClockExpired = false
+          roundLastHit = null
           resetTracker(leftTracker)
           resetTracker(rightTracker)
           ballHitMap = new WeakMap()
@@ -292,12 +321,16 @@ export function createPongHeadlessSimulator(
           handleDirectionSample(leftTracker, state.leftY - snapshot.leftY)
           handleDirectionSample(rightTracker, state.rightY - snapshot.rightY)
 
-          if (
+          const shotClockExpiredThisStep =
             snapshot.shotClockActive &&
             !state.shotClockActive &&
             state.shotClockRemaining === 0
-          ) {
-            roundShotClockExpired = true
+
+          if (shotClockExpiredThisStep) {
+            const winner: PaddleSide =
+              roundLastHit === 'left' ? 'right' : roundLastHit === 'right' ? 'left' : 'right'
+            endCurrentRound(winner, true)
+            continue
           }
 
           for (const ball of state.balls) {
@@ -306,6 +339,7 @@ export function createPongHeadlessSimulator(
             const currentHit = (ball.lastPaddleHit ?? null) as PaddleSide | null
             if (currentHit && currentHit !== previousHit) {
               roundReturnCount += 1
+              roundLastHit = currentHit
               if (currentHit === 'left') {
                 finalizeDirectionSample(leftTracker)
               } else {
@@ -321,46 +355,26 @@ export function createPongHeadlessSimulator(
             state.leftScore > snapshot.leftScore ? 'left' : 'right'
           const loser: PaddleSide = winner === 'left' ? 'right' : 'left'
           const exitBall = pickExitBall(winner, snapshot.ballSnapshots)
-          const missDistance = computeMissDistance(loser, exitBall, snapshot, dt)
+          const missDistance = computeMissDistance(loser, exitBall, snapshot, dtSim)
           if (missDistance !== null && missDistance > 0) {
             aiMisses.push({ side: loser, missDistancePx: missDistance })
           }
 
           if (roundActive) {
-            const duration = Math.max(0, elapsed - roundStartTime)
-            const leftChanges = finalizeRoundTracker(leftTracker)
-            const rightChanges = finalizeRoundTracker(rightTracker)
-            rounds.push({
-              durationSeconds: duration,
-              returnCount: roundReturnCount,
-              shotClockExpired: roundShotClockExpired,
-              winner,
-              leftDirectionChanges: leftChanges,
-              rightDirectionChanges: rightChanges,
-            })
+            endCurrentRound(winner, false)
+          } else {
+            resetTracker(leftTracker)
+            resetTracker(rightTracker)
+            roundReturnCount = 0
+            roundLastHit = null
+            ballHitMap = new WeakMap()
           }
-
-          roundActive = false
-          roundReturnCount = 0
-          roundShotClockExpired = false
-          resetTracker(leftTracker)
-          resetTracker(rightTracker)
         }
       }
 
       if (roundActive) {
         const winner: PaddleSide = state.leftScore >= state.rightScore ? 'left' : 'right'
-        const duration = Math.max(0, elapsed - roundStartTime)
-        const leftChanges = finalizeRoundTracker(leftTracker)
-        const rightChanges = finalizeRoundTracker(rightTracker)
-        rounds.push({
-          durationSeconds: duration,
-          returnCount: roundReturnCount,
-          shotClockExpired: roundShotClockExpired,
-          winner,
-          leftDirectionChanges: leftChanges,
-          rightDirectionChanges: rightChanges,
-        })
+        endCurrentRound(winner, false)
       }
 
       return {

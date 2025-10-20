@@ -6,8 +6,8 @@
         {
           "modPath": "arena.blackHole",
           "parameters": {
-            "gravityStrength": 750000,
-            "radius": 280
+            "gravityStrength": 800000,
+            "gravityFalloff": 140
           }
         }
       ],

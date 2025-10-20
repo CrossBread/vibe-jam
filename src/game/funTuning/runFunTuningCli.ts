@@ -1,4 +1,4 @@
-﻿import fs from 'node:fs/promises'
+﻿import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
@@ -40,6 +40,7 @@ function printUsage(): void {
     `  --mutation-survivors   Override survivor count per generation.\n` +
     `  --generations          Override total generations to run.\n` +
     `  --concurrency          Number of matches to simulate in parallel (default 1).\n` +
+    `  --time-scale           Multiply the in-game clock by this factor during simulations.\n` +
     `  --verbose              Print progress information while running.\n` +
     `  --help                 Show this help message.\n`)
 }
@@ -109,6 +110,13 @@ function parseArguments(argv: string[]): CliArguments {
         }
         break
       }
+      case '--time-scale': {
+        const scale = Number(argv[++index])
+        if (!Number.isNaN(scale)) {
+          args.overrides.timeScale = scale
+        }
+        break
+      }
       case '--verbose':
         args.verbose = true
         break
@@ -123,7 +131,7 @@ function parseArguments(argv: string[]): CliArguments {
 
 async function readJsonFileSafe(filePath: string) {
   const abs = path.resolve(filePath);
-  const raw = await fs.readFile(abs, 'utf8');
+  const raw = await readFile(abs, { encoding: 'utf8' });
   const noBom = raw.replace(/^\uFEFF/, ''); // strip UTF-8 BOM if present
 
   try {
@@ -235,6 +243,9 @@ async function main(): Promise<void> {
         `[${formatTimestamp(runStart)}] Starting fun tuning with ${generationCount} ` +
           `generation${generationCount === 1 ? '' : 's'}. ETA updates will be provided as data becomes available.`,
       )
+      if (typeof options.timeScale === 'number') {
+        console.log(`Simulated time scale: ${options.timeScale}x.`)
+      }
     }
 
     const statusLogger = args.verbose ? createVerboseStatusLogger(runStart) : undefined
@@ -249,7 +260,7 @@ async function main(): Promise<void> {
 
     if (args.outputPath) {
       const resolvedOutput = path.resolve(process.cwd(), args.outputPath)
-      await fs.writeFile(resolvedOutput, JSON.stringify(report, null, 2))
+      await writeFile(resolvedOutput, JSON.stringify(report, null, 2))
       console.log(`Full report saved to ${resolvedOutput}`)
     } else if (args.verbose) {
       console.log('No output path provided; skipping report file write.')
