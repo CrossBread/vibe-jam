@@ -1,0 +1,24 @@
+﻿{
+  "trials": [
+    {
+      "id": "baseline-black-hole",
+      "mods": [
+        {
+          "modPath": "arena.blackHole",
+          "parameters": {
+            "gravityStrength": 750000,
+            "radius": 280
+          }
+        }
+      ],
+      "repetitions": 10,
+      "aiMisalignment": 0.6
+    }
+  ],
+  "options": {
+    "generations": 3,
+    "mutationSurvivors": 2,
+    "concurrency": 2,
+    "scoreLimit": 11
+  }
+}

@@ -122,6 +122,57 @@ npm run fun-tuning -- \
 
 CLI overrides (`--repetitions`, `--score-limit`, `--ai-misalignment`, `--generations`, `--mutation-survivors`, `--concurrency`) replace the defaults from the trials file. The `--concurrency` flag controls how many matches run in parallel per trial; increase it to take advantage of multicore machines when your simulator supports concurrent work. The command prints a high-level summary (best fun score and recommended config patch) and, if `--output` is provided, writes the full `FunTuningReport` JSON to disk.
 
+### Fun tuning simulations
+
+The fun tuning utilities live in `src/game/funTuning`. The CLI reuses the production Pong engine in headless mode so tuning runs exercise the same code used in-game.
+
+1. Choose a simulator.
+   - The built-in simulator at `src/game/funTuning/pongHeadlessSimulator.ts` drives matches with the shipping physics and modifiers while skipping UI work. This is the recommended option for most scenarios.
+   - You can provide your own module that exports either a `createSimulator()` factory, a `simulator` value, or a default export with a `runMatch()` method.
+
+2. Define the trials you want to run. A sample configuration is available at `docs/fun-tuning-sample.json` and demonstrates the expected shape:
+
+```json
+{
+  "trials": [
+    {
+      "id": "baseline-black-hole",
+      "mods": [
+        {
+          "modPath": "arena.blackHole",
+          "parameters": {
+            "gravityStrength": 750000,
+            "radius": 280
+          }
+        }
+      ],
+      "repetitions": 10,
+      "aiMisalignment": 0.6
+    }
+  ],
+  "options": {
+    "generations": 3,
+    "mutationSurvivors": 2,
+    "concurrency": 2,
+    "scoreLimit": 11
+  }
+}
+```
+
+3. Run the CLI. On PowerShell, the Windows-friendly command looks like this:
+
+```powershell
+npm run fun-tuning -- `
+  --simulator .\src\game\funTuning\pongHeadlessSimulator.ts `
+  --trials .\docs\fun-tuning-sample.json `
+  --concurrency 4 `
+  --output .\reports\fun-tuning-report.json
+```
+
+The backtick (\`) is PowerShell's line-continuation character. Create the `reports` folder first if it does not already exist: `New-Item -ItemType Directory -Path .\reports -Force`.
+
+CLI overrides (`--repetitions`, `--score-limit`, `--ai-misalignment`, `--generations`, `--mutation-survivors`, `--concurrency`) replace the defaults from the trials file. The `--concurrency` flag controls how many matches run in parallel per trial; increase it to take advantage of multicore machines when your simulator supports concurrent work. The command prints a high-level summary (best fun score and recommended config patch) and, if `--output` is provided, writes the full `FunTuningReport` JSON to disk.
+
 ## Auto-deploy (GitHub Pages)
 This repo includes a Pages workflow for branch **master**. On every push to `master`: test → build → deploy to Pages.
 

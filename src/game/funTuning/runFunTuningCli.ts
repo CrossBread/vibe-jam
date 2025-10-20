@@ -114,25 +114,15 @@ function parseArguments(argv: string[]): CliArguments {
   return args
 }
 
-async function loadTrials(filePath: string): Promise<TrialConfigFile> {
-  const raw = await fs.readFile(filePath, 'utf-8')
-  const parsed = JSON.parse(raw)
-
-  if (Array.isArray(parsed)) {
-    return { trials: parsed }
-  }
-
-  if (!parsed || typeof parsed !== 'object') {
-    throw new Error('Trial configuration must be an array or object with a trials property.')
-  }
-
-  if (!Array.isArray(parsed.trials)) {
-    throw new Error('Trial configuration object is missing a trials array.')
-  }
-
-  return {
-    trials: parsed.trials,
-    options: parsed.options ?? {},
+async function readJsonFileSafe(filePath: string) {
+  const abs = path.resolve(filePath);
+  const raw = await fs.readFile(abs, 'utf8');
+  const noBom = raw.replace(/^\uFEFF/, ''); // strip UTF-8 BOM if present
+  try {
+    return JSON.parse(noBom);
+  } catch (err) {
+    const hint = noBom.charCodeAt(0) === 0xFEFF ? ' (BOM removed)' : '';
+    throw new Error(`Failed to parse JSON at ${abs}${hint}: ${(err as Error).message}`);
   }
 }
 
@@ -193,7 +183,7 @@ async function main(): Promise<void> {
   try {
     const [simulator, trialConfig] = await Promise.all([
       resolveSimulator(args.simulatorPath),
-      loadTrials(args.trialsPath),
+      readJsonFileSafe(args.trialsPath),
     ])
 
     const options = mergeOptions(trialConfig.options, args.overrides)
