@@ -1,8 +1,4 @@
-﻿/*
- * Copyright (c) 2025. CrossBread Tech All rights reserved.
- */
-
-import fs from 'node:fs/promises'
+﻿import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'

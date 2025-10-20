@@ -14,6 +14,7 @@ import {
   type TrialDefinition,
   type TrialModConfig,
 } from '../src/game/funTuning/funTuning'
+import { createPongHeadlessSimulator } from '../src/game/funTuning/pongHeadlessSimulator'
 
 class MockSimulator implements HeadlessMatchSimulator {
   private readonly matches: MatchSample[]
@@ -219,5 +220,22 @@ describe('fun tuning utilities', () => {
 
     expect(report.repetitions).toHaveLength(4)
     expect(simulator.maxConcurrency).toBeGreaterThan(1)
+  })
+
+  it('runs the headless pong simulator using the production game loop', async () => {
+    const simulator = createPongHeadlessSimulator({
+      stepsPerSecond: 240,
+      maxDurationSeconds: 60,
+    })
+
+    const match = await simulator.runMatch({
+      trial: createTrial([]),
+      parameters: [],
+      aiMisalignment: 0.6,
+      scoreLimit: 1,
+    })
+
+    expect(match.rounds.length).toBeGreaterThan(0)
+    expect(match.finalScore.left + match.finalScore.right).toBe(1)
   })
 })

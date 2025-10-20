@@ -9,6 +9,7 @@ import {
   getGravityWellsEntries,
   type AnimationCurve,
   type ArenaModifiers,
+  type DevConfig,
   type GravityWellKey,
   type GravityWellModifier,
   type SearchLightModifier,
@@ -148,6 +149,8 @@ export interface PongAPI {
   reset(): void
 
   tick(dt: number): void
+
+  config: DevConfig
 }
 
 export interface PongOptions {
@@ -156,6 +159,11 @@ export interface PongOptions {
    * Disable for headless/unit testing environments.
    */
   autoStart?: boolean
+
+  /**
+   * Disable rendering, overlays, and input handlers for headless simulations.
+   */
+  headless?: boolean
 
   /**
    * Duration in seconds before an announcement begins to fade.
@@ -176,6 +184,16 @@ export interface PongOptions {
    * Delay in seconds before a countdown begins when revealing the active mod.
    */
   modRevealDelay?: number
+
+  /**
+   * Override the default dev config used for the game instance.
+   */
+  initialConfig?: DevConfig
+
+  /**
+   * Override the match score limit (first to N points wins).
+   */
+  scoreLimit?: number
 }
 
 type KeySet = Record<string, boolean>
@@ -288,25 +306,31 @@ export function createPong(
   options: PongOptions = {},
 ): PongAPI {
   const context = canvas.getContext('2d')
-  if (!context) throw new Error('Canvas 2D context is required')
-  const ctx = context
+  const headlessFlag = Boolean(options.headless)
+  if (!context && !headlessFlag) throw new Error('Canvas 2D context is required')
+  const ctx = context ?? createHeadlessRenderingContext(canvas)
 
   const {
-    autoStart = true,
+    autoStart: autoStartOption = true,
+    headless: headlessOption = false,
     announcementHoldDuration = 3.5,
     announcementFadeDuration = 1.35,
     serveCountdownDuration: serveCountdownDurationOption = 3,
     modRevealDelay: modRevealDelayOption = 2,
+    initialConfig,
+    scoreLimit: scoreLimitOption,
   } = options
+  const headless = headlessFlag || Boolean(headlessOption)
+  const autoStart = headless ? Boolean(options.autoStart ?? false) : autoStartOption
   const serveCountdownDuration = Math.max(0, serveCountdownDurationOption)
   const modRevealDelayDuration = Math.max(0, modRevealDelayOption)
+  const winScore = Math.max(1, Math.floor(scoreLimitOption ?? 11))
   const W = canvas.width
   const H = canvas.height
   const BASE_PADDLE_H = 90
   const PADDLE_W = 12
   const PADDLE_COLLISION_CUSHION = 2
   const BALL_R = 8
-  const WIN_SCORE = 11
   const PIPS_PER_BITE = 8
   const ARENA_BACKGROUND = '#10172a'
   const ANNOUNCEMENT_COLOR = '#203275'
@@ -326,36 +350,91 @@ export function createPong(
   const MIN_POTION_PADDLE_HEIGHT = 18
 
   const defaults = createDevConfig()
-  const config = deepClone(defaults)
+  const config = deepClone(initialConfig ?? defaults)
   const container = canvas.parentElement
-  container?.classList.add('dev-overlay-container')
+  if (!headless) {
+    container?.classList.add('dev-overlay-container')
+  }
 
-  const overlay = createDevOverlay(config, defaults, {
-    onDockChange: () => syncOverlayLayout(),
-  })
+  const overlay = headless
+    ? null
+    : createDevOverlay(config, defaults, {
+        onDockChange: () => syncOverlayLayout(),
+      })
 
-  const performanceTracker = createPerformanceStatsTracker({ overlay })
+  const performanceTracker: PerformanceTrackerLike = overlay
+    ? createPerformanceStatsTracker({ overlay })
+    : createNoopPerformanceTracker()
 
-  overlay.addEventListener(DEV_OVERLAY_STATS_TOGGLE_EVENT, event => {
-    const detail = (event as CustomEvent<DevOverlayStatsToggleDetail>).detail
-    performanceTracker.setEnabled(Boolean(detail?.enabled))
-  })
+  if (overlay) {
+    overlay.addEventListener(DEV_OVERLAY_STATS_TOGGLE_EVENT, event => {
+      const detail = (event as CustomEvent<DevOverlayStatsToggleDetail>).detail
+      performanceTracker.setEnabled(Boolean(detail?.enabled))
+    })
 
-  container?.appendChild(overlay)
-  syncOverlayLayout()
+    container?.appendChild(overlay)
+    syncOverlayLayout()
+  }
 
   type TouchSide = 'left' | 'right'
   type TouchMode = 'direct' | 'relative'
 
-  interface ActiveTouchControl {
-    id: number
-    side: TouchSide
-    mode: TouchMode
-    directDirection: -1 | 0 | 1
-    lastCanvasY: number
-    canvasX: number
-    canvasY: number
+interface ActiveTouchControl {
+  id: number
+  side: TouchSide
+  mode: TouchMode
+  directDirection: -1 | 0 | 1
+  lastCanvasY: number
+  canvasX: number
+  canvasY: number
+}
+
+function createHeadlessRenderingContext(
+  canvas: HTMLCanvasElement,
+): CanvasRenderingContext2D {
+  const noop = () => {}
+  const gradient = { addColorStop: noop }
+  return new Proxy(
+    {
+      canvas,
+      measureText: () => ({
+        width: 0,
+        actualBoundingBoxAscent: 0,
+        actualBoundingBoxDescent: 0,
+        actualBoundingBoxLeft: 0,
+        actualBoundingBoxRight: 0,
+        fontBoundingBoxAscent: 0,
+        fontBoundingBoxDescent: 0,
+      }),
+      createLinearGradient: () => gradient,
+      createRadialGradient: () => gradient,
+      createPattern: () => null,
+    },
+    {
+      get(target, prop) {
+        if (prop in target) {
+          return Reflect.get(target, prop)
+        }
+        return noop
+      },
+      set() {
+        return true
+      },
+    },
+  ) as CanvasRenderingContext2D
+}
+
+interface PerformanceTrackerLike {
+  setEnabled(enabled: boolean): void
+  recordFrame(frameTimeMs: number, now: number): void
+}
+
+function createNoopPerformanceTracker(): PerformanceTrackerLike {
+  return {
+    setEnabled() {},
+    recordFrame() {},
   }
+}
 
   const activeTouches = new Map<number, ActiveTouchControl>()
   const touchControls: Record<TouchSide, { direction: number; relativeDelta: number }> = {
@@ -364,12 +443,16 @@ export function createPong(
   }
   let tripleTouchTimeout: number | null = null
 
-  canvas.style.touchAction = 'none'
+  if (!headless) {
+    if (canvas.style) {
+      ;(canvas.style as CSSStyleDeclaration).touchAction = 'none'
+    }
 
-  canvas.addEventListener('touchstart', handleTouchStart, { passive: false })
-  canvas.addEventListener('touchmove', handleTouchMove, { passive: false })
-  canvas.addEventListener('touchend', handleTouchEnd)
-  canvas.addEventListener('touchcancel', handleTouchEnd)
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false })
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false })
+    canvas.addEventListener('touchend', handleTouchEnd)
+    canvas.addEventListener('touchcancel', handleTouchEnd)
+  }
 
   const keys: KeySet = {}
   let leftAIEnabled = true
@@ -470,11 +553,13 @@ export function createPong(
     }
   }
 
-    if (typeof window !== 'undefined') {
+  if (!headless && typeof window !== 'undefined') {
     window.addEventListener('keydown', (e) => {
       if (e.key === '`' && !e.repeat) {
-        toggleOverlay(overlay)
-        syncOverlayLayout()
+        if (overlay) {
+          toggleOverlay(overlay)
+          syncOverlayLayout()
+        }
         e.preventDefault()
         return
       }
@@ -641,19 +726,25 @@ export function createPong(
   function updateTripleTouchHold() {
     const shouldHold = hasThreeCenterTouches()
     if (!shouldHold && tripleTouchTimeout !== null) {
-      window.clearTimeout(tripleTouchTimeout)
+      if (typeof window !== 'undefined') {
+        window.clearTimeout(tripleTouchTimeout)
+      }
       tripleTouchTimeout = null
     }
 
     if (
       shouldHold &&
       tripleTouchTimeout === null &&
+      overlay &&
+      typeof window !== 'undefined' &&
       !overlay.classList.contains('dev-overlay--visible')
     ) {
       tripleTouchTimeout = window.setTimeout(() => {
         tripleTouchTimeout = null
-        showOverlay(overlay)
-        syncOverlayLayout()
+        if (overlay) {
+          showOverlay(overlay)
+          syncOverlayLayout()
+        }
       }, 3000)
     }
   }
@@ -1515,25 +1606,27 @@ export function createPong(
     resetBall(Math.random() < 0.5)
   }
 
-  if (typeof window !== 'undefined') {
+  if (!headless && typeof window !== 'undefined') {
     window.addEventListener('keypress', (e) => {
       if (e.key.toLowerCase() === 'r') reset()
     })
   }
 
   function syncOverlayLayout() {
-    if (!container) return
+    if (!container || !overlay) return
     const docked = overlay.classList.contains('dev-overlay--docked')
     const visible = overlay.classList.contains('dev-overlay--visible')
     const isDockedAndVisible = docked && visible
     container.classList.toggle('dev-overlay-container--docked', isDockedAndVisible)
-    container.dispatchEvent(
-      new CustomEvent('pong:layout-changed', {
-        bubbles: true,
-        composed: true,
-        detail: { docked: isDockedAndVisible },
-      }),
-    )
+    if (typeof CustomEvent === 'function') {
+      container.dispatchEvent(
+        new CustomEvent('pong:layout-changed', {
+          bubbles: true,
+          composed: true,
+          detail: { docked: isDockedAndVisible },
+        }),
+      )
+    }
   }
 
   let last = performance.now()
@@ -1834,10 +1927,10 @@ export function createPong(
       const nextServeToLeft = pointAwarded === 'left'
       if (pointAwarded === 'right') {
         state.rightScore++
-        if (state.rightScore >= WIN_SCORE) state.winner = 'right'
+        if (state.rightScore >= winScore) state.winner = 'right'
       } else {
         state.leftScore++
-        if (state.leftScore >= WIN_SCORE) state.winner = 'left'
+        if (state.leftScore >= winScore) state.winner = 'left'
       }
       clearDivotWells()
       const modChanged = handlePointScored()
@@ -4468,6 +4561,9 @@ export function createPong(
   }
 
   function draw() {
+    if (headless) {
+      return
+    }
     ctx.fillStyle = ARENA_BACKGROUND
     ctx.fillRect(0, 0, W, H)
 
@@ -5060,5 +5156,5 @@ export function createPong(
     return Math.max(a, Math.min(b, v))
   }
 
-  return { state, reset, tick }
+  return { state, reset, tick, config }
 }
