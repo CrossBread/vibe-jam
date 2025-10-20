@@ -50,7 +50,7 @@ function printUsage(): void {
     `Usage: npm run fun-tuning -- --simulator ./path/to/simulator.ts --trials ./trials.json [options]\n\n` +
     `Required flags:\n` +
     `  --simulator    Path to a module exporting a HeadlessMatchSimulator or a createSimulator() factory.\n` +
-    `  --trials       Path to a JSON file containing an array of trials or { \'trials\': [...], \'options\': {...} }.\n\n` +
+    `  --trials       Path to a JSON file containing an array of trials or { 'trials': [...], 'options': {...} }.\n\n` +
     `Optional flags:\n` +
     `  --output               Where to write the full report as JSON. Defaults to stdout only.\n` +
     `  --repetitions          Override repetitions per trial.\n` +

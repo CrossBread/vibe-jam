@@ -586,24 +586,31 @@ export async function runTrialMutationSet(
   }
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 function buildConfigPatch(trial: TrialDefinition): Record<string, unknown> {
-  const patch: Record<string, any> = { modifiers: {} }
+  const patch: Record<string, unknown> = { modifiers: {} as Record<string, unknown> }
 
   for (const mod of trial.mods) {
     const segments = mod.modPath.split('.')
     if (!segments.length) continue
 
-    let cursor = patch.modifiers
+    let cursor = patch.modifiers as Record<string, unknown>
     for (let index = 0; index < segments.length; index += 1) {
       const segment = segments[index]!
       if (index === segments.length - 1) {
+        const existing = isPlainRecord(cursor[segment]) ? cursor[segment] : {}
         cursor[segment] = {
-          ...(cursor[segment] ?? {}),
+          ...existing,
           ...mod.parameters,
         }
       } else {
-        cursor[segment] = cursor[segment] ?? {}
-        cursor = cursor[segment]
+        if (!isPlainRecord(cursor[segment])) {
+          cursor[segment] = {}
+        }
+        cursor = cursor[segment] as Record<string, unknown>
       }
     }
   }

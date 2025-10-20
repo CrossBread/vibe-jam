@@ -356,6 +356,14 @@ export function createPong(
     container?.classList.add('dev-overlay-container')
   }
 
+  if (announcementHoldDuration !== undefined) {
+    config.ui.animations.modTitleHoldSeconds = Math.max(0, announcementHoldDuration)
+  }
+
+  if (announcementFadeDuration !== undefined) {
+    config.ui.animations.modTitleFadeSeconds = Math.max(0, announcementFadeDuration)
+  }
+
   const overlay = headless
     ? null
     : createDevOverlay(config, defaults, {
@@ -445,7 +453,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
 
   if (!headless) {
     if (canvas.style) {
-      ;(canvas.style as CSSStyleDeclaration).touchAction = 'none'
+      (canvas.style as CSSStyleDeclaration).touchAction = 'none'
     }
 
     canvas.addEventListener('touchstart', handleTouchStart, { passive: false })
