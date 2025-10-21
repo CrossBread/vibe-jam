@@ -646,20 +646,11 @@ function ensureDevOverlayStyles() {
     .dev-overlay__modifier summary::-webkit-details-marker {
       display: none;
     }
-    .dev-overlay__modifier summary::after {
-      content: '';
-      width: 8px;
-      height: 8px;
-      border-right: 2px solid rgba(226, 232, 240, 0.7);
-      border-bottom: 2px solid rgba(226, 232, 240, 0.7);
-      position: absolute;
-      right: 16px;
-      top: 50%;
-      transform: translateY(-50%) rotate(45deg);
-      transition: transform 0.2s ease;
-    }
-    .dev-overlay__modifier[open] summary::after {
-      transform: translateY(-50%) rotate(225deg);
+    .dev-overlay__modifier-indicator {
+      margin-left: auto;
+      font-size: 14px;
+      color: rgba(226, 232, 240, 0.7);
+      transition: color 0.2s ease;
     }
     .dev-overlay__modifier-header {
       display: flex;
@@ -728,18 +719,10 @@ function ensureDevOverlayStyles() {
     .dev-overlay__collapsible summary::-webkit-details-marker {
       display: none;
     }
-    .dev-overlay__collapsible summary::after {
-      content: '';
-      width: 8px;
-      height: 8px;
-      border-right: 2px solid rgba(226, 232, 240, 0.7);
-      border-bottom: 2px solid rgba(226, 232, 240, 0.7);
-      transform: rotate(45deg);
+    .dev-overlay__collapsible-indicator {
       margin-left: auto;
-      transition: transform 0.2s ease;
-    }
-    .dev-overlay__collapsible[open] summary::after {
-      transform: rotate(225deg);
+      font-size: 12px;
+      color: rgba(226, 232, 240, 0.7);
     }
     .dev-overlay__collapsible-body {
       display: flex;
@@ -923,6 +906,31 @@ export function createDevOverlay(
   function trackCollapsible(section: HTMLDetailsElement) {
     section.addEventListener('toggle', updateCollapseButtonLabel)
     return section
+  }
+
+  function attachCollapsibleIndicator(
+    section: HTMLDetailsElement,
+    target: HTMLElement,
+    options: { className?: string; openSymbol?: string; closedSymbol?: string } = {},
+  ) {
+    const {
+      className = 'dev-overlay__collapsible-indicator',
+      openSymbol = '^',
+      closedSymbol = 'v',
+    } = options
+    const indicator = document.createElement('span')
+    indicator.className = className
+    indicator.setAttribute('aria-hidden', 'true')
+
+    const updateIndicator = () => {
+      indicator.textContent = section.open ? openSymbol : closedSymbol
+    }
+
+    target.appendChild(indicator)
+    updateIndicator()
+    section.addEventListener('toggle', updateIndicator)
+
+    return indicator
   }
 
   const dockToggleLabel = document.createElement('label')
@@ -1518,6 +1526,9 @@ export function createDevOverlay(
         summaryHeader.appendChild(toggle)
         summaryHeader.appendChild(summaryLabel)
         summary.appendChild(summaryHeader)
+        attachCollapsibleIndicator(details, summaryHeader, {
+          className: 'dev-overlay__modifier-indicator',
+        })
 
         const copyButton = document.createElement('button')
         copyButton.type = 'button'
@@ -1617,6 +1628,7 @@ export function createDevOverlay(
     const baseSummary = document.createElement('summary')
     baseSummary.textContent = 'Game Parameters'
     baseSection.appendChild(baseSummary)
+    attachCollapsibleIndicator(baseSection, baseSummary)
 
     const baseBody = document.createElement('div')
     baseBody.className = 'dev-overlay__collapsible-body'
@@ -1774,6 +1786,7 @@ export function createDevOverlay(
     const uiSummary = document.createElement('summary')
     uiSummary.textContent = 'UI Settings'
     uiSection.appendChild(uiSummary)
+    attachCollapsibleIndicator(uiSection, uiSummary)
 
     const uiBody = document.createElement('div')
     uiBody.className = 'dev-overlay__collapsible-body'
@@ -2072,6 +2085,7 @@ export function createDevOverlay(
     paddleLabel.textContent = 'Paddle Modifiers'
     paddleSummary.appendChild(paddleLabel)
     paddleCollapsible.appendChild(paddleSummary)
+    attachCollapsibleIndicator(paddleCollapsible, paddleSummary)
 
     const paddleBody = document.createElement('div')
     paddleBody.className = 'dev-overlay__collapsible-body'
@@ -2128,6 +2142,7 @@ export function createDevOverlay(
     ballLabel.textContent = 'Ball Modifiers'
     ballSummary.appendChild(ballLabel)
     ballCollapsible.appendChild(ballSummary)
+    attachCollapsibleIndicator(ballCollapsible, ballSummary)
 
     const ballBody = document.createElement('div')
     ballBody.className = 'dev-overlay__collapsible-body'
@@ -2184,6 +2199,7 @@ export function createDevOverlay(
     arenaLabel.textContent = 'Arena Modifiers'
     arenaSummary.appendChild(arenaLabel)
     arenaCollapsible.appendChild(arenaSummary)
+    attachCollapsibleIndicator(arenaCollapsible, arenaSummary)
 
     const arenaBody = document.createElement('div')
     arenaBody.className = 'dev-overlay__collapsible-body'
