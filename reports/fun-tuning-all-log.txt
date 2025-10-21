@@ -1,0 +1,981 @@
+Fun tuning completed for suite arena.blackHole.
+Generations evaluated: 4
+Starting trial id: arena-blackHole
+Starting average fun score: 0.581
+Best trial id: arena-blackHole.1.3.2.2.3.1
+Average fun score (best trial): 0.649
+Fun score improvement: +0.068 (11.8%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "blackHole": {
+        "gravityStrength": 800000,
+        "gravityFalloff": 70,
+        "radius": 90
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.blackMole.
+Generations evaluated: 4
+Starting trial id: arena-blackMole
+Starting average fun score: 0.565
+Best trial id: arena-blackMole.1.3.2.2.3.2
+Average fun score (best trial): 0.643
+Fun score improvement: +0.078 (13.7%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "blackMole": {
+        "gravityStrength": 4600000,
+        "gravityFalloff": 188.8,
+        "radius": 29.333333333333332,
+        "wanderWidthPercentage": 0.4,
+        "pauseDuration": 1.25,
+        "wanderSpeed": 123.75
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.ceres.
+Generations evaluated: 4
+Starting trial id: arena-ceres
+Starting average fun score: 0.610
+Best trial id: arena-ceres.1.3.2.1.3.2
+Average fun score (best trial): 0.628
+Fun score improvement: +0.018 (3.0%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "ceres": {
+        "gravityStrength": 4480000,
+        "gravityFalloff": 128,
+        "radius": 124,
+        "wanderSpeed": 106.66666666666667
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.divots.
+Generations evaluated: 4
+Starting trial id: arena-divots
+Starting average fun score: 0.570
+Best trial id: arena-divots.1.2.2.2.3.3
+Average fun score (best trial): 0.645
+Fun score improvement: +0.076 (13.3%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "divots": {
+        "gravityStrength": 3466666.6666666665,
+        "gravityFalloff": 126,
+        "radius": 38,
+        "maxDivots": 14,
+        "spawnMargin": 102.4
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.drinkMe.
+Generations evaluated: 4
+Starting trial id: arena-drinkMe
+Starting average fun score: 0.602
+Best trial id: arena-drinkMe.1.1.2.2.3.1
+Average fun score (best trial): 0.626
+Fun score improvement: +0.024 (4.0%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "drinkMe": {
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 25,
+        "objectRadius": 12,
+        "spawnCount": 4,
+        "shrinkAmount": 28
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.fogOfWar.
+Generations evaluated: 4
+Starting trial id: arena-fogOfWar
+Starting average fun score: 0.611
+Best trial id: arena-fogOfWar.1.2.2.3.3.2
+Average fun score (best trial): 0.626
+Fun score improvement: +0.015 (2.4%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "fogOfWar": {
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "fogExpansionSpeed": 146.66666666666666,
+        "fogMaxRadius": 420,
+        "fogMaxOpacity": 0.85
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.gopher.
+Generations evaluated: 4
+Starting trial id: arena-gopher
+Starting average fun score: 0.582
+Best trial id: arena-gopher.1.1.2.3.3.2
+Average fun score (best trial): 0.610
+Fun score improvement: +0.028 (4.8%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "gopher": {
+        "gravityStrength": -8266666.666666667,
+        "gravityFalloff": 45,
+        "radius": 53,
+        "wanderWidthPercentage": 0.5625,
+        "pauseDuration": 1.1,
+        "wanderSpeed": 250
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.ireland.
+Generations evaluated: 4
+Starting trial id: arena-ireland
+Starting average fun score: 0.612
+Best trial id: arena-ireland.1.3.2.3.3.1
+Average fun score (best trial): 0.649
+Fun score improvement: +0.037 (6.0%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "ireland": {
+        "gravityStrength": -1200000,
+        "gravityFalloff": 7,
+        "radius": 37.333333333333336,
+        "wellCount": 12.8,
+        "minGravityStrength": 1600000,
+        "maxGravityStrength": 3100000,
+        "minGravityFalloff": 95,
+        "maxGravityFalloff": 161,
+        "minRadius": 24,
+        "maxRadius": 86
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.jupiter.
+Generations evaluated: 4
+Starting trial id: arena-jupiter
+Starting average fun score: 0.595
+Best trial id: arena-jupiter.1.1.2.2.3.3
+Average fun score (best trial): 0.631
+Fun score improvement: +0.036 (6.1%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "jupiter": {
+        "gravityStrength": 6800000,
+        "gravityFalloff": 149.33333333333334,
+        "radius": 74,
+        "wanderWidthPercentage": 0.875,
+        "wanderSpeed": 0.55
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.madHatter.
+Generations evaluated: 4
+Starting trial id: arena-madHatter
+Starting average fun score: 0.616
+Best trial id: arena-madHatter.1.1.2.1.3.2
+Average fun score (best trial): 0.649
+Fun score improvement: +0.034 (5.4%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "madHatter": {
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.minesweeper.
+Generations evaluated: 4
+Starting trial id: arena-minesweeper
+Starting average fun score: 0.593
+Best trial id: arena-minesweeper.1.2.2.3.3.3
+Average fun score (best trial): 0.632
+Fun score improvement: +0.039 (6.6%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "minesweeper": {
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "gridSpacing": 68,
+        "squareSize": 34,
+        "rows": 6.25,
+        "columns": 3
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.russianRoulette.
+Generations evaluated: 4
+Starting trial id: arena-russianRoulette
+Starting average fun score: 0.625
+Best trial id: arena-russianRoulette.1.2.2.1.3.2
+Average fun score (best trial): 0.633
+Fun score improvement: +0.009 (1.4%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "russianRoulette": {
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "illusionFadeDistance": 124.44444444444444,
+        "illusionFadeSpeed": 6
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.searchLight.
+Generations evaluated: 4
+Starting trial id: arena-searchLight
+Starting average fun score: 0.578
+Best trial id: arena-searchLight.1.2.2.3.3.1
+Average fun score (best trial): 0.635
+Fun score improvement: +0.057 (9.8%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "searchLight": {
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "coneLength": 240,
+        "coneWidth": 220,
+        "ballBrightness": 1.51875
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.secondChances.
+Generations evaluated: 4
+Starting trial id: arena-secondChances
+Starting average fun score: 0.627
+Best trial id: arena-secondChances.1.2.2.3.3.2
+Average fun score (best trial): 0.625
+Fun score improvement: -0.002 (-0.3%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "secondChances": {
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "maxHits": 1.7777777777777777
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.spaceInvaders.
+Generations evaluated: 4
+Starting trial id: arena-spaceInvaders
+Starting average fun score: 0.601
+Best trial id: arena-spaceInvaders.1.3.2.2.3.1
+Average fun score (best trial): 0.626
+Fun score improvement: +0.025 (4.2%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "spaceInvaders": {
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "barricadeHealth": 1.3333333333333333,
+        "barricadeCount": 4,
+        "barricadeSpacing": 26,
+        "barricadeDistance": 120
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.superMassive.
+Generations evaluated: 4
+Starting trial id: arena-superMassive
+Starting average fun score: 0.623
+Best trial id: arena-superMassive.1.3.2.2.3.2
+Average fun score (best trial): 0.636
+Fun score improvement: +0.013 (2.1%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "superMassive": {
+        "gravityStrength": 2000000,
+        "gravityFalloff": 188,
+        "radius": 72
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.teaParty.
+Generations evaluated: 4
+Starting trial id: arena-teaParty
+Starting average fun score: 0.600
+Best trial id: arena-teaParty.1.2.2.3.3.1
+Average fun score (best trial): 0.640
+Fun score improvement: +0.040 (6.7%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "teaParty": {
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 16,
+        "objectRadius": 22.5,
+        "spawnCount": 1.5,
+        "shrinkAmount": 24,
+        "growAmount": 20
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.threeBodyProblem.
+Generations evaluated: 4
+Starting trial id: arena-threeBodyProblem
+Starting average fun score: 0.603
+Best trial id: arena-threeBodyProblem.1.3.2.3.3.2
+Average fun score (best trial): 0.644
+Fun score improvement: +0.042 (6.9%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "threeBodyProblem": {
+        "gravityStrength": 6200000,
+        "gravityFalloff": 126,
+        "radius": 72,
+        "orbitGravityStrength": 5250000,
+        "orbitGravityFalloff": 94,
+        "orbitRadius": 42.75,
+        "orbitDistance": 120,
+        "orbitSpeed": 1.8
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.vortex.
+Generations evaluated: 4
+Starting trial id: arena-vortex
+Starting average fun score: 0.614
+Best trial id: arena-vortex.1.3.2.2.3.1
+Average fun score (best trial): 0.628
+Fun score improvement: +0.014 (2.3%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "vortex": {
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "portalPairs": 1.6,
+        "portalRadius": 30.22222222222222,
+        "portalMargin": 144,
+        "portalCooldown": 0.18,
+        "portalRotationSpeed": 3.14
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.whiteDwarf.
+Generations evaluated: 4
+Starting trial id: arena-whiteDwarf
+Starting average fun score: 0.586
+Best trial id: arena-whiteDwarf.1.2.2.1.3.1
+Average fun score (best trial): 0.631
+Fun score improvement: +0.044 (7.6%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "whiteDwarf": {
+        "gravityStrength": 9000000,
+        "gravityFalloff": 115.5,
+        "radius": 14.625
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.wonderland.
+Generations evaluated: 4
+Starting trial id: arena-wonderland
+Starting average fun score: 0.621
+Best trial id: arena-wonderland.1.3.2.1.3.3
+Average fun score (best trial): 0.622
+Fun score improvement: +0.000 (0.1%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "wonderland": {
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "snowflakeCount": 200,
+        "snowflakeSize": 8,
+        "snowflakeSpeed": 330,
+        "snowOpacity": 1.1
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite arena.wormhole.
+Generations evaluated: 4
+Starting trial id: arena-wormhole
+Starting average fun score: 0.559
+Best trial id: arena-wormhole.1.1.2.2.3.3
+Average fun score (best trial): 0.628
+Fun score improvement: +0.068 (12.2%)
+Recommended config patch:
+{
+  "modifiers": {
+    "arena": {
+      "wormhole": {
+        "gravityStrength": 0,
+        "gravityFalloff": 0,
+        "radius": 0,
+        "portalPairs": 2,
+        "portalRadius": 22.666666666666668,
+        "portalMargin": 92,
+        "portalCooldown": 0.18
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite ball.bumShuffle.
+Generations evaluated: 4
+Starting trial id: ball-bumShuffle
+Starting average fun score: 0.582
+Best trial id: ball-bumShuffle.1.2.2.1.3.3
+Average fun score (best trial): 0.629
+Fun score improvement: +0.047 (8.0%)
+Recommended config patch:
+{
+  "modifiers": {
+    "ball": {
+      "bumShuffle": {
+        "trailLength": 426.6666666666667
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite ball.kite.
+Generations evaluated: 4
+Starting trial id: ball-kite
+Starting average fun score: 0.598
+Best trial id: ball-kite.1.3.2.3.3.1
+Average fun score (best trial): 0.623
+Fun score improvement: +0.025 (4.2%)
+Recommended config patch:
+{
+  "modifiers": {
+    "ball": {
+      "kite": {
+        "tailLength": 8.296296296296298
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite ball.meteor.
+Generations evaluated: 4
+Starting trial id: ball-meteor
+Starting average fun score: 0.555
+Best trial id: ball-meteor.1.1.2.2.3.2
+Average fun score (best trial): 0.632
+Fun score improvement: +0.077 (13.9%)
+Recommended config patch:
+{
+  "modifiers": {
+    "ball": {
+      "meteor": {
+        "startRadius": 54,
+        "minRadius": 5,
+        "shrinkRate": 0.014222222222222223
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite ball.pollok.
+Generations evaluated: 4
+Starting trial id: ball-pollok
+Starting average fun score: 0.587
+Best trial id: ball-pollok.1.3.2.2.3.2
+Average fun score (best trial): 0.624
+Fun score improvement: +0.037 (6.4%)
+Recommended config patch:
+{
+  "modifiers": {
+    "ball": {
+      "pollok": {
+        "trailLength": 444.44444444444446
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite ball.snowball.
+Generations evaluated: 4
+Starting trial id: ball-snowball
+Starting average fun score: 0.613
+Best trial id: ball-snowball.1.3.2.3.3.3
+Average fun score (best trial): 0.692
+Fun score improvement: +0.079 (12.9%)
+Recommended config patch:
+{
+  "modifiers": {
+    "ball": {
+      "snowball": {
+        "minRadius": 4,
+        "maxRadius": 33.75,
+        "growthRate": 0.0225
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.angry.
+Generations evaluated: 4
+Starting trial id: paddle-angry
+Starting average fun score: 0.602
+Best trial id: paddle-angry.1.1.2.1.3.3
+Average fun score (best trial): 0.684
+Fun score improvement: +0.082 (13.5%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "angry": {
+        "paddleSizeMultiplier": 3,
+        "stretchSpeed": 225,
+        "maxStretch": 67.5,
+        "releaseSpeed": 380,
+        "moveSpeedMultiplier": 0.55
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.apparition.
+Generations evaluated: 4
+Starting trial id: paddle-apparition
+Starting average fun score: 0.592
+Best trial id: paddle-apparition.1.1.2.1.3.3
+Average fun score (best trial): 0.676
+Fun score improvement: +0.083 (14.1%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "apparition": {
+        "minOpacity": 0.044444444444444446,
+        "fadeDuration": 0.8,
+        "visibleHoldDuration": 3.2,
+        "hiddenHoldDuration": 1.4,
+        "paddleSizeMultiplier": 3.75
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.bendy.
+Generations evaluated: 4
+Starting trial id: paddle-bendy
+Starting average fun score: 0.592
+Best trial id: paddle-bendy.1.1.2.3.3.3
+Average fun score (best trial): 0.648
+Fun score improvement: +0.056 (9.4%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "bendy": {
+        "paddleSizeMultiplier": 2.8125,
+        "maxOffset": 8,
+        "oscillationSpeed": 5,
+        "speedForMaxBend": 280
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.brokePhysics.
+Generations evaluated: 4
+Starting trial id: paddle-brokePhysics
+Starting average fun score: 0.573
+Best trial id: paddle-brokePhysics.1.1.2.2.3.3
+Average fun score (best trial): 0.686
+Fun score improvement: +0.113 (19.7%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "brokePhysics": {
+        "centerAngle": 0.5333333333333333,
+        "edgeAngle": 0.07500000000000001,
+        "paddleSizeMultiplier": 0.8
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.buckTooth.
+Generations evaluated: 4
+Starting trial id: paddle-buckTooth
+Starting average fun score: 0.559
+Best trial id: paddle-buckTooth.1.2.2.3.3.3
+Average fun score (best trial): 0.663
+Fun score improvement: +0.104 (18.7%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "buckTooth": {
+        "gapSize": 18,
+        "paddleSizeMultiplier": 4.21875
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.bungee.
+Generations evaluated: 4
+Starting trial id: paddle-bungee
+Starting average fun score: 0.592
+Best trial id: paddle-bungee.1.1.2.1.3.2
+Average fun score (best trial): 0.659
+Fun score improvement: +0.067 (11.3%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "bungee": {
+        "paddleSizeMultiplier": 3,
+        "returnSpeed": 240
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.charlotte.
+Generations evaluated: 4
+Starting trial id: paddle-charlotte
+Starting average fun score: 0.409
+Best trial id: paddle-charlotte.1.2.2.2.3.1
+Average fun score (best trial): 0.420
+Fun score improvement: +0.011 (2.6%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "charlotte": {
+        "paddleSizeMultiplier": 1,
+        "webWidthMultiplier": 1,
+        "maxWebLengthMultiplier": 0.4740740740740741
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.chilly.
+Generations evaluated: 4
+Starting trial id: paddle-chilly
+Starting average fun score: 0.611
+Best trial id: paddle-chilly.1.1.2.1.3.3
+Average fun score (best trial): 0.683
+Fun score improvement: +0.072 (11.7%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "chilly": {
+        "startingHeight": 264,
+        "shrinkAmount": 6,
+        "minimumHeight": 69.33333333333333,
+        "paddleSizeMultiplier": 1.875
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.crabby.
+Generations evaluated: 4
+Starting trial id: paddle-crabby
+Starting average fun score: 0.531
+Best trial id: paddle-crabby.1.1.2.1.3.1
+Average fun score (best trial): 0.639
+Fun score improvement: +0.108 (20.3%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "crabby": {
+        "gapSize": 12,
+        "clawRatio": 0.65,
+        "clawAdvantage": 0.33749999999999997,
+        "swapSides": false,
+        "paddleSizeMultiplier": 2
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.dizzy.
+Generations evaluated: 4
+Starting trial id: paddle-dizzy
+Starting average fun score: 0.584
+Best trial id: paddle-dizzy.1.1.2.1.3.1
+Average fun score (best trial): 0.668
+Fun score improvement: +0.084 (14.3%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "dizzy": {
+        "paddleSizeMultiplier": 4.21875
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.dundee.
+Generations evaluated: 4
+Starting trial id: paddle-dundee
+Starting average fun score: 0.575
+Best trial id: paddle-dundee.1.1.2.1.3.1
+Average fun score (best trial): 0.628
+Fun score improvement: +0.053 (9.2%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "dundee": {
+        "paddleSizeMultiplier": 1,
+        "baseSpeed": 110,
+        "acceleration": 346.6666666666667,
+        "maxSpeed": 700
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.foosball.
+Generations evaluated: 4
+Starting trial id: paddle-foosball
+Starting average fun score: 0.571
+Best trial id: paddle-foosball.1.1.2.1.3.2
+Average fun score (best trial): 0.687
+Fun score improvement: +0.116 (20.4%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "foosball": {
+        "gapSize": 8,
+        "paddleSizeMultiplier": 3.375
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.frisbee.
+Generations evaluated: 4
+Starting trial id: paddle-frisbee
+Starting average fun score: 0.591
+Best trial id: paddle-frisbee.1.2.2.2.3.1
+Average fun score (best trial): 0.645
+Fun score improvement: +0.055 (9.2%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "frisbee": {
+        "paddleSizeMultiplier": 1.5,
+        "throwSpeed": 504
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.hadron.
+Generations evaluated: 4
+Starting trial id: paddle-hadron
+Starting average fun score: 0.659
+Best trial id: paddle-hadron.1.1.2.2.3.2
+Average fun score (best trial): 0.723
+Fun score improvement: +0.064 (9.7%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "hadron": {
+        "splitAngle": 0.09333333333333332,
+        "paddleSizeMultiplier": 3.375
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.inchworm.
+Generations evaluated: 4
+Starting trial id: paddle-inchworm
+Starting average fun score: 0.595
+Best trial id: paddle-inchworm.1.1.2.1.3.1
+Average fun score (best trial): 0.671
+Fun score improvement: +0.076 (12.7%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "inchworm": {
+        "paddleSizeMultiplier": 3.375,
+        "shrinkAmount": 28,
+        "minimumHeight": 48,
+        "shrinkSpeed": 220,
+        "extendSpeed": 260
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.missileCommander.
+Generations evaluated: 4
+Starting trial id: paddle-missileCommander
+Starting average fun score: 0.594
+Best trial id: paddle-missileCommander.1.3.2.3.3.3
+Average fun score (best trial): 0.646
+Fun score improvement: +0.052 (8.7%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "missileCommander": {
+        "paddleSizeMultiplier": 2,
+        "launchSpeed": 520,
+        "cooldown": 0.8,
+        "missileHeight": 45.333333333333336,
+        "missileLifetime": 2
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.osteoWhat.
+Generations evaluated: 4
+Starting trial id: paddle-osteoWhat
+Starting average fun score: 0.558
+Best trial id: paddle-osteoWhat.1.2.2.1.3.2
+Average fun score (best trial): 0.680
+Fun score improvement: +0.122 (21.9%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "osteoWhat": {
+        "segmentCount": 6.75,
+        "gapSize": 6,
+        "hitsBeforeBreak": 2,
+        "paddleSizeMultiplier": 3.75
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.outOfBody.
+Generations evaluated: 4
+Starting trial id: paddle-outOfBody
+Starting average fun score: 0.543
+Best trial id: paddle-outOfBody.1.2.2.1.3.3
+Average fun score (best trial): 0.641
+Fun score improvement: +0.098 (18.1%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "outOfBody": {
+        "paddleOpacity": 0.2,
+        "trailLength": 4,
+        "sampleInterval": 0.045,
+        "trailFade": 0.7,
+        "paddleSizeMultiplier": 2
+      }
+    }
+  }
+}
+
+Fun tuning completed for suite paddle.slinky.
+Generations evaluated: 4
+Starting trial id: paddle-slinky
+Starting average fun score: 0.612
+Best trial id: paddle-slinky.1.1.2.1.3.1
+Average fun score (best trial): 0.695
+Fun score improvement: +0.082 (13.5%)
+Recommended config patch:
+{
+  "modifiers": {
+    "paddle": {
+      "slinky": {
+        "paddleSizeMultiplier": 3.75,
+        "flopRate": 2.6
+      }
+    }
+  }
+}
