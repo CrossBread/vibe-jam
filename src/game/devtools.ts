@@ -405,6 +405,7 @@ export interface DevConfig {
   speedIncreaseOnHit: number
   shotClockSeconds: number
   maxAiMisalignment: number
+  lockMods: boolean
   doubles: DoublesConfig
   modifiers: ModifiersConfig
   ui: UISettings

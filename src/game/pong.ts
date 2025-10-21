@@ -4042,6 +4042,9 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
   }
 
   function disableAllMods() {
+    if (config.lockMods) {
+      return
+    }
     let anyDisabled = false
     for (const key of GRAVITY_WELL_KEYS) {
       const modifier = config.modifiers.arena[key]
@@ -4256,6 +4259,13 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     const enabledMods = sortBySelectionOrder(
       GRAVITY_WELL_KEYS.filter(key => config.modifiers.arena[key].enabled),
     )
+    if (config.lockMods) {
+      arenaModManager.syncEnabled()
+      activeGravityWells = collectActiveGravityWells()
+      activeModKey = enabledMods.length > 0 ? enabledMods[0] : null
+      modRevealDelayPending = enabledMods.length > 0
+      return
+    }
     if (enabledMods.length === 0) {
       setActiveMod(pickRandomMod(null))
       modRevealDelayPending = true
@@ -4277,6 +4287,17 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
   }
 
   function setActiveMod(nextKey: GravityWellKey): boolean {
+    if (config.lockMods) {
+      const previousKey = activeModKey
+      if (config.modifiers.arena[nextKey].enabled) {
+        activeModKey = nextKey
+        arenaModManager.syncEnabled()
+        activeGravityWells = collectActiveGravityWells()
+        return previousKey !== nextKey
+      }
+      return false
+    }
+
     const previousKey = activeModKey
     const previousEnabled = config.modifiers.arena[nextKey].enabled
     if (previousKey === nextKey && previousEnabled) return false
@@ -4298,6 +4319,12 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
   }
 
   function applyModVoteSelection(nextKey: GravityWellKey) {
+    if (config.lockMods) {
+      if (config.modifiers.arena[nextKey].enabled) {
+        activeModKey = nextKey
+      }
+      return
+    }
     const hasOtherActiveMods = GRAVITY_WELL_KEYS.some(
       key => key !== nextKey && config.modifiers.arena[key].enabled,
     )

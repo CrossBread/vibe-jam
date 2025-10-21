@@ -9,6 +9,7 @@
   "speedIncreaseOnHit": 1.03,
   "shotClockSeconds": 8,
   "maxAiMisalignment": 55,
+  "lockMods": false,
   "doubles": {
     "enabled": false,
     "insideOffset": 72

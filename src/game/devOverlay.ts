@@ -676,34 +676,36 @@ function ensureDevOverlayStyles() {
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .dev-overlay__modifier-copy-chip {
+    .dev-overlay__modifier-copy-button {
       margin-left: auto;
       margin-right: 12px;
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 4px 10px;
-      border-radius: 9999px;
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      background: rgba(30, 41, 59, 0.45);
-      color: rgba(226, 232, 240, 0.85);
-      font-size: 11px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: rgba(59, 130, 246, 0.12);
+      color: rgba(226, 232, 240, 0.95);
+      font-size: 12px;
       font-weight: 600;
-      line-height: 1;
+      line-height: 1.2;
       cursor: pointer;
-      transition: background 0.2s ease, border-color 0.2s ease;
+      transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
     }
-    .dev-overlay__modifier-copy-chip:hover {
-      background: rgba(51, 65, 85, 0.6);
-      border-color: rgba(148, 163, 184, 0.6);
+    .dev-overlay__modifier-copy-button:hover {
+      background: rgba(59, 130, 246, 0.22);
+      border-color: rgba(148, 163, 184, 0.55);
+      color: rgba(226, 232, 240, 1);
     }
-    .dev-overlay__modifier-copy-chip:focus-visible {
-      outline: 2px solid rgba(148, 163, 184, 0.85);
+    .dev-overlay__modifier-copy-button:focus-visible {
+      outline: 2px solid rgba(96, 165, 250, 0.9);
       outline-offset: 2px;
+      box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.6);
     }
     .dev-overlay__modifier-copy-icon {
-      width: 12px;
-      height: 12px;
+      width: 14px;
+      height: 14px;
       flex-shrink: 0;
     }
     .dev-overlay__collapsible {
@@ -880,7 +882,7 @@ export function createDevOverlay(
   }
 
   interface SectionState {
-    container: HTMLDivElement
+    container: HTMLElement
     list: HTMLDivElement
     emptyMessage: HTMLParagraphElement
   }
@@ -1359,13 +1361,10 @@ export function createDevOverlay(
   controls.className = 'dev-overlay__controls'
 
   const paddleSection = document.createElement('div')
-  paddleSection.className = 'dev-overlay__section'
 
   const ballSection = document.createElement('div')
-  ballSection.className = 'dev-overlay__section'
 
   const arenaSection = document.createElement('div')
-  arenaSection.className = 'dev-overlay__section'
 
   const buttons = document.createElement('div')
   buttons.className = 'dev-overlay__buttons'
@@ -1518,10 +1517,11 @@ export function createDevOverlay(
         summaryHeader.appendChild(summaryLabel)
         summary.appendChild(summaryHeader)
 
-        const copyChip = document.createElement('button')
-        copyChip.type = 'button'
-        copyChip.className = 'dev-overlay__modifier-copy-chip'
-        copyChip.title = `Copy trial parameters for ${modifier.name}`
+        const copyButton = document.createElement('button')
+        copyButton.type = 'button'
+        copyButton.className = 'dev-overlay__modifier-copy-button'
+        copyButton.title = `Copy trial parameters for ${modifier.name}`
+        copyButton.setAttribute('aria-label', `Copy trial parameters for ${modifier.name}`)
 
         const copyIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
         copyIcon.setAttribute('viewBox', '0 0 20 20')
@@ -1537,13 +1537,13 @@ export function createDevOverlay(
         copyIcon.appendChild(iconPath)
 
         const copyLabel = document.createElement('span')
-        copyLabel.textContent = 'Trial'
+        copyLabel.textContent = 'Copy Trial'
 
-        copyChip.appendChild(copyIcon)
-        copyChip.appendChild(copyLabel)
-        summary.appendChild(copyChip)
+        copyButton.appendChild(copyIcon)
+        copyButton.appendChild(copyLabel)
+        summary.appendChild(copyButton)
 
-        copyChip.addEventListener('click', async event => {
+        copyButton.addEventListener('click', async event => {
           event.stopPropagation()
           event.preventDefault()
 
@@ -1591,6 +1591,22 @@ export function createDevOverlay(
         return details
       }
     }
+
+    const lockModsControl = createToggleControl('Lock Mods', Boolean(config.lockMods), {
+      onChange: value => {
+        config.lockMods = value
+        setStatus(
+          value
+            ? 'Mods locked. Automatic progression disabled.'
+            : 'Mods unlocked. Automatic progression restored.',
+        )
+      },
+    })
+    const lockModsInput = lockModsControl.querySelector(
+      'input[type="checkbox"]',
+    ) as HTMLInputElement | null
+    lockModsInput?.setAttribute('title', 'Prevent the game from changing mods automatically')
+    controls.appendChild(lockModsControl)
 
     const baseSection = document.createElement('details')
     baseSection.className = 'dev-overlay__collapsible'
@@ -2044,26 +2060,40 @@ export function createDevOverlay(
     dynamicCollapsibleSections.push(trackCollapsible(uiSection))
     controls.appendChild(uiSection)
 
-    const paddleTitle = document.createElement('div')
-    paddleTitle.className = 'dev-overlay__section-title'
-    paddleTitle.textContent = 'Paddle Modifiers'
-    paddleSection.appendChild(paddleTitle)
+    const paddleCollapsible = document.createElement('details')
+    paddleCollapsible.className = 'dev-overlay__collapsible'
+    paddleCollapsible.open = true
+
+    const paddleSummary = document.createElement('summary')
+    const paddleLabel = document.createElement('span')
+    paddleLabel.className = 'dev-overlay__section-title'
+    paddleLabel.textContent = 'Paddle Modifiers'
+    paddleSummary.appendChild(paddleLabel)
+    paddleCollapsible.appendChild(paddleSummary)
+
+    const paddleBody = document.createElement('div')
+    paddleBody.className = 'dev-overlay__collapsible-body'
+    paddleCollapsible.appendChild(paddleBody)
 
     const paddleList = document.createElement('div')
     paddleList.className = 'dev-overlay__modifiers'
-    paddleSection.appendChild(paddleList)
+    paddleBody.appendChild(paddleList)
 
     const paddleEmpty = document.createElement('p')
     paddleEmpty.className = 'dev-overlay__section-empty'
     paddleEmpty.textContent = 'No paddle modifiers match the current filters.'
     paddleEmpty.style.display = 'none'
-    paddleSection.appendChild(paddleEmpty)
+    paddleBody.appendChild(paddleEmpty)
+
+    paddleSection.appendChild(paddleCollapsible)
 
     sectionStates.paddle = {
-      container: paddleSection,
+      container: paddleCollapsible,
       list: paddleList,
       emptyMessage: paddleEmpty,
     }
+
+    dynamicCollapsibleSections.push(trackCollapsible(paddleCollapsible))
 
     const renderPaddleModifier = <K extends typeof PADDLE_MODIFIER_KEYS[number]>(key: K) => {
       const modifier = config.modifiers.paddle[key]
@@ -2086,26 +2116,40 @@ export function createDevOverlay(
       renderPaddleModifier(key)
     }
 
-    const ballTitle = document.createElement('div')
-    ballTitle.className = 'dev-overlay__section-title'
-    ballTitle.textContent = 'Ball Modifiers'
-    ballSection.appendChild(ballTitle)
+    const ballCollapsible = document.createElement('details')
+    ballCollapsible.className = 'dev-overlay__collapsible'
+    ballCollapsible.open = true
+
+    const ballSummary = document.createElement('summary')
+    const ballLabel = document.createElement('span')
+    ballLabel.className = 'dev-overlay__section-title'
+    ballLabel.textContent = 'Ball Modifiers'
+    ballSummary.appendChild(ballLabel)
+    ballCollapsible.appendChild(ballSummary)
+
+    const ballBody = document.createElement('div')
+    ballBody.className = 'dev-overlay__collapsible-body'
+    ballCollapsible.appendChild(ballBody)
 
     const ballList = document.createElement('div')
     ballList.className = 'dev-overlay__modifiers'
-    ballSection.appendChild(ballList)
+    ballBody.appendChild(ballList)
 
     const ballEmpty = document.createElement('p')
     ballEmpty.className = 'dev-overlay__section-empty'
     ballEmpty.textContent = 'No ball modifiers match the current filters.'
     ballEmpty.style.display = 'none'
-    ballSection.appendChild(ballEmpty)
+    ballBody.appendChild(ballEmpty)
+
+    ballSection.appendChild(ballCollapsible)
 
     sectionStates.ball = {
-      container: ballSection,
+      container: ballCollapsible,
       list: ballList,
       emptyMessage: ballEmpty,
     }
+
+    dynamicCollapsibleSections.push(trackCollapsible(ballCollapsible))
 
     const renderBallModifier = <K extends typeof BALL_MODIFIER_KEYS[number]>(key: K) => {
       const modifier = config.modifiers.ball[key]
@@ -2128,26 +2172,40 @@ export function createDevOverlay(
       renderBallModifier(key)
     }
 
-    const arenaTitle = document.createElement('div')
-    arenaTitle.className = 'dev-overlay__section-title'
-    arenaTitle.textContent = 'Arena Modifiers'
-    arenaSection.appendChild(arenaTitle)
+    const arenaCollapsible = document.createElement('details')
+    arenaCollapsible.className = 'dev-overlay__collapsible'
+    arenaCollapsible.open = true
+
+    const arenaSummary = document.createElement('summary')
+    const arenaLabel = document.createElement('span')
+    arenaLabel.className = 'dev-overlay__section-title'
+    arenaLabel.textContent = 'Arena Modifiers'
+    arenaSummary.appendChild(arenaLabel)
+    arenaCollapsible.appendChild(arenaSummary)
+
+    const arenaBody = document.createElement('div')
+    arenaBody.className = 'dev-overlay__collapsible-body'
+    arenaCollapsible.appendChild(arenaBody)
 
     const modifiersList = document.createElement('div')
     modifiersList.className = 'dev-overlay__modifiers'
-    arenaSection.appendChild(modifiersList)
+    arenaBody.appendChild(modifiersList)
 
     const arenaEmpty = document.createElement('p')
     arenaEmpty.className = 'dev-overlay__section-empty'
     arenaEmpty.textContent = 'No arena modifiers match the current filters.'
     arenaEmpty.style.display = 'none'
-    arenaSection.appendChild(arenaEmpty)
+    arenaBody.appendChild(arenaEmpty)
+
+    arenaSection.appendChild(arenaCollapsible)
 
     sectionStates.arena = {
-      container: arenaSection,
+      container: arenaCollapsible,
       list: modifiersList,
       emptyMessage: arenaEmpty,
     }
+
+    dynamicCollapsibleSections.push(trackCollapsible(arenaCollapsible))
 
     const renderArenaModifier = <K extends typeof GRAVITY_WELL_KEYS[number]>(key: K) => {
       const modifier = config.modifiers.arena[key]
@@ -2209,6 +2267,42 @@ export function createDevOverlay(
     }
   })
 
+  const clearModsButton = createOverlayButton('Clear Mods')
+  clearModsButton.addEventListener('click', () => {
+    let changed = false
+
+    for (const key of GRAVITY_WELL_KEYS) {
+      const modifier = config.modifiers.arena[key]
+      if (modifier.enabled) {
+        modifier.enabled = false
+        changed = true
+      }
+    }
+
+    for (const key of BALL_MODIFIER_KEYS) {
+      const modifier = config.modifiers.ball[key]
+      if (modifier.enabled) {
+        modifier.enabled = false
+        changed = true
+      }
+    }
+
+    for (const key of PADDLE_MODIFIER_KEYS) {
+      const modifier = config.modifiers.paddle[key]
+      if (modifier.enabled) {
+        modifier.enabled = false
+        changed = true
+      }
+    }
+
+    if (changed) {
+      renderControls()
+      setStatus('All modifiers have been disabled.')
+    } else {
+      setStatus('All modifiers are already disabled.')
+    }
+  })
+
   const resetButton = createOverlayButton('Reset to Defaults')
   resetButton.addEventListener('click', () => {
     applyConfig(config, defaults)
@@ -2226,6 +2320,7 @@ export function createDevOverlay(
 
   buttonsRow.appendChild(copyButton)
   buttonsRow.appendChild(loadButton)
+  buttonsRow.appendChild(clearModsButton)
   buttonsRow.appendChild(resetButton)
   buttons.appendChild(buttonsRow)
 
@@ -2256,6 +2351,9 @@ function applyConfig(target: DevConfig, source: DevConfig) {
   target.minHorizontalRatio = source.minHorizontalRatio
   target.speedIncreaseOnHit = source.speedIncreaseOnHit
   target.shotClockSeconds = source.shotClockSeconds
+  if ('lockMods' in source) {
+    target.lockMods = Boolean((source as Partial<DevConfig>).lockMods)
+  }
   target.doubles = deepClone(source.doubles)
   target.modifiers = deepClone(source.modifiers)
   target.ui = deepClone(source.ui)
@@ -2275,6 +2373,10 @@ function isDevConfig(value: unknown): value is DevConfig {
     typeof candidate.speedIncreaseOnHit !== 'number' ||
     typeof candidate.shotClockSeconds !== 'number'
   ) {
+    return false
+  }
+
+  if ('lockMods' in candidate && typeof candidate.lockMods !== 'boolean') {
     return false
   }
 
