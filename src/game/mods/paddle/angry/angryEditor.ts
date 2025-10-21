@@ -13,8 +13,8 @@ export const createAngryModifier: ModifierBuilder<AngryModifier> = ({
   createDetails(modifier, body => {
     body.appendChild(
       createSliderControl('Paddle Size Multiplier', modifier.paddleSizeMultiplier, {
-        min: 0.5,
-        max: 1.75,
+        min: 0.25,
+        max: 4,
         step: 0.05,
         format: v => `${v.toFixed(2)}×`,
         onInput: v => (modifier.paddleSizeMultiplier = v),
@@ -23,8 +23,8 @@ export const createAngryModifier: ModifierBuilder<AngryModifier> = ({
 
     body.appendChild(
       createSliderControl('Stretch Speed', modifier.stretchSpeed, {
-        min: 20,
-        max: 480,
+        min: 0,
+        max: 1000,
         step: 5,
         format: v => `${Math.round(v)} px/s`,
         onInput: v => (modifier.stretchSpeed = v),
@@ -33,8 +33,8 @@ export const createAngryModifier: ModifierBuilder<AngryModifier> = ({
 
     body.appendChild(
       createSliderControl('Maximum Stretch', modifier.maxStretch, {
-        min: 10,
-        max: 140,
+        min: 0,
+        max: 240,
         step: 1,
         format: v => `${Math.round(v)} px`,
         onInput: v => (modifier.maxStretch = v),
@@ -43,8 +43,8 @@ export const createAngryModifier: ModifierBuilder<AngryModifier> = ({
 
     body.appendChild(
       createSliderControl('Release Speed', modifier.releaseSpeed, {
-        min: 20,
-        max: 720,
+        min: 0,
+        max: 1000,
         step: 5,
         format: v => `${Math.round(v)} px/s`,
         onInput: v => (modifier.releaseSpeed = v),
@@ -53,8 +53,8 @@ export const createAngryModifier: ModifierBuilder<AngryModifier> = ({
 
     body.appendChild(
       createSliderControl('Movement Multiplier', modifier.moveSpeedMultiplier, {
-        min: 0.2,
-        max: 1,
+        min: 0.1,
+        max: 3,
         step: 0.01,
         format: v => `${v.toFixed(2)}×`,
         onInput: v => (modifier.moveSpeedMultiplier = v),

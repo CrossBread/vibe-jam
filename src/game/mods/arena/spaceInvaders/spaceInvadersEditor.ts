@@ -21,8 +21,8 @@ export const createSpaceInvadersModifier: ModifierBuilder<SpaceInvadersModifier>
         'Barricades Per Column',
         Number.isFinite(currentCount) ? currentCount : 4,
         {
-          min: 1,
-          max: 8,
+          min: 0,
+          max: 20,
           step: 1,
           format: value => `${Math.round(value)} blocks`,
           onInput: value => {
@@ -35,7 +35,7 @@ export const createSpaceInvadersModifier: ModifierBuilder<SpaceInvadersModifier>
     body.appendChild(
       createSliderControl('Barricade Durability', Number.isFinite(currentHealth) ? currentHealth : 3, {
         min: 1,
-        max: 8,
+        max: 20,
         step: 1,
         format: value => `${Math.round(value)} hits`,
         onInput: value => {
@@ -47,7 +47,7 @@ export const createSpaceInvadersModifier: ModifierBuilder<SpaceInvadersModifier>
     body.appendChild(
       createSliderControl('Vertical Spacing', Number.isFinite(currentSpacing) ? currentSpacing : 26, {
         min: 0,
-        max: 120,
+        max: 400,
         step: 1,
         format: value => `${Math.round(value)} px`,
         onInput: value => {
@@ -59,7 +59,7 @@ export const createSpaceInvadersModifier: ModifierBuilder<SpaceInvadersModifier>
     body.appendChild(
       createSliderControl('Distance from Center', Number.isFinite(currentDistance) ? currentDistance : 120, {
         min: 0,
-        max: 240,
+        max: 600,
         step: 1,
         format: value => `${Math.round(value)} px`,
         onInput: value => {

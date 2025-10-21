@@ -13,8 +13,8 @@ export const createOsteoWhatModifier: ModifierBuilder<OsteoWhatModifier> = ({
   createDetails(modifier, body => {
     body.appendChild(
       createSliderControl('Paddle Size Multiplier', modifier.paddleSizeMultiplier, {
-        min: 0.5,
-        max: 1.75,
+        min: 0.25,
+        max: 4,
         step: 0.05,
         format: v => `${v.toFixed(2)}×`,
         onInput: v => (modifier.paddleSizeMultiplier = v),
@@ -23,8 +23,8 @@ export const createOsteoWhatModifier: ModifierBuilder<OsteoWhatModifier> = ({
 
     body.appendChild(
       createSliderControl('Segment Count', modifier.segmentCount, {
-        min: 2,
-        max: 8,
+        min: 1,
+        max: 12,
         step: 1,
         format: v => `${Math.round(v)} segments`,
         onInput: v => (modifier.segmentCount = v),
@@ -34,7 +34,7 @@ export const createOsteoWhatModifier: ModifierBuilder<OsteoWhatModifier> = ({
     body.appendChild(
       createSliderControl('Gap Size', modifier.gapSize, {
         min: 0,
-        max: 40,
+        max: 400,
         step: 1,
         format: v => `${Math.round(v)} px`,
         onInput: v => (modifier.gapSize = v),
@@ -44,7 +44,7 @@ export const createOsteoWhatModifier: ModifierBuilder<OsteoWhatModifier> = ({
     body.appendChild(
       createSliderControl('Hits Before Break', modifier.hitsBeforeBreak, {
         min: 1,
-        max: 12,
+        max: 20,
         step: 1,
         format: v => `${Math.round(v)} hits`,
         onInput: v => (modifier.hitsBeforeBreak = v),

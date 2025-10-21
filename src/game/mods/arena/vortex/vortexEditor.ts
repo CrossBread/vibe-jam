@@ -23,8 +23,8 @@ export const createVortexModifier: ModifierBuilder<VortexModifierConfig> = ({
     const currentPairs = Number.isFinite(modifier.portalPairs) ? Number(modifier.portalPairs) : 2
     body.appendChild(
       createSliderControl('Portal Pairs', currentPairs, {
-        min: 1,
-        max: 6,
+        min: 0,
+        max: 12,
         step: 1,
         format: value => `${Math.round(value)}`,
         onInput: value => {
@@ -40,8 +40,8 @@ export const createVortexModifier: ModifierBuilder<VortexModifierConfig> = ({
         : 34
     body.appendChild(
       createSliderControl('Portal Radius', currentRadius, {
-        min: 12,
-        max: 120,
+        min: 0,
+        max: 400,
         step: 1,
         format: value => `${Math.round(value)} px`,
         onInput: value => {
@@ -53,8 +53,8 @@ export const createVortexModifier: ModifierBuilder<VortexModifierConfig> = ({
     const currentMargin = Number.isFinite(modifier.portalMargin) ? Number(modifier.portalMargin) : 96
     body.appendChild(
       createSliderControl('Arena Margin', currentMargin, {
-        min: 20,
-        max: 260,
+        min: 0,
+        max: 400,
         step: 1,
         format: value => `${Math.round(value)} px`,
         onInput: value => {
@@ -67,8 +67,8 @@ export const createVortexModifier: ModifierBuilder<VortexModifierConfig> = ({
     body.appendChild(
       createSliderControl('Re-entry Cooldown', currentCooldown, {
         min: 0,
-        max: 1,
-        step: 0.01,
+        max: 10,
+        step: 0.05,
         format: value => `${value.toFixed(2)} s`,
         onInput: value => {
           modifier.portalCooldown = Number(value.toFixed(2))
@@ -81,8 +81,8 @@ export const createVortexModifier: ModifierBuilder<VortexModifierConfig> = ({
       : Math.PI
     body.appendChild(
       createSliderControl('Rotation Speed', currentRotation, {
-        min: -Math.PI * 3,
-        max: Math.PI * 3,
+        min: -Math.PI * 6,
+        max: Math.PI * 6,
         step: 0.1,
         format: value => `${value.toFixed(2)} rad/s`,
         onInput: value => {

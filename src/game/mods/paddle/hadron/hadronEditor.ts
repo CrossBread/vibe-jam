@@ -18,8 +18,8 @@ export const createHadronModifier: ModifierBuilder<HadronModifier> = ({
   createDetails(modifier, body => {
     body.appendChild(
       createSliderControl('Paddle Size Multiplier', modifier.paddleSizeMultiplier, {
-        min: 0.5,
-        max: 1.75,
+        min: 0.25,
+        max: 4,
         step: 0.05,
         format: v => `${v.toFixed(2)}×`,
         onInput: v => (modifier.paddleSizeMultiplier = v),
@@ -29,7 +29,7 @@ export const createHadronModifier: ModifierBuilder<HadronModifier> = ({
     body.appendChild(
       createSliderControl('Split Angle Offset', radiansToDegrees(modifier.splitAngle), {
         min: 0,
-        max: 60,
+        max: 90,
         step: 1,
         format: v => `${Math.round(v)}°`,
         onInput: v => (modifier.splitAngle = degreesToRadians(v)),

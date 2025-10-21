@@ -24,7 +24,7 @@ export const createGravityWellModifier: ModifierBuilder<GravityWellModifier> = (
     body.appendChild(
       createSliderControl('Gravity Falloff', modifier.gravityFalloff, {
         min: 0,
-        max: 200,
+        max: 1000,
         step: 1,
         format: v => `${Math.round(v)} px`,
         onInput: v => (modifier.gravityFalloff = v),
@@ -33,8 +33,8 @@ export const createGravityWellModifier: ModifierBuilder<GravityWellModifier> = (
 
     body.appendChild(
       createSliderControl('Visual Radius', modifier.radius, {
-        min: 10,
-        max: 120,
+        min: 0,
+        max: 500,
         step: 1,
         format: v => `${Math.round(v)} px`,
         onInput: v => (modifier.radius = v),
@@ -86,7 +86,7 @@ export const createGravityWellModifier: ModifierBuilder<GravityWellModifier> = (
       body.appendChild(
         createSliderControl('Wander Speed', current, {
           min: 0,
-          max: 240,
+          max: 600,
           step: 0.05,
           format: v => `${Math.abs(v) < 10 ? v.toFixed(2) : Math.round(v)} px/s`,
           onInput: v => (modifier.wanderSpeed = v),

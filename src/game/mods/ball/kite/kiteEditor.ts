@@ -13,8 +13,8 @@ export const createKiteModifier: ModifierBuilder<KiteModifier> = ({
   createDetails(modifier, body => {
     body.appendChild(
       createSliderControl('Tail Length', modifier.tailLength, {
-        min: 4,
-        max: 120,
+        min: 0,
+        max: 400,
         step: 1,
         format: v => `${Math.round(v)} samples`,
         onInput: v => (modifier.tailLength = v),

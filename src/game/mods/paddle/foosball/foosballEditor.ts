@@ -13,8 +13,8 @@ export const createFoosballModifier: ModifierBuilder<FoosballModifier> = ({
   createDetails(modifier, body => {
     body.appendChild(
       createSliderControl('Paddle Size Multiplier', modifier.paddleSizeMultiplier, {
-        min: 0.5,
-        max: 1.75,
+        min: 0.25,
+        max: 4,
         step: 0.05,
         format: v => `${v.toFixed(2)}×`,
         onInput: v => (modifier.paddleSizeMultiplier = v),
@@ -24,7 +24,7 @@ export const createFoosballModifier: ModifierBuilder<FoosballModifier> = ({
     body.appendChild(
       createSliderControl('Gap Size', modifier.gapSize, {
         min: 0,
-        max: 80,
+        max: 400,
         step: 1,
         format: v => `${Math.round(v)} px`,
         onInput: v => (modifier.gapSize = v),

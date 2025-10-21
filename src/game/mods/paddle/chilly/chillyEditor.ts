@@ -13,8 +13,8 @@ export const createChillyModifier: ModifierBuilder<ChillyModifier> = ({
   createDetails(modifier, body => {
     body.appendChild(
       createSliderControl('Paddle Size Multiplier', modifier.paddleSizeMultiplier, {
-        min: 0.5,
-        max: 1.75,
+        min: 0.25,
+        max: 4,
         step: 0.05,
         format: v => `${v.toFixed(2)}×`,
         onInput: v => (modifier.paddleSizeMultiplier = v),
@@ -23,8 +23,8 @@ export const createChillyModifier: ModifierBuilder<ChillyModifier> = ({
 
     body.appendChild(
       createSliderControl('Starting Height', modifier.startingHeight, {
-        min: 60,
-        max: 200,
+        min: 20,
+        max: 400,
         step: 1,
         format: v => `${Math.round(v)} px`,
         onInput: v => (modifier.startingHeight = v),
@@ -34,7 +34,7 @@ export const createChillyModifier: ModifierBuilder<ChillyModifier> = ({
     body.appendChild(
       createSliderControl('Shrink Per Return', modifier.shrinkAmount, {
         min: 0,
-        max: 20,
+        max: 200,
         step: 1,
         format: v => `${Math.round(v)} px`,
         onInput: v => (modifier.shrinkAmount = v),
@@ -43,8 +43,8 @@ export const createChillyModifier: ModifierBuilder<ChillyModifier> = ({
 
     body.appendChild(
       createSliderControl('Minimum Height', modifier.minimumHeight, {
-        min: 40,
-        max: 140,
+        min: 10,
+        max: 300,
         step: 1,
         format: v => `${Math.round(v)} px`,
         onInput: v => (modifier.minimumHeight = v),

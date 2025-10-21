@@ -33,8 +33,8 @@ export function createPaddlePotionEditor(
 
       body.appendChild(
         createSliderControl('Object Radius', currentRadius, {
-          min: 6,
-          max: 120,
+          min: 0,
+          max: 300,
           step: 1,
           format: value => `${Math.round(value)} px`,
           onInput: value => {
@@ -47,7 +47,7 @@ export function createPaddlePotionEditor(
       body.appendChild(
         createSliderControl('Object Count', currentCount, {
           min: 0,
-          max: 24,
+          max: 100,
           step: 1,
           format: value => `${Math.round(value)}`,
           onInput: value => {
@@ -59,8 +59,8 @@ export function createPaddlePotionEditor(
       const currentShrink = Number.isFinite(modifier.shrinkAmount) ? Number(modifier.shrinkAmount) : 28
       body.appendChild(
         createSliderControl('Shrink Amount', currentShrink, {
-          min: 4,
-          max: 120,
+          min: 0,
+          max: 400,
           step: 1,
           format: value => `${Math.round(value)} px`,
           onInput: value => {
@@ -74,7 +74,7 @@ export function createPaddlePotionEditor(
         body.appendChild(
           createSliderControl('Grow Amount', currentGrow, {
             min: 0,
-            max: 120,
+            max: 400,
             step: 1,
             format: value => `${Math.round(value)} px`,
             onInput: value => {

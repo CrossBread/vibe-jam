@@ -13,8 +13,8 @@ export const createInchwormModifier: ModifierBuilder<InchwormModifier> = ({
   createDetails(modifier, body => {
     body.appendChild(
       createSliderControl('Paddle Size Multiplier', modifier.paddleSizeMultiplier, {
-        min: 0.5,
-        max: 1.75,
+        min: 0.25,
+        max: 4,
         step: 0.05,
         format: v => `${v.toFixed(2)}×`,
         onInput: v => (modifier.paddleSizeMultiplier = v),
@@ -24,7 +24,7 @@ export const createInchwormModifier: ModifierBuilder<InchwormModifier> = ({
     body.appendChild(
       createSliderControl('Shrink Amount', modifier.shrinkAmount, {
         min: 0,
-        max: 96,
+        max: 300,
         step: 1,
         format: v => `${Math.round(v)} px`,
         onInput: v => (modifier.shrinkAmount = v),
@@ -33,8 +33,8 @@ export const createInchwormModifier: ModifierBuilder<InchwormModifier> = ({
 
     body.appendChild(
       createSliderControl('Minimum Height', modifier.minimumHeight, {
-        min: 24,
-        max: 180,
+        min: 10,
+        max: 300,
         step: 1,
         format: v => `${Math.round(v)} px`,
         onInput: v => (modifier.minimumHeight = v),
@@ -43,8 +43,8 @@ export const createInchwormModifier: ModifierBuilder<InchwormModifier> = ({
 
     body.appendChild(
       createSliderControl('Shrink Speed', modifier.shrinkSpeed, {
-        min: 20,
-        max: 600,
+        min: 0,
+        max: 1000,
         step: 5,
         format: v => `${Math.round(v)} px/s`,
         onInput: v => (modifier.shrinkSpeed = v),
@@ -53,8 +53,8 @@ export const createInchwormModifier: ModifierBuilder<InchwormModifier> = ({
 
     body.appendChild(
       createSliderControl('Extend Speed', modifier.extendSpeed, {
-        min: 20,
-        max: 600,
+        min: 0,
+        max: 1000,
         step: 5,
         format: v => `${Math.round(v)} px/s`,
         onInput: v => (modifier.extendSpeed = v),

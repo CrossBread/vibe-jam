@@ -19,7 +19,7 @@ export const createMinesweeperModifier: ModifierBuilder<MinesweeperModifier> = (
     body.appendChild(
       createSliderControl('Rows', Number.isFinite(currentRows) ? currentRows : 5, {
         min: 1,
-        max: 9,
+        max: 16,
         step: 1,
         format: value => `${Math.round(value)} rows`,
         onInput: value => {
@@ -31,7 +31,7 @@ export const createMinesweeperModifier: ModifierBuilder<MinesweeperModifier> = (
     body.appendChild(
       createSliderControl('Columns', Number.isFinite(currentColumns) ? currentColumns : 6, {
         min: 1,
-        max: 12,
+        max: 20,
         step: 1,
         format: value => `${Math.round(value)} columns`,
         onInput: value => {
@@ -42,8 +42,8 @@ export const createMinesweeperModifier: ModifierBuilder<MinesweeperModifier> = (
 
     body.appendChild(
       createSliderControl('Grid Spacing', Number.isFinite(currentSpacing) ? currentSpacing : 68, {
-        min: 12,
-        max: 200,
+        min: 0,
+        max: 500,
         step: 1,
         format: value => `${Math.round(value)} px`,
         onInput: value => {
@@ -54,8 +54,8 @@ export const createMinesweeperModifier: ModifierBuilder<MinesweeperModifier> = (
 
     body.appendChild(
       createSliderControl('Square Size', Number.isFinite(currentSize) ? currentSize : 34, {
-        min: 8,
-        max: 160,
+        min: 4,
+        max: 400,
         step: 1,
         format: value => `${Math.round(value)} px`,
         onInput: value => {

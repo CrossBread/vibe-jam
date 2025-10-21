@@ -20,8 +20,8 @@ export const createRussianRouletteModifier: ModifierBuilder<GravityWellModifier>
 
     body.appendChild(
       createSliderControl('Fade Distance', currentDistance, {
-        min: 20,
-        max: 260,
+        min: 0,
+        max: 600,
         step: 5,
         format: value => `${Math.round(value)} px`,
         onInput: value => {
@@ -36,10 +36,10 @@ export const createRussianRouletteModifier: ModifierBuilder<GravityWellModifier>
 
     body.appendChild(
       createSliderControl('Fade Speed', currentSpeed, {
-        min: 1,
-        max: 20,
-        step: 1,
-        format: value => `${Math.round(value)} /s`,
+        min: 0,
+        max: 1000,
+        step: 5,
+        format: value => `${Math.round(value)} px/s`,
         onInput: value => {
           modifier.illusionFadeSpeed = value
         },

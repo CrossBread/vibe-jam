@@ -13,8 +13,8 @@ export const createSnowballModifier: ModifierBuilder<SnowballModifier> = ({
   createDetails(modifier, body => {
     body.appendChild(
       createSliderControl('Minimum Radius', modifier.minRadius, {
-        min: 1,
-        max: 160,
+        min: 0,
+        max: 400,
         step: 1,
         format: v => `${Math.round(v)} px`,
         onInput: v => (modifier.minRadius = v),
@@ -23,8 +23,8 @@ export const createSnowballModifier: ModifierBuilder<SnowballModifier> = ({
 
     body.appendChild(
       createSliderControl('Maximum Radius', modifier.maxRadius, {
-        min: 1,
-        max: 200,
+        min: 0,
+        max: 400,
         step: 1,
         format: v => `${Math.round(v)} px`,
         onInput: v => (modifier.maxRadius = v),
@@ -34,9 +34,9 @@ export const createSnowballModifier: ModifierBuilder<SnowballModifier> = ({
     body.appendChild(
       createSliderControl('Growth Rate', modifier.growthRate, {
         min: 0,
-        max: 5,
-        step: 0.01,
-        format: v => `${v.toFixed(2)} px/unit`,
+        max: 100,
+        step: 0.1,
+        format: v => `${v.toFixed(2)} px/s`,
         onInput: v => (modifier.growthRate = v),
       }),
     )

@@ -13,8 +13,8 @@ export const createMeteorModifier: ModifierBuilder<MeteorModifier> = ({
   createDetails(modifier, body => {
     body.appendChild(
       createSliderControl('Start Radius', modifier.startRadius, {
-        min: 2,
-        max: 220,
+        min: 0,
+        max: 400,
         step: 1,
         format: v => `${Math.round(v)} px`,
         onInput: v => (modifier.startRadius = v),
@@ -23,8 +23,8 @@ export const createMeteorModifier: ModifierBuilder<MeteorModifier> = ({
 
     body.appendChild(
       createSliderControl('Minimum Radius', modifier.minRadius, {
-        min: 1,
-        max: 220,
+        min: 0,
+        max: 400,
         step: 1,
         format: v => `${Math.round(v)} px`,
         onInput: v => (modifier.minRadius = v),
@@ -34,8 +34,8 @@ export const createMeteorModifier: ModifierBuilder<MeteorModifier> = ({
     body.appendChild(
       createSliderControl('Shrink Rate', modifier.shrinkRate, {
         min: 0,
-        max: 5,
-        step: 0.01,
+        max: 100,
+        step: 0.1,
         format: v => `${v.toFixed(2)} px/unit`,
         onInput: v => (modifier.shrinkRate = v),
       }),

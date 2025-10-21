@@ -26,7 +26,7 @@ export const createSearchLightModifier: ModifierBuilder<SearchLightModifier> = (
     body.appendChild(
       createSliderControl('Ball Brightness', getSearchLightBallBrightness(modifier), {
         min: 0,
-        max: 2,
+        max: 3,
         step: 0.05,
         format: value => `${value.toFixed(2)}×`,
         onInput: value => {
@@ -37,8 +37,8 @@ export const createSearchLightModifier: ModifierBuilder<SearchLightModifier> = (
 
     body.appendChild(
       createSliderControl('Cone Length', getSearchLightConeLength(modifier), {
-        min: 60,
-        max: 480,
+        min: 0,
+        max: 800,
         step: 5,
         format: value => `${Math.round(value)} px`,
         onInput: value => {
@@ -49,8 +49,8 @@ export const createSearchLightModifier: ModifierBuilder<SearchLightModifier> = (
 
     body.appendChild(
       createSliderControl('Cone Width', getSearchLightConeWidth(modifier), {
-        min: 60,
-        max: 480,
+        min: 0,
+        max: 800,
         step: 5,
         format: value => `${Math.round(value)} px`,
         onInput: value => {

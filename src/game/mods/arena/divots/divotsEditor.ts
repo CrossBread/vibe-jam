@@ -24,8 +24,8 @@ export const createDivotsModifier: ModifierBuilder<DivotsModifierConfig> = conte
           : 12
         body.appendChild(
           createSliderControl('Max Active Divots', currentMaxDivots, {
-            min: 1,
-            max: 60,
+            min: 0,
+            max: 200,
             step: 1,
             format: value => `${Math.round(value)} wells`,
             onInput: value => {
@@ -42,7 +42,7 @@ export const createDivotsModifier: ModifierBuilder<DivotsModifierConfig> = conte
         body.appendChild(
           createSliderControl('Spawn Margin', currentSpawnMargin, {
             min: 0,
-            max: 320,
+            max: 600,
             step: 1,
             format: value => `${Math.round(value)} px`,
             onInput: value => {

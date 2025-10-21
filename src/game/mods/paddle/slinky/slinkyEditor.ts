@@ -13,8 +13,8 @@ export const createSlinkyModifier: ModifierBuilder<SlinkyModifier> = ({
   createDetails(modifier, body => {
     body.appendChild(
       createSliderControl('Paddle Size Multiplier', modifier.paddleSizeMultiplier, {
-        min: 0.5,
-        max: 1.75,
+        min: 0.25,
+        max: 4,
         step: 0.05,
         format: v => `${v.toFixed(2)}×`,
         onInput: v => (modifier.paddleSizeMultiplier = v),
@@ -23,8 +23,8 @@ export const createSlinkyModifier: ModifierBuilder<SlinkyModifier> = ({
 
     body.appendChild(
       createSliderControl('Flops Per Second', modifier.flopRate, {
-        min: 0.2,
-        max: 6,
+        min: 0.1,
+        max: 60,
         step: 0.1,
         format: v => `${v.toFixed(2)} flops/s`,
         onInput: v => (modifier.flopRate = v),

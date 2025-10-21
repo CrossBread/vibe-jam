@@ -21,8 +21,8 @@ export const createWormholeModifier: ModifierBuilder<WormholeModifierConfig> = (
     const currentPairs = Number.isFinite(modifier.portalPairs) ? Number(modifier.portalPairs) : 2
     body.appendChild(
       createSliderControl('Portal Pairs', currentPairs, {
-        min: 1,
-        max: 6,
+        min: 0,
+        max: 12,
         step: 1,
         format: value => `${Math.round(value)}`,
         onInput: value => {
@@ -38,8 +38,8 @@ export const createWormholeModifier: ModifierBuilder<WormholeModifierConfig> = (
         : 34
     body.appendChild(
       createSliderControl('Portal Radius', currentRadius, {
-        min: 12,
-        max: 120,
+        min: 0,
+        max: 400,
         step: 1,
         format: value => `${Math.round(value)} px`,
         onInput: value => {
@@ -51,8 +51,8 @@ export const createWormholeModifier: ModifierBuilder<WormholeModifierConfig> = (
     const currentMargin = Number.isFinite(modifier.portalMargin) ? Number(modifier.portalMargin) : 92
     body.appendChild(
       createSliderControl('Arena Margin', currentMargin, {
-        min: 20,
-        max: 260,
+        min: 0,
+        max: 400,
         step: 1,
         format: value => `${Math.round(value)} px`,
         onInput: value => {
@@ -65,8 +65,8 @@ export const createWormholeModifier: ModifierBuilder<WormholeModifierConfig> = (
     body.appendChild(
       createSliderControl('Re-entry Cooldown', currentCooldown, {
         min: 0,
-        max: 1,
-        step: 0.01,
+        max: 10,
+        step: 0.05,
         format: value => `${value.toFixed(2)} s`,
         onInput: value => {
           modifier.portalCooldown = Number(value.toFixed(2))

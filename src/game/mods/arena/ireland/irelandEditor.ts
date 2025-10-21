@@ -29,8 +29,8 @@ export const createIrelandModifier: ModifierBuilder<IrelandModifierConfig> = con
           : 16
         body.appendChild(
           createSliderControl('Well Count', currentWellCount, {
-            min: 1,
-            max: 48,
+            min: 0,
+            max: 100,
             step: 1,
             format: value => `${Math.round(value)} wells`,
             onInput: value => {
@@ -75,7 +75,7 @@ export const createIrelandModifier: ModifierBuilder<IrelandModifierConfig> = con
         body.appendChild(
           createSliderControl('Min Gravity Falloff', defaultMinFalloff, {
             min: 0,
-            max: 300,
+            max: 1000,
             step: 1,
             format: value => `${Math.round(value)} px`,
             onInput: value => {
@@ -90,7 +90,7 @@ export const createIrelandModifier: ModifierBuilder<IrelandModifierConfig> = con
         body.appendChild(
           createSliderControl('Max Gravity Falloff', defaultMaxFalloff, {
             min: 0,
-            max: 300,
+            max: 1000,
             step: 1,
             format: value => `${Math.round(value)} px`,
             onInput: value => {
@@ -104,8 +104,8 @@ export const createIrelandModifier: ModifierBuilder<IrelandModifierConfig> = con
           : Math.max(16, modifier.radius * 0.5)
         body.appendChild(
           createSliderControl('Min Radius', defaultMinRadius, {
-            min: 10,
-            max: 200,
+            min: 0,
+            max: 500,
             step: 1,
             format: value => `${Math.round(value)} px`,
             onInput: value => {
@@ -119,8 +119,8 @@ export const createIrelandModifier: ModifierBuilder<IrelandModifierConfig> = con
           : Math.max(20, modifier.radius * 1.25)
         body.appendChild(
           createSliderControl('Max Radius', defaultMaxRadius, {
-            min: 10,
-            max: 240,
+            min: 0,
+            max: 500,
             step: 1,
             format: value => `${Math.round(value)} px`,
             onInput: value => {

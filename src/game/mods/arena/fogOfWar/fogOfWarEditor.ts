@@ -17,7 +17,7 @@ export const createFogOfWarModifier: ModifierBuilder<GravityWellModifier> = ({
     body.appendChild(
       createSliderControl('Expansion Speed', expansionSpeed, {
         min: 0,
-        max: 480,
+        max: 1000,
         step: 5,
         format: value => `${Math.round(value)} px/s`,
         onInput: value => {
@@ -29,8 +29,8 @@ export const createFogOfWarModifier: ModifierBuilder<GravityWellModifier> = ({
     const maxRadius = Number.isFinite(modifier.fogMaxRadius) ? Number(modifier.fogMaxRadius) : 420
     body.appendChild(
       createSliderControl('Max Radius', maxRadius, {
-        min: 100,
-        max: 600,
+        min: 0,
+        max: 1000,
         step: 5,
         format: value => `${Math.round(value)} px`,
         onInput: value => {

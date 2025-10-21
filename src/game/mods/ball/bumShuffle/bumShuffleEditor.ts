@@ -13,8 +13,8 @@ export const createBumShuffleModifier: ModifierBuilder<BumShuffleModifier> = ({
   createDetails(modifier, body => {
     body.appendChild(
       createSliderControl('Trail Length', modifier.trailLength, {
-        min: 40,
-        max: 4000,
+        min: 0,
+        max: 10_000,
         step: 1,
         format: v => `${Math.round(v)} samples`,
         onInput: v => (modifier.trailLength = v),

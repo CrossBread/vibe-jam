@@ -16,7 +16,7 @@ export const createSecondChancesModifier: ModifierBuilder<SecondChancesModifier>
     body.appendChild(
       createSliderControl('Hits Per Shield', Number.isFinite(currentHits) ? currentHits : 2, {
         min: 1,
-        max: 6,
+        max: 20,
         step: 1,
         format: value => `${Math.round(value)} hits`,
         onInput: value => {

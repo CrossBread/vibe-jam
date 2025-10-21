@@ -13,8 +13,8 @@ export const createOutOfBodyModifier: ModifierBuilder<OutOfBodyModifier> = ({
   createDetails(modifier, body => {
     body.appendChild(
       createSliderControl('Paddle Size Multiplier', modifier.paddleSizeMultiplier, {
-        min: 0.5,
-        max: 1.75,
+        min: 0.25,
+        max: 4,
         step: 0.05,
         format: v => `${v.toFixed(2)}×`,
         onInput: v => (modifier.paddleSizeMultiplier = v),
@@ -33,8 +33,8 @@ export const createOutOfBodyModifier: ModifierBuilder<OutOfBodyModifier> = ({
 
     body.appendChild(
       createSliderControl('Trail Length', modifier.trailLength, {
-        min: 2,
-        max: 16,
+        min: 0,
+        max: 120,
         step: 1,
         format: v => `${Math.round(v)} frames`,
         onInput: v => (modifier.trailLength = v),
@@ -44,7 +44,7 @@ export const createOutOfBodyModifier: ModifierBuilder<OutOfBodyModifier> = ({
     body.appendChild(
       createSliderControl('Sample Interval', modifier.sampleInterval, {
         min: 0.01,
-        max: 0.2,
+        max: 1,
         step: 0.01,
         format: v => `${v.toFixed(2)} s`,
         onInput: v => (modifier.sampleInterval = v),
@@ -53,8 +53,8 @@ export const createOutOfBodyModifier: ModifierBuilder<OutOfBodyModifier> = ({
 
     body.appendChild(
       createSliderControl('Trail Fade', modifier.trailFade, {
-        min: 0.3,
-        max: 0.95,
+        min: 0,
+        max: 1,
         step: 0.01,
         format: v => `${Math.round(v * 100)}%`,
         onInput: v => (modifier.trailFade = v),

@@ -39,7 +39,7 @@ export const createThreeBodyProblemModifier: ModifierBuilder<ThreeBodyProblemMod
     body.appendChild(
       createSliderControl('Core Gravity Falloff', modifier.gravityFalloff, {
         min: 0,
-        max: 240,
+        max: 1000,
         step: 1,
         format: value => `${Math.round(value)} px`,
         onInput: value => {
@@ -50,8 +50,8 @@ export const createThreeBodyProblemModifier: ModifierBuilder<ThreeBodyProblemMod
 
     body.appendChild(
       createSliderControl('Core Visual Radius', modifier.radius, {
-        min: 10,
-        max: 160,
+        min: 0,
+        max: 500,
         step: 1,
         format: value => `${Math.round(value)} px`,
         onInput: value => {
@@ -91,7 +91,7 @@ export const createThreeBodyProblemModifier: ModifierBuilder<ThreeBodyProblemMod
     body.appendChild(
       createSliderControl('Orbit Gravity Falloff', orbitFalloff, {
         min: 0,
-        max: 240,
+        max: 1000,
         step: 1,
         format: value => `${Math.round(value)} px`,
         onInput: value => {
@@ -103,8 +103,8 @@ export const createThreeBodyProblemModifier: ModifierBuilder<ThreeBodyProblemMod
     const orbitRadius = getOrbitValue(modifier.orbitRadius, Math.max(20, modifier.radius * 0.6))
     body.appendChild(
       createSliderControl('Orbit Visual Radius', orbitRadius, {
-        min: 8,
-        max: 120,
+        min: 0,
+        max: 500,
         step: 1,
         format: value => `${Math.round(value)} px`,
         onInput: value => {
@@ -117,7 +117,7 @@ export const createThreeBodyProblemModifier: ModifierBuilder<ThreeBodyProblemMod
     body.appendChild(
       createSliderControl('Orbit Distance', orbitDistance, {
         min: 0,
-        max: 320,
+        max: 600,
         step: 1,
         format: value => `${Math.round(value)} px`,
         onInput: value => {
@@ -130,8 +130,8 @@ export const createThreeBodyProblemModifier: ModifierBuilder<ThreeBodyProblemMod
     body.appendChild(
       createSliderControl('Orbit Speed', orbitSpeed, {
         min: 0,
-        max: 4,
-        step: 0.01,
+        max: Math.PI * 6,
+        step: 0.05,
         format: value => `${value.toFixed(2)} rad/s`,
         onInput: value => {
           modifier.orbitSpeed = value

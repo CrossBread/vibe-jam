@@ -13,8 +13,8 @@ export const createCharlotteModifier: ModifierBuilder<CharlotteModifier> = ({
   createDetails(modifier, body => {
     body.appendChild(
       createSliderControl('Paddle Size Multiplier', modifier.paddleSizeMultiplier, {
-        min: 0.5,
-        max: 1.75,
+        min: 0.25,
+        max: 4,
         step: 0.05,
         format: value => `${value.toFixed(2)}×`,
         onInput: value => (modifier.paddleSizeMultiplier = value),
@@ -23,8 +23,8 @@ export const createCharlotteModifier: ModifierBuilder<CharlotteModifier> = ({
 
     body.appendChild(
       createSliderControl('Web Width', modifier.webWidthMultiplier, {
-        min: 0.2,
-        max: 1,
+        min: 0.1,
+        max: 2,
         step: 0.02,
         format: value => `${Math.round(value * 100)}%`,
         onInput: value => (modifier.webWidthMultiplier = value),
@@ -33,8 +33,8 @@ export const createCharlotteModifier: ModifierBuilder<CharlotteModifier> = ({
 
     body.appendChild(
       createSliderControl('Web Length Limit', modifier.maxWebLengthMultiplier, {
-        min: 0.25,
-        max: 1.5,
+        min: 0.1,
+        max: 4,
         step: 0.05,
         format: value => `${value.toFixed(2)}×`,
         onInput: value => (modifier.maxWebLengthMultiplier = value),
