@@ -4,7 +4,7 @@
 
 import type { GravityWellModifier } from '../../../devtools'
 import type { ModifierBuilder } from '../../shared'
-import { createSliderControl } from '../../shared'
+import { createColorControl, createSliderControl } from '../../shared'
 
 type VortexModifierConfig = GravityWellModifier & {
   portalPairs?: number
@@ -12,6 +12,7 @@ type VortexModifierConfig = GravityWellModifier & {
   portalMargin?: number
   portalCooldown?: number
   portalRotationSpeed?: number
+  arrowColor?: string
 }
 
 export const createVortexModifier: ModifierBuilder<VortexModifierConfig> = ({
@@ -87,6 +88,15 @@ export const createVortexModifier: ModifierBuilder<VortexModifierConfig> = ({
         onInput: value => {
           modifier.portalRotationSpeed = Number(value.toFixed(2))
         },
+      }),
+    )
+
+    const currentArrowColor = typeof modifier.arrowColor === 'string'
+      ? modifier.arrowColor
+      : '#f472b6'
+    body.appendChild(
+      createColorControl('Arrow Color', currentArrowColor, value => {
+        modifier.arrowColor = value
       }),
     )
   })

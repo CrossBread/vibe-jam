@@ -29,8 +29,12 @@ export function createSliderControl(label: string, value: number, options: Slide
   title.textContent = label
 
   const valueEl = document.createElement('span')
-  valueEl.className = 'dev-overlay__value'
+  valueEl.className = 'dev-overlay__value dev-overlay__value--interactive'
   valueEl.textContent = options.format(value)
+  valueEl.tabIndex = 0
+  valueEl.setAttribute('role', 'button')
+  valueEl.setAttribute('aria-label', `Enter a value for ${label}`)
+  valueEl.title = 'Click to enter a value'
   title.appendChild(valueEl)
 
   const input = document.createElement('input')
@@ -40,10 +44,66 @@ export function createSliderControl(label: string, value: number, options: Slide
   input.step = String(options.step)
   input.value = String(value)
 
+  const precision = (() => {
+    const stepString = options.step.toString()
+    const decimalIndex = stepString.indexOf('.')
+    if (decimalIndex === -1) {
+      return 0
+    }
+    return stepString.length - decimalIndex - 1
+  })()
+
+  const clampToRange = (candidate: number) =>
+    Math.min(options.max, Math.max(options.min, candidate))
+
+  const snapToStep = (candidate: number) => {
+    const offset = candidate - options.min
+    const steps = Math.round(offset / options.step)
+    const snapped = options.min + steps * options.step
+    return Number(snapped.toFixed(precision))
+  }
+
+  const applyValue = (candidate: number) => {
+    if (!Number.isFinite(candidate)) {
+      return
+    }
+    const clamped = clampToRange(candidate)
+    const normalized = snapToStep(clamped)
+    input.value = String(normalized)
+    options.onInput(normalized)
+    valueEl.textContent = options.format(normalized)
+  }
+
+  const normalizedInitial = snapToStep(clampToRange(value))
+  input.value = String(normalizedInitial)
+  valueEl.textContent = options.format(normalizedInitial)
+
   input.addEventListener('input', () => {
-    const next = Number(input.value)
-    options.onInput(next)
-    valueEl.textContent = options.format(next)
+    applyValue(Number(input.value))
+  })
+
+  const requestManualEntry = () => {
+    const result = window.prompt(`Enter a value for ${label}`, input.value)
+    if (result === null) {
+      return
+    }
+    const next = Number(result)
+    if (!Number.isFinite(next)) {
+      return
+    }
+    applyValue(next)
+  }
+
+  valueEl.addEventListener('click', event => {
+    event.preventDefault()
+    requestManualEntry()
+  })
+
+  valueEl.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      requestManualEntry()
+    }
   })
 
   wrapper.appendChild(title)

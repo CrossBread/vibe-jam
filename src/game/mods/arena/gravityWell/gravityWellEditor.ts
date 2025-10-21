@@ -80,13 +80,15 @@ export const createGravityWellModifier: ModifierBuilder<GravityWellModifier> = (
     }
 
     if ('wanderSpeed' in modifier) {
-      const current = modifier.wanderSpeed ?? 60
+      const current = Number.isFinite(modifier.wanderSpeed)
+        ? Number(modifier.wanderSpeed)
+        : 60
       body.appendChild(
         createSliderControl('Wander Speed', current, {
-          min: 10,
-          max: 200,
-          step: 5,
-          format: v => `${Math.round(v)} px/s`,
+          min: 0,
+          max: 240,
+          step: 0.05,
+          format: v => `${Math.abs(v) < 10 ? v.toFixed(2) : Math.round(v)} px/s`,
           onInput: v => (modifier.wanderSpeed = v),
         }),
       )

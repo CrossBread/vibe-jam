@@ -503,6 +503,14 @@ function ensureDevOverlayStyles() {
       font-variant-numeric: tabular-nums;
       color: rgba(226, 232, 240, 0.85);
     }
+    .dev-overlay__value--interactive {
+      cursor: pointer;
+      text-decoration: underline dotted rgba(226, 232, 240, 0.55);
+    }
+    .dev-overlay__value--interactive:focus-visible {
+      outline: 2px solid rgba(96, 165, 250, 0.65);
+      outline-offset: 2px;
+    }
     .dev-overlay__card {
       display: flex;
       flex-direction: column;
