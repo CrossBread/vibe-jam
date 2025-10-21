@@ -1,4 +1,8 @@
-﻿import { chromium } from 'playwright'
+﻿/*
+ * Copyright (c) 2025. CrossBread Tech All rights reserved.
+ */
+
+import { chromium } from 'playwright'
 import { spawn } from 'child_process'
 import fs from 'fs/promises'
 import path from 'path'
