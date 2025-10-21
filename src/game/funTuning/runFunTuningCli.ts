@@ -45,6 +45,32 @@ interface TrialSuiteRunResult {
   options: FunTuningOptions
 }
 
+function sanitizeForFileName(value: string): string {
+  const sanitized = value
+    .trim()
+    .replace(/[^\w.-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase()
+
+  return sanitized || 'suite'
+}
+
+function createSuiteOutputEntry(result: TrialSuiteRunResult) {
+  return {
+    suite: {
+      id: result.suite.id,
+      label: result.suite.label ?? null,
+      trials: result.suite.trials,
+      options: result.suite.options ?? null,
+    },
+    funScoreImprovement: result.improvement,
+    recommendedConfigPatch: result.report.recommendedConfigPatch,
+    report: result.report,
+    effectiveOptions: result.options,
+  }
+}
+
 function printUsage(): void {
   console.log(`Fun tuning CLI\n\n` +
     `Usage: npm run fun-tuning -- --simulator ./path/to/simulator.ts --trials ./trials.json [options]\n\n` +
@@ -371,6 +397,13 @@ async function main(): Promise<void> {
 
     if (hasSuites) {
       const suiteResults: TrialSuiteRunResult[] = []
+      const resolvedOutput = args.outputPath
+        ? path.resolve(process.cwd(), args.outputPath)
+        : null
+      const outputPathInfo = resolvedOutput ? path.parse(resolvedOutput) : null
+      const outputDir = outputPathInfo && outputPathInfo.dir ? outputPathInfo.dir : ''
+      const baseOutputName = outputPathInfo && outputPathInfo.name ? outputPathInfo.name : 'results'
+      const outputExtension = outputPathInfo && outputPathInfo.ext ? outputPathInfo.ext : '.json'
 
       for (const suite of trialConfig.suites!) {
         const suiteLabel = suite.label ?? suite.id
@@ -399,31 +432,36 @@ async function main(): Promise<void> {
           suiteStatusLogger,
         )
 
-        suiteResults.push({
+        const suiteResult: TrialSuiteRunResult = {
           suite,
           report,
           improvement: calculateFunScoreImprovement(report),
           options: suiteOptions,
-        })
+        }
+
+        suiteResults.push(suiteResult)
+
+        if (resolvedOutput) {
+          const suitePrefix = sanitizeForFileName(suiteLabel)
+          const suiteFileName = `${suitePrefix}-${baseOutputName}${outputExtension}`
+          const suiteFilePath = path.join(outputDir || '.', suiteFileName)
+          const suiteFileContents = {
+            suites: [createSuiteOutputEntry(suiteResult)],
+          }
+
+          await writeFile(suiteFilePath, JSON.stringify(suiteFileContents, null, 2))
+
+          if (args.verbose) {
+            console.log(`Suite report saved to ${suiteFilePath}`)
+          }
+        }
       }
 
       printSuiteCollectionSummary(suiteResults)
 
-      if (args.outputPath) {
-        const resolvedOutput = path.resolve(process.cwd(), args.outputPath)
+      if (resolvedOutput) {
         const suiteOutput = {
-          suites: suiteResults.map(result => ({
-            suite: {
-              id: result.suite.id,
-              label: result.suite.label ?? null,
-              trials: result.suite.trials,
-              options: result.suite.options ?? null,
-            },
-            funScoreImprovement: result.improvement,
-            recommendedConfigPatch: result.report.recommendedConfigPatch,
-            report: result.report,
-            effectiveOptions: result.options,
-          })),
+          suites: suiteResults.map(result => createSuiteOutputEntry(result)),
         }
         await writeFile(resolvedOutput, JSON.stringify(suiteOutput, null, 2))
         console.log(`Full report saved to ${resolvedOutput}`)
