@@ -267,7 +267,7 @@
       "ireland": {
         "name": "Ireland",
         "description": "Rolling gravity hills and a few towering peaks",
-        "enabled": true,
+        "enabled": false,
         "gravityStrength": -1200000,
         "gravityFalloff": 7,
         "radius": 56,
