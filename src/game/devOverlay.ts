@@ -1395,6 +1395,8 @@ export function createDevOverlay(
 
     const dynamicCollapsibleSections: HTMLDetailsElement[] = []
 
+    controls.appendChild(buttons)
+
     const createHeading = (label: string) => {
       const heading = document.createElement('div')
       heading.className = 'dev-overlay__section-title'
@@ -2332,7 +2334,6 @@ export function createDevOverlay(
   overlay.appendChild(title)
   overlay.appendChild(searchContainer)
   overlay.appendChild(content)
-  overlay.appendChild(buttons)
   overlay.appendChild(status)
   overlay.appendChild(scrollTopButton)
 
