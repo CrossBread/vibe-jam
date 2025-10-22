@@ -5,6 +5,7 @@
     "tests/**/*.ts",
     "tests/**/*.tsx",
     "vite.config.ts",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "scripts/**/*.ts"
   ]
 }

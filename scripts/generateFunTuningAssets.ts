@@ -14,6 +14,8 @@ interface ParameterChange {
   after: unknown
 }
 
+type JsonRecord = Record<string, unknown>
+
 interface SuiteRecord {
   suite: string
   category: 'arena' | 'ball' | 'paddle'
@@ -25,7 +27,7 @@ interface SuiteRecord {
   bestAverage: number
   improvement: number
   percentImprovement: number
-  patch: Record<string, unknown>
+  patch: JsonRecord
   parameterChanges: ParameterChange[]
 }
 
@@ -38,6 +40,56 @@ const screenshotDir = path.join(repoRoot, 'reports', 'screenshots', 'fun-tuning'
 const csvPath = path.join(repoRoot, 'reports', 'fun-tuning-summary.csv')
 const markdownPath = path.join(repoRoot, 'reports', 'fun-tuning-report.md')
 const serverUrl = 'http://127.0.0.1:4173/'
+
+interface FunTuningPatch {
+  modifiers?: Record<string, Record<string, JsonRecord>>
+}
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value !== null
+}
+
+function parseFunTuningPatch(
+  json: string,
+): { success: true; patch: FunTuningPatch } | { success: false; error: unknown } {
+  try {
+    const parsed = JSON.parse(json) as unknown
+    if (!isRecord(parsed)) {
+      return { success: false, error: new Error('Patch is not an object') }
+    }
+
+    const { modifiers } = parsed as { modifiers?: unknown }
+    if (modifiers !== undefined) {
+      if (!isRecord(modifiers)) {
+        return { success: false, error: new Error('Patch modifiers is not an object') }
+      }
+      for (const [groupKey, groupValue] of Object.entries(modifiers)) {
+        if (!isRecord(groupValue)) {
+          return {
+            success: false,
+            error: new Error(`Modifier group ${groupKey} is not an object`),
+          }
+        }
+        for (const [modKey, modValue] of Object.entries(groupValue)) {
+          if (!isRecord(modValue)) {
+            return {
+              success: false,
+              error: new Error(`Modifier patch ${groupKey}.${modKey} is not an object`),
+            }
+          }
+        }
+      }
+    }
+
+    return { success: true, patch: parsed as FunTuningPatch }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
+
+function ensureJsonRecord(value: JsonRecord | undefined): JsonRecord {
+  return value ?? {}
+}
 
 function slugifySuite(suite: string): string {
   return suite.replace(/[^a-zA-Z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
@@ -108,18 +160,17 @@ function parseFunTuningLog(text: string): SuiteRecord[] {
     }
 
     const patchJson = section.slice(patchStartInSection, patchEndInSection)
-    let patch: any
-    try {
-      patch = JSON.parse(patchJson)
-    } catch (error) {
-      console.error(`Failed to parse patch for ${suite}:`, error)
+    const parsedPatch = parseFunTuningPatch(patchJson)
+    if (!parsedPatch.success) {
+      console.error(`Failed to parse patch for ${suite}:`, parsedPatch.error)
       index = sectionEnd
       continue
     }
 
     const [categoryRaw, modKey] = suite.split('.') as [SuiteRecord['category'], string]
     const category = categoryRaw as SuiteRecord['category']
-    const modPatch = patch?.modifiers?.[category]?.[modKey] ?? {}
+    const modifierGroup = parsedPatch.patch.modifiers?.[category]
+    const modPatch = ensureJsonRecord(modifierGroup?.[modKey])
 
     records.push({
       suite,
@@ -254,52 +305,86 @@ async function captureScreenshots(records: SuiteRecord[]) {
       await page.goto(serverUrl, { waitUntil: 'networkidle' })
       await page.waitForTimeout(1500)
 
-      await page.evaluate(({ category, modKey }) => {
-        const pong: any = (window as any).__pong
-        if (!pong) {
-          throw new Error('Pong instance not found')
-        }
+      await page.evaluate(
+        ({ category, modKey }: { category: SuiteRecord['category']; modKey: string }) => {
+          type ModifierCategory = 'arena' | 'ball' | 'paddle'
+          type ModifierConfig = { enabled?: boolean } & Record<string, unknown>
+          type BrowserPong = {
+            config: {
+              modifiers: Record<ModifierCategory, Record<string, ModifierConfig>>
+            }
+            reset(): void
+          }
+          type BrowserWindow = Window & { __pong?: BrowserPong | undefined }
 
-        const modifiers = pong.config.modifiers
-        for (const key of Object.keys(modifiers.arena)) {
-          modifiers.arena[key].enabled = false
-        }
-        for (const key of Object.keys(modifiers.ball)) {
-          modifiers.ball[key].enabled = false
-        }
-        for (const key of Object.keys(modifiers.paddle)) {
-          modifiers.paddle[key].enabled = false
-        }
+          const globalWindow = window as BrowserWindow
+          const pong = globalWindow.__pong
+          if (!pong) {
+            throw new Error('Pong instance not found')
+          }
 
-        const target = modifiers[category][modKey]
-        if (!target) {
-          throw new Error(`Modifier not found: ${category}.${modKey}`)
-        }
+          const modifiers = pong.config.modifiers
+          const categories: ModifierCategory[] = ['arena', 'ball', 'paddle']
+          for (const key of categories) {
+            const modifierGroup = modifiers[key]
+            for (const modifier of Object.values(modifierGroup)) {
+              modifier.enabled = false
+            }
+          }
 
-        target.enabled = true
-        pong.reset()
-      }, { category: record.category, modKey: record.modKey })
+          const target = modifiers[category][modKey]
+          if (!target) {
+            throw new Error(`Modifier not found: ${category}.${modKey}`)
+          }
+
+          target.enabled = true
+          pong.reset()
+        },
+        { category: record.category, modKey: record.modKey },
+      )
 
       await page.waitForTimeout(5000)
       await page.screenshot({ path: beforePath, fullPage: true })
 
-      await page.evaluate(({ category, modKey, patch }) => {
-        const pong: any = (window as any).__pong
-        if (!pong) {
-          throw new Error('Pong instance not found')
-        }
-        const target = pong.config.modifiers[category][modKey]
-        if (!target) {
-          throw new Error(`Modifier not found: ${category}.${modKey}`)
-        }
-        for (const [key, value] of Object.entries(patch)) {
-          if (key === 'enabled') {
-            continue
+      await page.evaluate(
+        ({
+          category,
+          modKey,
+          patch,
+        }: {
+          category: SuiteRecord['category']
+          modKey: string
+          patch: JsonRecord
+        }) => {
+          type ModifierCategory = 'arena' | 'ball' | 'paddle'
+          type ModifierConfig = { enabled?: boolean } & Record<string, unknown>
+          type BrowserPong = {
+            config: {
+              modifiers: Record<ModifierCategory, Record<string, ModifierConfig>>
+            }
+            reset(): void
           }
-          ;(target as any)[key] = value
-        }
-        pong.reset()
-      }, { category: record.category, modKey: record.modKey, patch: record.patch })
+          type BrowserWindow = Window & { __pong?: BrowserPong | undefined }
+
+          const globalWindow = window as BrowserWindow
+          const pong = globalWindow.__pong
+          if (!pong) {
+            throw new Error('Pong instance not found')
+          }
+          const target = pong.config.modifiers[category][modKey]
+          if (!target) {
+            throw new Error(`Modifier not found: ${category}.${modKey}`)
+          }
+          for (const [key, value] of Object.entries(patch)) {
+            if (key === 'enabled') {
+              continue
+            }
+            target[key] = value
+          }
+          pong.reset()
+        },
+        { category: record.category, modKey: record.modKey, patch: record.patch },
+      )
 
       await page.waitForTimeout(5000)
       await page.screenshot({ path: afterPath, fullPage: true })

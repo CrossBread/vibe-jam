@@ -4,7 +4,6 @@
 
 import { createPong } from '../src/game/pong'
 import devConfig from '../src/game/devConfig.json'
-import { createDevConfig } from '../src/game/devtools'
 import { describe, it, expect, vi } from 'vitest'
 
 describe('Pong core', () => {
@@ -192,6 +191,7 @@ describe('Pong core', () => {
       expect(game.state.shotClockRemaining).toBeGreaterThan(7.5)
     } finally {
       randomSpy.mockRestore()
+      devConfig.shotClockSeconds = originalShotClock
     }
   })
 
