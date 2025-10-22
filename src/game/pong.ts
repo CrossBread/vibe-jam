@@ -277,6 +277,18 @@ interface PaddleHeightOptions {
   preserveCenter?: boolean
 }
 
+type ResetBallReason = 'score' | 'startup' | 'shotClock'
+
+interface ResetBallOptions {
+  reason?: ResetBallReason
+}
+
+interface ServeAttachmentState {
+  side: 'left' | 'right'
+  ballX: number
+  ballY: number
+}
+
 interface BallState {
   x: number
   y: number
@@ -538,6 +550,12 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
   let serveCountdownRemaining = 0
   let preServeDelayRemaining = 0
   let modRevealDelayPending = false
+  let serveAttachment: ServeAttachmentState | null = null
+  let serveDialSpinRemaining = 0
+  let serveDialSpinDuration = 0
+  let serveDialSpinTarget: 'left' | 'right' | null = null
+  let serveDialSpinSpins = 0
+  let serveDialSpinDirection: 1 | -1 = 1
   type ModVoteSelection = 'up' | 'down' | 'neutral'
 
   interface ModVoteState {
@@ -556,7 +574,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     downRequested: boolean
   }
 
-  interface ModVoteInputState extends VoteInputSnapshot {}
+  type ModVoteInputState = VoteInputSnapshot
 
   const modVoteInputStates: PlayerSelections<ModVoteInputState> =
     createPlayerSelections(() => ({ upRequested: false, downRequested: false }))
@@ -582,7 +600,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     context: RoundFeedbackContext
   }
 
-  interface RoundFeedbackInputState extends VoteInputSnapshot {}
+  type RoundFeedbackInputState = VoteInputSnapshot
 
   const pendingFeedbackContexts: RoundFeedbackContext[] = []
   const roundRatings: RoundRatingRecord[] = []
@@ -1507,25 +1525,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
   initializeActiveModState()
   resetBallSize()
   initializePaddleHeights(true)
-  resetBall(Math.random() < 0.5)
-
-  function createBall(toLeft: boolean): BallState {
-    const direction = toLeft ? -1 : 1
-    const vx = config.baseBallSpeed * direction
-    const vy = (Math.random() * 2 - 1) * config.baseBallSpeed * 0.6
-    return {
-      x: W * 0.5,
-      y: H * 0.5,
-      vx,
-      vy,
-      radius: BALL_R,
-      travelDistance: 0,
-      isReal: true,
-      opacity: 1,
-      lastPaddleHit: null,
-      portalCooldown: 0,
-    }
-  }
+  resetBall(Math.random() < 0.5, { reason: 'startup' })
 
   function createRussianRouletteBall(
     angleOffset: number,
@@ -1607,6 +1607,15 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
       return
     }
 
+    if (serveAttachment) {
+      state.ballX = serveAttachment.ballX
+      state.ballY = serveAttachment.ballY
+      state.vx = 0
+      state.vy = 0
+      state.ballRadius = BALL_R
+      return
+    }
+
     state.ballX = W * 0.5
     state.ballY = H * 0.5
     state.vx = 0
@@ -1633,7 +1642,8 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     }
   }
 
-  function resetBall(toLeft: boolean) {
+  function resetBall(toLeft: boolean, options: ResetBallOptions = {}) {
+    const reason = options.reason ?? 'score'
     balls.length = 0
     clearShotClock()
     secondChancesMod.resetShields()
@@ -1647,11 +1657,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     preServeDelayRemaining = modRevealDelayPending ? modRevealDelayDuration : 0
     serveCountdownRemaining = serveCountdownDuration
     modRevealDelayPending = false
-    state.ballX = W * 0.5
-    state.ballY = H * 0.5
-    state.vx = 0
-    state.vy = 0
-    state.ballRadius = BALL_R
+    setupServeAttachment(toLeft, reason)
     syncPrimaryBallState()
 
     if (roundFeedback || modVote) {
@@ -1663,6 +1669,44 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     }
   }
 
+  function setupServeAttachment(toLeft: boolean, reason: ResetBallReason) {
+    const servingSide: 'left' | 'right' = toLeft ? 'right' : 'left'
+    const paddleY = servingSide === 'left' ? state.leftY : state.rightY
+    const height = servingSide === 'left' ? state.leftPaddleHeight : state.rightPaddleHeight
+    const clampedHeight = Math.max(height, 1)
+    const center = clamp(paddleY + clampedHeight / 2, 0, H)
+    const safeTop = paddleY + BALL_R
+    const safeBottom = paddleY + clampedHeight - BALL_R
+    const minBallY = clamp(Math.min(safeTop, safeBottom), BALL_R, H - BALL_R)
+    const maxBallY = clamp(Math.max(safeTop, safeBottom), BALL_R, H - BALL_R)
+    const ballX = getServeBallX(servingSide)
+    const ballY = clamp(center, minBallY, maxBallY)
+
+    serveAttachment = {
+      side: servingSide,
+      ballX,
+      ballY,
+    }
+
+    updateServeAttachmentPosition(true)
+
+    if (reason === 'startup' || reason === 'shotClock') {
+      startServeDialSpin(servingSide)
+    } else {
+      serveDialSpinRemaining = 0
+      serveDialSpinDuration = 0
+      serveDialSpinTarget = null
+    }
+  }
+
+  function startServeDialSpin(target: 'left' | 'right') {
+    serveDialSpinDuration = 0.85
+    serveDialSpinRemaining = serveDialSpinDuration
+    serveDialSpinTarget = target
+    serveDialSpinSpins = 3 + Math.random() * 1.5
+    serveDialSpinDirection = Math.random() < 0.5 ? -1 : 1
+  }
+
   function launchPendingServe() {
     if (pendingServeToLeft === null) return
 
@@ -1670,20 +1714,114 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     pendingServeToLeft = null
     preServeDelayRemaining = 0
     serveCountdownRemaining = 0
+    serveDialSpinRemaining = 0
+    serveDialSpinDuration = 0
+    serveDialSpinTarget = null
+
+    const servingSide: 'left' | 'right' = toLeft ? 'right' : 'left'
+    const physicalSide = getPhysicalSide(servingSide)
+    const paddleY = servingSide === 'left' ? state.leftY : state.rightY
+    const height = servingSide === 'left' ? state.leftPaddleHeight : state.rightPaddleHeight
+    const clampedHeight = Math.max(height, 1)
+    const center = clamp(paddleY + clampedHeight / 2, 0, H)
+    const halfHeight = Math.max(clampedHeight / 2, 1)
+    const ballX = serveAttachment ? serveAttachment.ballX : getServeBallX(servingSide)
+    const ballY = serveAttachment
+      ? serveAttachment.ballY
+      : clamp(center, BALL_R, H - BALL_R)
+    const rel = clamp((ballY - center) / halfHeight, -1, 1)
+    const baseSpeed = Math.max(0, config.baseBallSpeed)
+    const deflection = computeDeflectionAngle(servingSide, rel, 0)
+
+    let vx: number
+    let vy: number
+    if (physicalSide === 'left') {
+      vx = Math.cos(deflection) * baseSpeed
+      vy = Math.sin(deflection) * baseSpeed
+    } else {
+      const angle = Math.PI - deflection
+      vx = Math.cos(angle) * baseSpeed
+      vy = Math.sin(angle) * baseSpeed
+    }
 
     if (config.modifiers.arena.russianRoulette.enabled) {
       spawnRussianRouletteBalls(toLeft)
     } else {
-      balls.push(createBall(toLeft))
+      const ball: BallState = {
+        x: ballX,
+        y: ballY,
+        vx,
+        vy,
+        radius: BALL_R,
+        travelDistance: 0,
+        isReal: true,
+        opacity: 1,
+        lastPaddleHit: servingSide,
+        portalCooldown: 0,
+      }
+      balls.push(ball)
     }
 
     resetBallSize()
-    const servingSide: 'left' | 'right' = toLeft ? 'right' : 'left'
     registerShotClockHit(servingSide)
+    serveAttachment = null
+    syncPrimaryBallState()
+  }
+
+  function updateServeAttachmentPosition(forceReanchor = false) {
+    if (!serveAttachment) return
+
+    const { side } = serveAttachment
+    const paddleY = side === 'left' ? state.leftY : state.rightY
+    const height = side === 'left' ? state.leftPaddleHeight : state.rightPaddleHeight
+    const clampedHeight = Math.max(height, 1)
+    const center = clamp(paddleY + clampedHeight / 2, 0, H)
+    const safeTop = clamp(paddleY + BALL_R, BALL_R, H - BALL_R)
+    const safeBottom = clamp(paddleY + clampedHeight - BALL_R, BALL_R, H - BALL_R)
+    const minBallY = Math.min(safeTop, safeBottom)
+    const maxBallY = Math.max(safeTop, safeBottom)
+
+    const rawDistance = Number.isFinite(config.serveCarryDistance)
+      ? config.serveCarryDistance
+      : 0
+    const carryDistance = Math.max(0, rawDistance)
+
+    let ballY = serveAttachment.ballY
+
+    if (forceReanchor) {
+      ballY = clamp(center, minBallY, maxBallY)
+    }
+
+    const minCarryY = clamp(center - carryDistance, minBallY, maxBallY)
+    const maxCarryY = clamp(center + carryDistance, minBallY, maxBallY)
+    ballY = clamp(ballY, minCarryY, maxCarryY)
+    ballY = clamp(ballY, minBallY, maxBallY)
+
+    serveAttachment.ballY = ballY
+    serveAttachment.ballX = getServeBallX(side)
+
+    state.ballX = serveAttachment.ballX
+    state.ballY = ballY
+    state.vx = 0
+    state.vy = 0
+    state.ballRadius = BALL_R
+  }
+
+  function getServeBallX(side: 'left' | 'right') {
+    const physical = getPhysicalSide(side)
+    const paddleX = getOuterXFor(side)
+    return physical === 'left' ? paddleX + PADDLE_W + BALL_R : paddleX - BALL_R
   }
 
   function updateServeTimers(dt: number) {
     if (pendingServeToLeft === null) return
+
+    if (serveDialSpinRemaining > 0) {
+      serveDialSpinRemaining = Math.max(0, serveDialSpinRemaining - dt)
+      if (serveDialSpinRemaining > 0) {
+        return
+      }
+    }
 
     if (roundFeedback) {
       if (updateRoundFeedbackCountdown(dt)) {
@@ -1757,7 +1895,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     syncOsteoState(true)
     initializePaddleHeights(true)
     modRevealDelayPending = true
-    resetBall(Math.random() < 0.5)
+    resetBall(Math.random() < 0.5, { reason: 'startup' })
   }
 
   if (!headless && typeof window !== 'undefined') {
@@ -1805,6 +1943,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     updateRoundFeedbackFade(dt)
     checkModifierAnnouncements()
     updatePaddleModifierState(dt)
+    updateServeAttachmentPosition()
 
     const gamepadInput = getGamepadInput()
     const doublesEnabled = Boolean(config.doubles.enabled)
@@ -1843,6 +1982,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
 
     const ballDirection: -1 | 0 | 1 = state.vx > 0 ? 1 : state.vx < 0 ? -1 : 0
     updateAiMisalignment(ballDirection)
+    const serveMovementLocked = isServeMovementLocked()
 
     if (roundFeedback) {
       handleRoundFeedbackInput(gamepadInput)
@@ -1850,18 +1990,31 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
       handleModVoteInput(gamepadInput)
     } else {
       if (leftAIEnabled) {
-        const target = state.ballY - leftPaddleHeight / 2 + leftAiOffset
-        const maxStep = leftPaddleSpeed * dt
-        const delta = clamp(target - state.leftY, -maxStep, maxStep)
-        state.leftY += delta
-        if (doublesEnabled) {
-          const innerDelta = clamp(target - state.leftInnerY, -maxStep, maxStep)
-          state.leftInnerY += innerDelta
-        } else {
+        if (!serveMovementLocked) {
+          const target = state.ballY - leftPaddleHeight / 2 + leftAiOffset
+          const maxStep = leftPaddleSpeed * dt
+          const delta = clamp(target - state.leftY, -maxStep, maxStep)
+          state.leftY += delta
+          if (doublesEnabled) {
+            const innerDelta = clamp(target - state.leftInnerY, -maxStep, maxStep)
+            state.leftInnerY += innerDelta
+          } else {
+            state.leftInnerY = state.leftY
+          }
+        } else if (!doublesEnabled) {
           state.leftInnerY = state.leftY
         }
       } else {
-        const control = getPaddleControlState('left', doublesEnabled, gamepadInput)
+        let control = getPaddleControlState('left', doublesEnabled, gamepadInput)
+        if (serveMovementLocked) {
+          control = {
+            direction: 0,
+            relativeDelta: 0,
+            hasDirectionalInput: false,
+            upRequested: false,
+            downRequested: false,
+          }
+        }
         handleManualPaddle('left', dt, leftPaddleSpeed, control)
 
         if (doublesEnabled) {
@@ -1871,7 +2024,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
               0,
               H - state.leftInnerPaddleHeight,
             )
-          } else {
+          } else if (!serveMovementLocked) {
             let innerGamepad = 0
             if (gamepadInput.rightAxis)
               innerGamepad += gamepadInput.rightAxis * config.paddleSpeed * dt
@@ -1886,18 +2039,31 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
       }
 
       if (rightAIEnabled) {
-        const target = state.ballY - rightPaddleHeight / 2 + rightAiOffset
-        const maxStep = rightPaddleSpeed * dt
-        const delta = clamp(target - state.rightY, -maxStep, maxStep)
-        state.rightY += delta
-        if (doublesEnabled) {
-          const innerDelta = clamp(target - state.rightInnerY, -maxStep, maxStep)
-          state.rightInnerY += innerDelta
-        } else {
+        if (!serveMovementLocked) {
+          const target = state.ballY - rightPaddleHeight / 2 + rightAiOffset
+          const maxStep = rightPaddleSpeed * dt
+          const delta = clamp(target - state.rightY, -maxStep, maxStep)
+          state.rightY += delta
+          if (doublesEnabled) {
+            const innerDelta = clamp(target - state.rightInnerY, -maxStep, maxStep)
+            state.rightInnerY += innerDelta
+          } else {
+            state.rightInnerY = state.rightY
+          }
+        } else if (!doublesEnabled) {
           state.rightInnerY = state.rightY
         }
       } else {
-        const control = getPaddleControlState('right', doublesEnabled, gamepadInput)
+        let control = getPaddleControlState('right', doublesEnabled, gamepadInput)
+        if (serveMovementLocked) {
+          control = {
+            direction: 0,
+            relativeDelta: 0,
+            hasDirectionalInput: false,
+            upRequested: false,
+            downRequested: false,
+          }
+        }
         handleManualPaddle('right', dt, rightPaddleSpeed, control)
 
         if (doublesEnabled) {
@@ -1907,7 +2073,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
               0,
               H - state.rightInnerPaddleHeight,
             )
-          } else {
+          } else if (!serveMovementLocked) {
             const innerKeyDirection = (keys['w'] ? -1 : 0) + (keys['s'] ? 1 : 0)
             const innerDirection = clamp(innerKeyDirection, -1, 1)
             state.rightInnerY += innerDirection * config.paddleSpeed * dt
@@ -1917,6 +2083,8 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
         }
       }
     }
+
+    updateServeAttachmentPosition()
 
     updateMissilePaddles(dt)
 
@@ -2548,7 +2716,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     const serveToLeft =
       lastHitter === null ? Math.random() < 0.5 : lastHitter === 'right'
 
-    resetBall(serveToLeft)
+    resetBall(serveToLeft, { reason: 'shotClock' })
     syncPrimaryBallState()
   }
 
@@ -2911,6 +3079,9 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
       }
     }
     syncPaddleMotionForSide(side)
+    if (serveAttachment?.side === side) {
+      updateServeAttachmentPosition(true)
+    }
   }
 
   function createOutOfBodyTrailState(): OutOfBodyTrailState {
@@ -3796,6 +3967,13 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     clampPaddlePosition(side)
   }
 
+  function isServeMovementLocked(): boolean {
+    if (config.inMotionServe) return false
+    if (pendingServeToLeft === null) return false
+    if (serveCountdownRemaining <= 0) return false
+    return true
+  }
+
   function handleManualPaddle(
     side: 'left' | 'right',
     dt: number,
@@ -3893,6 +4071,9 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
         state.rightY = y
         state.rightInnerY = y
       }
+      if (serveAttachment?.side === side) {
+        updateServeAttachmentPosition(true)
+      }
       return
     }
 
@@ -3910,10 +4091,16 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
         state.rightY = newY
         state.rightInnerY = newInnerY
       }
+      if (serveAttachment?.side === side) {
+        updateServeAttachmentPosition()
+      }
       return
     }
 
     clampPaddlePosition(side)
+    if (serveAttachment?.side === side) {
+      updateServeAttachmentPosition()
+    }
   }
 
   function clampPaddlePosition(side: 'left' | 'right') {
@@ -4956,6 +5143,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     }
 
     drawAnnouncement()
+    drawServeDial()
     drawServeCountdown()
     drawRoundFeedbackPrompt()
 
@@ -5075,6 +5263,12 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
       }
     }
 
+    if (balls.length === 0 && serveAttachment) {
+      ctx.beginPath()
+      ctx.arc(state.ballX, state.ballY, state.ballRadius, 0, Math.PI * 2)
+      ctx.fill()
+    }
+
     const returnMeterScale = Math.max(0.2, uiScaling.returnMeterScale)
     const pipRadius = 6 * returnMeterScale
     const pipSpacing = Math.max(4, uiScaling.returnMeterSpacing)
@@ -5180,9 +5374,46 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
   }
 
 
+  function drawServeDial() {
+    if (pendingServeToLeft === null) return
+    if (serveDialSpinTarget === null) return
+    if (serveDialSpinDuration <= 0) return
+    if (serveDialSpinRemaining <= 0) return
+
+    const progress = clamp01(1 - serveDialSpinRemaining / serveDialSpinDuration)
+    const eased = 1 - Math.pow(1 - progress, 2)
+    const targetAngle = serveDialSpinTarget === 'left' ? Math.PI : 0
+    const angle =
+      targetAngle + serveDialSpinDirection * (1 - eased) * serveDialSpinSpins * Math.PI * 2
+    const radius = Math.min(W, H) * 0.08
+    const centerX = W / 2
+    const centerY = H / 2
+
+    ctx.save()
+    ctx.lineWidth = 2
+    ctx.strokeStyle = 'rgba(231,236,243,0.25)'
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
+    ctx.stroke()
+
+    ctx.lineWidth = 4
+    ctx.strokeStyle = HIGHLIGHT_COLOR
+    ctx.beginPath()
+    ctx.moveTo(centerX, centerY)
+    ctx.lineTo(centerX + Math.cos(angle) * radius, centerY + Math.sin(angle) * radius)
+    ctx.stroke()
+
+    ctx.fillStyle = HIGHLIGHT_COLOR
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, radius * 0.12, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
+
   function drawServeCountdown() {
     if (pendingServeToLeft === null) return
     if (preServeDelayRemaining > 0) return
+    if (serveDialSpinRemaining > 0) return
     if (serveCountdownRemaining <= 0) return
     if (roundFeedback || (roundFeedbackVisibility > 0 && lastRoundFeedbackSelections)) return
 

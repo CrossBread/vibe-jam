@@ -1,4 +1,6 @@
 ﻿{
+  "inMotionServe": true,
+  "serveCarryDistance": 24,
   "paddleSpeed": 200,
   "leftPaddleSpeedMultiplier": 1,
   "rightPaddleSpeedMultiplier": 1,

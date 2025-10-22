@@ -395,6 +395,8 @@ export const ANIMATION_CURVE_OPTIONS: AnimationCurve[] = [
 ]
 
 export interface DevConfig {
+  inMotionServe: boolean
+  serveCarryDistance: number
   paddleSpeed: number
   leftPaddleSpeedMultiplier: number
   rightPaddleSpeedMultiplier: number

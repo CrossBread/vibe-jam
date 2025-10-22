@@ -1748,6 +1748,24 @@ export function createDevOverlay(
     baseBody.appendChild(insideOffsetControl)
 
     baseBody.appendChild(
+      createToggleControl('In Motion Service', config.inMotionServe, {
+        onChange: value => {
+          config.inMotionServe = value
+        },
+      }),
+    )
+
+    baseBody.appendChild(
+      createSliderControl('Serve Carry Distance', config.serveCarryDistance, {
+        min: 0,
+        max: 300,
+        step: 1,
+        format: v => `${Math.round(v)} px`,
+        onInput: v => (config.serveCarryDistance = v),
+      }),
+    )
+
+    baseBody.appendChild(
       createSliderControl('Paddle Speed', config.paddleSpeed, {
         min: 120,
         max: 360,
@@ -2445,6 +2463,13 @@ export function createDevOverlay(
 }
 
 function applyConfig(target: DevConfig, source: DevConfig) {
+  const partial = source as Partial<DevConfig>
+  if (typeof partial.inMotionServe === 'boolean') {
+    target.inMotionServe = partial.inMotionServe
+  }
+  if (typeof partial.serveCarryDistance === 'number') {
+    target.serveCarryDistance = partial.serveCarryDistance
+  }
   target.paddleSpeed = source.paddleSpeed
   target.leftPaddleSpeedMultiplier = source.leftPaddleSpeedMultiplier
   target.rightPaddleSpeedMultiplier = source.rightPaddleSpeedMultiplier
@@ -2480,6 +2505,14 @@ function isDevConfig(value: unknown): value is DevConfig {
   }
 
   if ('lockMods' in candidate && typeof candidate.lockMods !== 'boolean') {
+    return false
+  }
+
+  if ('inMotionServe' in candidate && typeof candidate.inMotionServe !== 'boolean') {
+    return false
+  }
+
+  if ('serveCarryDistance' in candidate && typeof candidate.serveCarryDistance !== 'number') {
     return false
   }
 
