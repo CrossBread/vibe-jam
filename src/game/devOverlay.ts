@@ -656,9 +656,16 @@ function ensureDevOverlayStyles() {
     }
     .dev-overlay__modifier-indicator {
       margin-left: auto;
+      display: inline-flex;
+      align-items: center;
       font-size: 14px;
       color: rgba(226, 232, 240, 0.7);
       transition: color 0.2s ease;
+    }
+    .dev-overlay__modifier-indicator-icon {
+      width: 16px;
+      height: 16px;
+      display: block;
     }
     .dev-overlay__modifier-header {
       display: flex;
@@ -677,7 +684,6 @@ function ensureDevOverlayStyles() {
     }
     .dev-overlay__modifier-copy-button {
       margin-left: auto;
-      margin-right: 12px;
       display: inline-flex;
       align-items: center;
       gap: 6px;
@@ -706,6 +712,11 @@ function ensureDevOverlayStyles() {
       width: 14px;
       height: 14px;
       flex-shrink: 0;
+    }
+    .dev-overlay__modifier-body-header {
+      display: flex;
+      justify-content: flex-end;
+      padding: 0 0 8px;
     }
     .dev-overlay__collapsible {
       border-top: 1px solid rgba(148, 163, 184, 0.35);
@@ -921,17 +932,40 @@ export function createDevOverlay(
     target: HTMLElement,
     options: { className?: string; openSymbol?: string; closedSymbol?: string } = {},
   ) {
-    const {
-      className = 'dev-overlay__collapsible-indicator',
-      openSymbol = '^',
-      closedSymbol = 'v',
-    } = options
+    const { className = 'dev-overlay__collapsible-indicator', openSymbol, closedSymbol } =
+      options
+
     const indicator = document.createElement('span')
     indicator.className = className
     indicator.setAttribute('aria-hidden', 'true')
 
+    if (openSymbol !== undefined && closedSymbol !== undefined) {
+      const updateIndicator = () => {
+        indicator.textContent = section.open ? openSymbol : closedSymbol
+      }
+
+      target.appendChild(indicator)
+      updateIndicator()
+      section.addEventListener('toggle', updateIndicator)
+
+      return indicator
+    }
+
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    icon.setAttribute('viewBox', '0 0 24 24')
+    icon.classList.add('dev-overlay__modifier-indicator-icon')
+
+    const iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    iconPath.setAttribute('fill', 'none')
+    iconPath.setAttribute('stroke', 'currentColor')
+    iconPath.setAttribute('stroke-width', '2')
+    iconPath.setAttribute('stroke-linecap', 'round')
+    iconPath.setAttribute('stroke-linejoin', 'round')
+    icon.appendChild(iconPath)
+    indicator.appendChild(icon)
+
     const updateIndicator = () => {
-      indicator.textContent = section.open ? openSymbol : closedSymbol
+      iconPath.setAttribute('d', section.open ? 'M6 15L12 9 18 15' : 'M6 9L12 15 18 9')
     }
 
     target.appendChild(indicator)
@@ -1534,7 +1568,7 @@ export function createDevOverlay(
         summaryHeader.appendChild(toggle)
         summaryHeader.appendChild(summaryLabel)
         summary.appendChild(summaryHeader)
-        attachCollapsibleIndicator(details, summaryHeader, {
+        attachCollapsibleIndicator(details, summary, {
           className: 'dev-overlay__modifier-indicator',
         })
 
@@ -1562,8 +1596,6 @@ export function createDevOverlay(
 
         copyButton.appendChild(copyIcon)
         copyButton.appendChild(copyLabel)
-        summary.appendChild(copyButton)
-
         copyButton.addEventListener('click', async event => {
           event.stopPropagation()
           event.preventDefault()
@@ -1589,6 +1621,11 @@ export function createDevOverlay(
 
         const body = document.createElement('div')
         body.className = 'dev-overlay__modifier-body'
+
+        const bodyHeader = document.createElement('div')
+        bodyHeader.className = 'dev-overlay__modifier-body-header'
+        bodyHeader.appendChild(copyButton)
+        body.appendChild(bodyHeader)
 
         const description = document.createElement('p')
         description.className = 'dev-overlay__description'
