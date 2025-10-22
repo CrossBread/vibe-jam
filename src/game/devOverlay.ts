@@ -674,6 +674,14 @@ function ensureDevOverlayStyles() {
       flex: 1;
       min-width: 0;
     }
+    .dev-overlay__modifier-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      width: 100%;
+      margin: 4px 0;
+    }
     .dev-overlay__modifier-toggle {
       flex-shrink: 0;
     }
@@ -683,7 +691,6 @@ function ensureDevOverlayStyles() {
       white-space: nowrap;
     }
     .dev-overlay__modifier-copy-button {
-      margin-left: auto;
       display: inline-flex;
       align-items: center;
       gap: 6px;
@@ -1572,31 +1579,65 @@ export function createDevOverlay(
           className: 'dev-overlay__modifier-indicator',
         })
 
-        const copyButton = document.createElement('button')
-        copyButton.type = 'button'
-        copyButton.className = 'dev-overlay__modifier-copy-button'
-        copyButton.title = `Copy trial parameters for ${modifier.name}`
-        copyButton.setAttribute('aria-label', `Copy trial parameters for ${modifier.name}`)
+        const createCopyActionButton = (
+          label: string,
+          title: string,
+          ariaLabel: string,
+        ): HTMLButtonElement => {
+          const button = document.createElement('button')
+          button.type = 'button'
+          button.className = 'dev-overlay__modifier-copy-button'
+          button.title = title
+          button.setAttribute('aria-label', ariaLabel)
 
-        const copyIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-        copyIcon.setAttribute('viewBox', '0 0 20 20')
-        copyIcon.setAttribute('aria-hidden', 'true')
-        copyIcon.classList.add('dev-overlay__modifier-copy-icon')
+          const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+          icon.setAttribute('viewBox', '0 0 20 20')
+          icon.setAttribute('aria-hidden', 'true')
+          icon.classList.add('dev-overlay__modifier-copy-icon')
 
-        const iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path')
-        iconPath.setAttribute(
-          'd',
-          'M7 3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2zm-3 5a2 2 0 0 1 2-2h1v2H6v8h8v1a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z',
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+          path.setAttribute(
+            'd',
+            'M7 3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2zm-3 5a2 2 0 0 1 2-2h1v2H6v8h8v1a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z',
+          )
+          path.setAttribute('fill', 'currentColor')
+          icon.appendChild(path)
+
+          const text = document.createElement('span')
+          text.textContent = label
+
+          button.appendChild(icon)
+          button.appendChild(text)
+
+          return button
+        }
+
+        const copyModButton = createCopyActionButton(
+          'Mod',
+          `Copy mod definition for ${modifier.name}`,
+          `Copy mod definition for ${modifier.name}`,
         )
-        iconPath.setAttribute('fill', 'currentColor')
-        copyIcon.appendChild(iconPath)
+        copyModButton.addEventListener('click', async event => {
+          event.stopPropagation()
+          event.preventDefault()
 
-        const copyLabel = document.createElement('span')
-        copyLabel.textContent = 'Copy Trial'
+          const modDefinition = deepClone(modifier)
+          const snippet = JSON.stringify(modDefinition, null, 2)
 
-        copyButton.appendChild(copyIcon)
-        copyButton.appendChild(copyLabel)
-        copyButton.addEventListener('click', async event => {
+          try {
+            await navigator.clipboard.writeText(snippet)
+            setStatus(`Copied mod definition for ${modPath}.`)
+          } catch (error) {
+            console.error(error)
+            setStatus(`Failed to copy mod definition for ${modPath}.`, 'error')
+          }
+        })
+        const copyTrialButton = createCopyActionButton(
+          'Trial',
+          `Copy trial parameters for ${modifier.name}`,
+          `Copy trial parameters for ${modifier.name}`,
+        )
+        copyTrialButton.addEventListener('click', async event => {
           event.stopPropagation()
           event.preventDefault()
 
@@ -1616,16 +1657,16 @@ export function createDevOverlay(
             setStatus(`Failed to copy trial config for ${modPath}.`, 'error')
           }
         })
-
         details.appendChild(summary)
 
         const body = document.createElement('div')
         body.className = 'dev-overlay__modifier-body'
 
-        const bodyHeader = document.createElement('div')
-        bodyHeader.className = 'dev-overlay__modifier-body-header'
-        bodyHeader.appendChild(copyButton)
-        body.appendChild(bodyHeader)
+        const copyActions = document.createElement('div')
+        copyActions.className = 'dev-overlay__modifier-actions'
+        copyActions.appendChild(copyModButton)
+        copyActions.appendChild(copyTrialButton)
+        body.appendChild(copyActions)
 
         const description = document.createElement('p')
         description.className = 'dev-overlay__description'
