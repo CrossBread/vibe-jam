@@ -406,6 +406,7 @@ export interface DevConfig {
   minHorizontalRatio: number
   speedIncreaseOnHit: number
   shotClockSeconds: number
+  stuckBallSeconds: number
   maxAiMisalignment: number
   lockMods: boolean
   doubles: DoublesConfig

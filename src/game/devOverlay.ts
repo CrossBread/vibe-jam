@@ -1836,10 +1836,20 @@ export function createDevOverlay(
     baseBody.appendChild(
       createSliderControl('Shot Clock Duration', config.shotClockSeconds, {
         min: 0,
-        max: 20,
+        max: 60,
         step: 0.5,
         format: v => `${v.toFixed(1)} s`,
         onInput: v => (config.shotClockSeconds = v),
+      }),
+    )
+
+    baseBody.appendChild(
+      createSliderControl('Stuck Ball Duration', config.stuckBallSeconds, {
+        min: 0,
+        max: 60,
+        step: 0.5,
+        format: v => `${v.toFixed(1)} s`,
+        onInput: v => (config.stuckBallSeconds = v),
       }),
     )
 
@@ -2479,6 +2489,7 @@ function applyConfig(target: DevConfig, source: DevConfig) {
   target.minHorizontalRatio = source.minHorizontalRatio
   target.speedIncreaseOnHit = source.speedIncreaseOnHit
   target.shotClockSeconds = source.shotClockSeconds
+  target.stuckBallSeconds = source.stuckBallSeconds
   if ('lockMods' in source) {
     target.lockMods = Boolean((source as Partial<DevConfig>).lockMods)
   }
@@ -2499,7 +2510,8 @@ function isDevConfig(value: unknown): value is DevConfig {
     typeof candidate.baseBallSpeed !== 'number' ||
     typeof candidate.minHorizontalRatio !== 'number' ||
     typeof candidate.speedIncreaseOnHit !== 'number' ||
-    typeof candidate.shotClockSeconds !== 'number'
+    typeof candidate.shotClockSeconds !== 'number' ||
+    typeof candidate.stuckBallSeconds !== 'number'
   ) {
     return false
   }

@@ -141,6 +141,8 @@ export interface PongState {
   completedBitesSinceLastPoint: number
   shotClockRemaining: number
   shotClockActive: boolean
+  stuckBallRemaining: number
+  stuckBallActive: boolean
 }
 
 export interface PongAPI {
@@ -277,7 +279,7 @@ interface PaddleHeightOptions {
   preserveCenter?: boolean
 }
 
-type ResetBallReason = 'score' | 'startup' | 'shotClock'
+type ResetBallReason = 'score' | 'startup' | 'shotClock' | 'stuckBall'
 
 interface ResetBallOptions {
   reason?: ResetBallReason
@@ -948,6 +950,8 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     completedBitesSinceLastPoint: 0,
     shotClockRemaining: 0,
     shotClockActive: false,
+    stuckBallRemaining: 0,
+    stuckBallActive: false,
   }
 
   let leftPaddleHeight = state.leftPaddleHeight
@@ -976,6 +980,13 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
   let shotClockRemaining = 0
   let shotClockActive = false
   let shotClockLastHitter: 'left' | 'right' | null = null
+  let stuckBallRemaining = 0
+  let stuckBallActive = false
+  let lastStateBallX = state.ballX
+  let lastStateBallY = state.ballY
+  let lastStateVx = state.vx
+  let lastStateVy = state.vy
+  let lastStateBallRadius = state.ballRadius
   const missilePaddles: ActiveMissilePaddle[] = []
   const missileCooldowns: Record<'left' | 'right', number> = { left: 0, right: 0 }
   type InchwormPhase = 'idle' | 'contracting' | 'contracted' | 'extending'
@@ -1431,6 +1442,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     getModifier: () => getMinesweeperModifier(),
     getArenaDimensions: () => arenaDimensions,
     getContext: () => ctx,
+    getAreSidesSwapped: () => areSidesSwapped(),
   })
 
   let ballTrailColorHex = '#ffffff'
@@ -1604,6 +1616,11 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
       state.vx = primary.vx
       state.vy = primary.vy
       state.ballRadius = primary.radius
+      lastStateBallX = state.ballX
+      lastStateBallY = state.ballY
+      lastStateVx = state.vx
+      lastStateVy = state.vy
+      lastStateBallRadius = state.ballRadius
       return
     }
 
@@ -1613,6 +1630,11 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
       state.vx = 0
       state.vy = 0
       state.ballRadius = BALL_R
+      lastStateBallX = state.ballX
+      lastStateBallY = state.ballY
+      lastStateVx = state.vx
+      lastStateVy = state.vy
+      lastStateBallRadius = state.ballRadius
       return
     }
 
@@ -1621,31 +1643,55 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     state.vx = 0
     state.vy = 0
     state.ballRadius = BALL_R
+    lastStateBallX = state.ballX
+    lastStateBallY = state.ballY
+    lastStateVx = state.vx
+    lastStateVy = state.vy
+    lastStateBallRadius = state.ballRadius
   }
 
   function syncStateIntoPrimaryBall() {
     const primary = balls[0]
     if (!primary) return
 
-    if (Math.abs(state.ballX - primary.x) > 1e-3 || Math.abs(state.ballY - primary.y) > 1e-3) {
-      primary.x = state.ballX
-      primary.y = state.ballY
+    const stateChanged =
+      Math.abs(state.ballX - lastStateBallX) > 1e-3 ||
+      Math.abs(state.ballY - lastStateBallY) > 1e-3 ||
+      Math.abs(state.vx - lastStateVx) > 1e-3 ||
+      Math.abs(state.vy - lastStateVy) > 1e-3 ||
+      Math.abs(state.ballRadius - lastStateBallRadius) > 1e-3
+
+    const shouldSyncFromState =
+      stateChanged || Boolean(serveAttachment) || pendingServeToLeft !== null
+
+    if (shouldSyncFromState) {
+      if (Math.abs(state.ballX - primary.x) > 1e-3 || Math.abs(state.ballY - primary.y) > 1e-3) {
+        primary.x = state.ballX
+        primary.y = state.ballY
+      }
+
+      if (Math.abs(state.vx - primary.vx) > 1e-3 || Math.abs(state.vy - primary.vy) > 1e-3) {
+        primary.vx = state.vx
+        primary.vy = state.vy
+      }
+
+      if (Math.abs(state.ballRadius - primary.radius) > 1e-3) {
+        primary.radius = Math.max(1, state.ballRadius)
+      }
     }
 
-    if (Math.abs(state.vx - primary.vx) > 1e-3 || Math.abs(state.vy - primary.vy) > 1e-3) {
-      primary.vx = state.vx
-      primary.vy = state.vy
-    }
-
-    if (Math.abs(state.ballRadius - primary.radius) > 1e-3) {
-      primary.radius = Math.max(1, state.ballRadius)
-    }
+    lastStateBallX = state.ballX
+    lastStateBallY = state.ballY
+    lastStateVx = state.vx
+    lastStateVy = state.vy
+    lastStateBallRadius = state.ballRadius
   }
 
   function resetBall(toLeft: boolean, options: ResetBallOptions = {}) {
     const reason = options.reason ?? 'score'
     balls.length = 0
     clearShotClock()
+    clearStuckBallTimer()
     secondChancesMod.resetShields()
     spaceInvadersMod.resetBarricades()
     minesweeperMod.resetBoard()
@@ -1664,7 +1710,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
       return
     }
 
-    if (preServeDelayRemaining <= 0 && serveCountdownRemaining <= 0) {
+    if (preServeDelayRemaining <= 0 && serveCountdownRemaining <= 0 && !isServeCountdownBlocked()) {
       launchPendingServe()
     }
   }
@@ -1690,7 +1736,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
 
     updateServeAttachmentPosition(true)
 
-    if (reason === 'startup' || reason === 'shotClock') {
+    if (reason === 'startup' || reason === 'shotClock' || reason === 'stuckBall') {
       startServeDialSpin(servingSide)
     } else {
       serveDialSpinRemaining = 0
@@ -1756,7 +1802,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
         travelDistance: 0,
         isReal: true,
         opacity: 1,
-        lastPaddleHit: servingSide,
+        lastPaddleHit: null,
         portalCooldown: 0,
       }
       balls.push(ball)
@@ -1764,6 +1810,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
 
     resetBallSize()
     registerShotClockHit(servingSide)
+    startStuckBallTimer()
     serveAttachment = null
     syncPrimaryBallState()
   }
@@ -1866,6 +1913,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     state.completedBitesSinceLastPoint = 0
     completedBitesSinceLastPoint = 0
     clearShotClock()
+    clearStuckBallTimer()
     pendingModVoteCount = 0
     nextModVoteExclude = null
     modVote = null
@@ -2208,16 +2256,30 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
       const minesweeperResult = minesweeperMod.resolveCollision(ball)
       if (minesweeperResult) {
         radius = ball.radius
+        if (ball.isReal) {
+          registerStuckBallTouch()
+          if (minesweeperResult.side) {
+            registerShotClockHit(minesweeperResult.side)
+          }
+        }
       }
 
-      const hitBarricade = spaceInvadersMod.resolveCollision(ball)
-      if (hitBarricade) {
+      const barricadeSide = spaceInvadersMod.resolveCollision(ball)
+      if (barricadeSide) {
         radius = ball.radius
+        if (ball.isReal) {
+          registerStuckBallTouch()
+          registerShotClockHit(barricadeSide)
+        }
       }
 
       const shieldSide = secondChancesMod.reflectBall(ball)
       if (shieldSide) {
         radius = ball.radius
+        if (ball.isReal) {
+          registerStuckBallTouch()
+          registerShotClockHit(shieldSide)
+        }
       }
 
       if (resolvePaddleCollisions(ball, paddles)) {
@@ -2268,6 +2330,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     }
 
     updateShotClock(dt)
+    updateStuckBallTimer(dt)
     updateBallTrails(dt)
   }
 
@@ -2631,6 +2694,48 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     syncShotClockState()
   }
 
+  function getStuckBallDuration(): number {
+    const duration = Number(config.stuckBallSeconds)
+    return Number.isFinite(duration) ? Math.max(0, duration) : 0
+  }
+
+  function isStuckBallTimerEnabled(): boolean {
+    return getStuckBallDuration() > 0
+  }
+
+  function syncStuckBallState() {
+    state.stuckBallRemaining = stuckBallRemaining
+    state.stuckBallActive = stuckBallActive
+  }
+
+  function clearStuckBallTimer() {
+    stuckBallRemaining = 0
+    stuckBallActive = false
+    syncStuckBallState()
+  }
+
+  function startStuckBallTimer() {
+    if (!isStuckBallTimerEnabled()) {
+      clearStuckBallTimer()
+      return
+    }
+
+    stuckBallRemaining = getStuckBallDuration()
+    stuckBallActive = true
+    syncStuckBallState()
+  }
+
+  function registerStuckBallTouch() {
+    if (!isStuckBallTimerEnabled()) {
+      clearStuckBallTimer()
+      return
+    }
+
+    stuckBallRemaining = getStuckBallDuration()
+    stuckBallActive = true
+    syncStuckBallState()
+  }
+
   function registerShotClockHit(side: 'left' | 'right') {
     if (!isShotClockEnabled()) {
       clearShotClock()
@@ -2686,11 +2791,52 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     syncShotClockState()
   }
 
-  function handleShotClockExpiration() {
+  function updateStuckBallTimer(dt: number) {
+    if (!stuckBallActive) {
+      syncStuckBallState()
+      return
+    }
+
+    if (!isStuckBallTimerEnabled()) {
+      clearStuckBallTimer()
+      return
+    }
+
+    const duration = getStuckBallDuration()
+    stuckBallRemaining = Math.min(stuckBallRemaining, duration)
+
+    if (
+      pendingServeToLeft !== null ||
+      !balls.some(ball => ball.isReal) ||
+      Boolean(modVote) ||
+      Boolean(state.winner) ||
+      state.paused
+    ) {
+      syncStuckBallState()
+      return
+    }
+
+    stuckBallRemaining = Math.max(0, stuckBallRemaining - dt)
+    if (stuckBallRemaining <= 0) {
+      handleStuckBallExpiration()
+      return
+    }
+
+    syncStuckBallState()
+  }
+
+  function handleRoundTimerExpiration(
+    reason: 'shotClock' | 'stuckBall',
+    message: string,
+  ) {
     const previousMod = activeModKey
     const feedbackContext = createRoundFeedbackContext(previousMod ?? null)
     const lastHitter = shotClockLastHitter
+
     clearShotClock()
+    clearStuckBallTimer()
+
+    queueAnnouncement([message], { blockServeCountdown: true })
 
     balls.length = 0
     resetBallSize()
@@ -2716,8 +2862,16 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     const serveToLeft =
       lastHitter === null ? Math.random() < 0.5 : lastHitter === 'right'
 
-    resetBall(serveToLeft, { reason: 'shotClock' })
+    resetBall(serveToLeft, { reason })
     syncPrimaryBallState()
+  }
+
+  function handleShotClockExpiration() {
+    handleRoundTimerExpiration('shotClock', 'Shot Clock Expired')
+  }
+
+  function handleStuckBallExpiration() {
+    handleRoundTimerExpiration('stuckBall', 'Stuck Ball')
   }
 
   function handlePaddleReturn(side: 'left' | 'right', ball: BallState) {
@@ -2730,6 +2884,7 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     handleHadronSplit(side, ball)
     if (ball.isReal) {
       registerShotClockHit(side)
+      registerStuckBallTouch()
     }
   }
 
@@ -4360,7 +4515,8 @@ function createNoopPerformanceTracker(): PerformanceTrackerLike {
     const opponent: 'left' | 'right' = lastHit === 'left' ? 'right' : 'left'
     const drinkMeModifier = config.modifiers.arena.drinkMe
     if (drinkMeModifier.enabled) {
-      const index = findPotionCollision(drinkMeMod.getObjects(), drinkMeModifier, ball)
+      const objects = drinkMeMod.getObjects()
+      const index = findPotionCollision(objects, drinkMeModifier, ball)
       if (index !== -1) {
         const shrinkAmount = getPotionShrinkAmount(drinkMeModifier)
         if (shrinkAmount > 0) {

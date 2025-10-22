@@ -30,6 +30,11 @@ export interface MinesweeperState {
 
 export type MinesweeperCollisionResult = 'mine' | 'safe'
 
+export interface MinesweeperCollisionDetails {
+  result: MinesweeperCollisionResult
+  cell: MinesweeperCell
+}
+
 const DEFAULT_ROWS = 5
 const DEFAULT_COLUMNS = 6
 const DEFAULT_SPACING = 68
@@ -93,7 +98,7 @@ export function resolveMinesweeperCollision(
   state: MinesweeperState,
   modifier: MinesweeperModifier,
   ball: BallLike,
-): MinesweeperCollisionResult | null {
+): MinesweeperCollisionDetails | null {
   if (!modifier.enabled) return null
 
   for (const cell of state.cells) {
@@ -104,11 +109,11 @@ export function resolveMinesweeperCollision(
     if (cell.isMine) {
       cell.state = 'triggered'
       applyBounce(ball, cell)
-      return 'mine'
+      return { result: 'mine', cell }
     }
 
     cell.state = 'cleared'
-    return 'safe'
+    return { result: 'safe', cell }
   }
 
   return null
@@ -263,12 +268,16 @@ interface MinesweeperModParams {
   getModifier(): MinesweeperModifier
   getArenaDimensions(): ArenaDimensions
   getContext(): CanvasRenderingContext2D
+  getAreSidesSwapped(): boolean
 }
 
 export interface MinesweeperMod extends ManagedMod {
   resetBoard(): void
   clearBoard(): void
-  resolveCollision(ball: BallLike): MinesweeperCollisionResult | null
+  resolveCollision(ball: BallLike): {
+    result: MinesweeperCollisionResult
+    side: 'left' | 'right' | null
+  } | null
 }
 
 export function createMinesweeperMod(params: MinesweeperModParams): MinesweeperMod {
@@ -319,7 +328,31 @@ export function createMinesweeperMod(params: MinesweeperModParams): MinesweeperM
       clearState()
     },
     resolveCollision(ball) {
-      return resolveMinesweeperCollision(state, getModifier(), ball)
+      const collision = resolveMinesweeperCollision(state, getModifier(), ball)
+      if (!collision) return null
+
+      const width = getDimensions().width
+      const swapSides = params.getAreSidesSwapped()
+      const centerX = collision.cell.x + collision.cell.size / 2
+      const arenaCenter = width / 2
+      const epsilon = 1e-6
+
+      let physicalSide: 'left' | 'right' | null = null
+      if (centerX < arenaCenter - epsilon) {
+        physicalSide = 'left'
+      } else if (centerX > arenaCenter + epsilon) {
+        physicalSide = 'right'
+      }
+
+      const side = physicalSide
+        ? swapSides
+          ? physicalSide === 'left'
+            ? 'right'
+            : 'left'
+          : physicalSide
+        : null
+
+      return { result: collision.result, side }
     },
   }
 }

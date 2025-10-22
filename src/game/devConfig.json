@@ -9,7 +9,8 @@
   "baseBallSpeed": 320,
   "minHorizontalRatio": 0.35,
   "speedIncreaseOnHit": 1.03,
-  "shotClockSeconds": 8,
+  "shotClockSeconds": 30,
+  "stuckBallSeconds": 15,
   "maxAiMisalignment": 55,
   "lockMods": false,
   "doubles": {

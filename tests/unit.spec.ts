@@ -4,6 +4,7 @@
 
 import { createPong } from '../src/game/pong'
 import devConfig from '../src/game/devConfig.json'
+import { createDevConfig } from '../src/game/devtools'
 import { describe, it, expect, vi } from 'vitest'
 
 describe('Pong core', () => {
@@ -177,6 +178,8 @@ describe('Pong core', () => {
     vi.spyOn(canvas, 'getContext').mockReturnValue(ctx)
 
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.25)
+    const originalShotClock = devConfig.shotClockSeconds
+    devConfig.shotClockSeconds = 8
     try {
       const game = createPong(canvas, {
         autoStart: false,
@@ -214,12 +217,16 @@ describe('Pong core', () => {
     vi.spyOn(canvas, 'getContext').mockReturnValue(ctx)
 
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.25)
+    const originalShotClock = devConfig.shotClockSeconds
+    devConfig.shotClockSeconds = 8
     try {
       const game = createPong(canvas, {
         autoStart: false,
         serveCountdownDuration: 0,
         modRevealDelay: 0,
       })
+
+      expect(game.config.shotClockSeconds).toBe(8)
 
       const dt = 0.016
       const paddleWidth = 12
@@ -282,6 +289,7 @@ describe('Pong core', () => {
       game.tick(dt)
       expect(game.state.shotClockRemaining).toBeGreaterThan(beforeReset)
     } finally {
+      devConfig.shotClockSeconds = originalShotClock
       randomSpy.mockRestore()
     }
   })
@@ -388,6 +396,8 @@ describe('Pong core', () => {
     vi.spyOn(canvas, 'getContext').mockReturnValue(ctx)
 
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.25)
+    const originalShotClock = devConfig.shotClockSeconds
+    devConfig.shotClockSeconds = 8
     try {
       const game = createPong(canvas, {
         autoStart: false,
@@ -459,6 +469,7 @@ describe('Pong core', () => {
       expect(game.state.rightScore).toBe(0)
       expect(game.state.balls.length).toBe(0)
     } finally {
+      devConfig.shotClockSeconds = originalShotClock
       randomSpy.mockRestore()
     }
   })

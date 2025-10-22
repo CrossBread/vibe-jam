@@ -102,8 +102,8 @@ export function resolveSpaceInvadersCollision(
   state: SpaceInvadersState,
   modifier: SpaceInvadersModifier,
   ball: BallLike,
-): boolean {
-  if (!modifier.enabled) return false
+): BarricadeSide | null {
+  if (!modifier.enabled) return null
 
   const sides: BarricadeSide[] = ['left', 'right']
   for (const side of sides) {
@@ -117,11 +117,11 @@ export function resolveSpaceInvadersCollision(
       if (barricade.hitsRemaining <= 0) {
         barricades.splice(i, 1)
       }
-      return true
+      return side
     }
   }
 
-  return false
+  return null
 }
 
 function rebuildBarricades(
@@ -311,7 +311,7 @@ interface SpaceInvadersModParams {
 export interface SpaceInvadersMod extends ManagedMod {
   resetBarricades(): void
   clearBarricades(): void
-  resolveCollision(ball: BallLike): boolean
+  resolveCollision(ball: BallLike): BarricadeSide | null
 }
 
 export function createSpaceInvadersMod(params: SpaceInvadersModParams): SpaceInvadersMod {
